@@ -1607,9 +1607,11 @@
                   }
                 }
 
-                // Начисляем деньги только если reward > 0 и ещё не платили за этот цикл
+                // Начисляем деньги только если reward > 0 и ещё не платили за этот цикл.
+                // Условие cycleId > 0 убрано: деньги начисляются за каждую звезду/полузвезду,
+                // независимо от номера цикла. Защита от дублей — только paidCycleId !== cycleId.
                 let moneyToAdd = 0;
-                if (reward > 0 && cycleId > 0 && paidCycleId !== cycleId) {
+                if (reward > 0 && paidCycleId !== cycleId) {
                   try {
                     st.money_count = (Number(st.money_count) || 0) + reward;
                     st.money_earned = (Number(st.money_earned) || 0) + reward;

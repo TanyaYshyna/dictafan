@@ -229,7 +229,10 @@
       if (type === 'audio') existing.audio_count += n;
       if (type === 'activity') existing.activity_count += n;
 
-      existing.money_count = (Number(existing.money_count) || 0) + (Number(moneyCount) || 0);
+      // Деньги пишем в money_earned — именно это поле _flushOutbox() отправляет на сервер
+      // как money_earned (delta), и сервер сохраняет его в money_dt_delta.
+      // Поле money_count не используется для отправки на сервер.
+      existing.money_earned = (Number(existing.money_earned) || 0) + (Number(moneyCount) || 0);
       existing.mistake_count = (Number(existing.mistake_count) || 0) + (Number(mistakeCount) || 0);
       existing.monenumber_of_characters = (Number(existing.monenumber_of_characters) || 0) + (Number(numberOfCharacters) || 0);
       existing.lead_time_ms_total = (Number(existing.lead_time_ms_total) || 0) + (Number(leadTimeMs) || 0);
