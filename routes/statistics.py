@@ -2134,7 +2134,12 @@ def save_success():
         error_words = data.get('error_words')
         completed_at_ms = data.get('completed_at_ms')
         completed_at_tz_offset_min = data.get('completed_at_tz_offset_min')
-        completion_count = data.get('completion_count') or data.get('completion_count_after')
+        # completion_count может быть 0 — это означает "не завершение диктанта, просто активность".
+        # Используем явную проверку на None, чтобы 0 не превращался в None через "or".
+        raw_cc = data.get('completion_count')
+        if raw_cc is None:
+            raw_cc = data.get('completion_count_after')
+        completion_count = int(raw_cc) if raw_cc is not None else None
         selected_sentence_positions_raw = data.get('selected_sentence_positions')
         # Нормализуем positions для INTEGER[]
         try:

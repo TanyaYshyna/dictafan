@@ -248,7 +248,10 @@
       console.log(TAG, '[enqueueActivity] запись в IDB:', { key, audio_count: existing.audio_count, money_count: existing.money_count, successes: existing.successes, success_number: existing.success_number });
       await window.IdbManager.idbPut('outbox', existing);
 
-      // Если это завершение диктанта — проверяем рекорд и принудительно отправляем всё
+      // Если это завершение диктанта — проверяем рекорд.
+      // Отправка на сервер (flushAll) будет вызвана ПОСЛЕ того, как
+      // showCompletionModal увеличит session.completionCount,
+      // чтобы флаг (Number(session.completionCount) || 0) === 0 сработал корректно.
       if (compCount > 0) {
         try {
           await _checkAndSaveRecord({
@@ -260,11 +263,8 @@
         } catch (eRec) {
           console.warn(TAG, '[enqueueActivity] ошибка проверки рекорда:', eRec);
         }
-        // Принудительная отправка при завершении диктанта
-        try { await flushAll(); } catch (eFlush) { console.warn(TAG, '[enqueueActivity] ошибка flushAll:', eFlush); }
-      } else {
-        _scheduleFlush();
       }
+      _scheduleFlush();
 
       return true;
     } catch (e) {
