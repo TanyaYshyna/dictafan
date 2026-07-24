@@ -109,6 +109,25 @@
   margin: 3px 0;
 }
 
+/* Основная группа кнопок — занимает всё доступное место */
+.tool-palette.tool-palette--desk .tool-palette-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+/* Админ-секция — прижата к низу панели */
+.tool-palette.tool-palette--desk .tool-palette-admin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
 .tool-palette-separator {
   width: 100%;
   height: 1px;

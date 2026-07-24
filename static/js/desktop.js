@@ -605,6 +605,18 @@ window.Desktop = window.Desktop || {
     }
   },
 
+  toggleAdminSection() {
+    try {
+      const adminSection = document.getElementById('desktopToolPaletteAdmin');
+      if (!adminSection) return;
+      // TODO: когда появится роль администратора — заменить условие ниже на проверку роли
+      // const isAdmin = window.UM && window.UM.userData && String(window.UM.userData.role || '').toLowerCase() === 'admin';
+      const isAdmin = false; // пока скрыто для всех
+      adminSection.style.display = isAdmin ? '' : 'none';
+    } catch (e) {
+    }
+  },
+
   initAdminMenu() {
     const toggle = document.getElementById('desktopAdminMenuToggle');
     const dropdown = document.getElementById('desktopAdminMenuDropdown');
@@ -973,6 +985,7 @@ window.Desktop = window.Desktop || {
       } catch (e) {
       }
       this.loadDeskItems().catch(() => { });
+      this.toggleAdminSection();
     });
   },
 
@@ -1004,6 +1017,7 @@ window.Desktop = window.Desktop || {
     this.initStatsPanel();
     this.ensureDictationKartDeps();
     this.renderLucide(document.body);
+    this.toggleAdminSection();
 
     // Предзагружаем таблицы чисел для языков пользователя
     this._preloadNumberTables();

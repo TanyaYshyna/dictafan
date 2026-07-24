@@ -1304,12 +1304,10 @@
       window.checkText = async () => {
         try {
           if (!dictationModalState.dictationStarted) {
-            console.log('[DM:checkText] dictationModalState.dictationStarted=false → выход');
             return;
           }
         } catch (e0) {
         }
-        console.log('[DM:checkText] ВХОД, dictationStarted=true');
 
         // В режимах p3 и p4 проверка текста не используется
         try {
@@ -1323,7 +1321,6 @@
 
         const view = getCurrentSentenceViewFromSession(session);
         if (!view) return;
-        console.log('[DM:checkText] view.key=' + (view ? view.key : 'null') + ' view.number_of_perfect=' + (view.number_of_perfect) + ' view.number_of_corrected=' + (view.number_of_corrected) + ' view._textAllCorrect=' + (view._textAllCorrect));
 
         // Если текст уже засчитан как правильный (allCorrect), не даём
         // повторно запускать проверку — это предотвращает дублирование
@@ -1431,13 +1428,6 @@
           requiredPassedStarHalf,
           totalMistakeCount,
         });
-        console.log('[DM:checkText] checker.analyze() вернул:', JSON.stringify({
-          allCorrect: res?.allCorrect,
-          okToCheck: res?.okToCheck,
-          starOutcome: res?.starOutcome,
-          nextPerfect: res?.nextPerfect,
-          nextCorrected: res?.nextCorrected,
-        }), 'textAttemptCount=' + textAttemptCount + ' totalMistakeCount=' + totalMistakeCount + ' view.key=' + (view ? view.key : 'null'));
 
         try {
           const notice = document.getElementById('userInputNotice');
@@ -1593,7 +1583,6 @@
                 let reward = 0;
                 const perfectNow = Number(st && st.number_of_perfect) || 0;
                 const correctedNow = Number(st && st.number_of_corrected) || 0;
-                console.log('[DM:checkText] РАСЧЁТ НАГРАДЫ: perfectNow=' + perfectNow + ' correctedNow=' + correctedNow + ' cycleId=' + (Number(dictationModalState.rewardCycleId) || 0) + ' paidCycleId=' + (Number(st && st._paidTextRewardCycleId) || 0) + ' key=' + key + ' res.allCorrect=' + (res && res.allCorrect) + ' res.starOutcome=' + (res && res.starOutcome) + ' st.money_count=' + (st ? st.money_count : 'null') + ' st.money_earned=' + (st ? st.money_earned : 'null'));
                 if (perfectNow >= 1) {
                   reward = getPricingValue('star_reward', 3);
                 } else if (correctedNow > 0) {
@@ -2758,7 +2747,6 @@
     try {
       const checkBtn = document.getElementById('checkBtn');
       if (!checkBtn) return;
-      console.log('[DM:setCheckButtonState] mode=' + mode);
 
       checkBtn.classList.value = '';
       if (mode === 'ready') {
@@ -5229,11 +5217,9 @@
       input.addEventListener('keydown', (e) => {
         try {
           if (!dictationModalState.isOpen) {
-            console.log('[DM:bindEnterToCheck] dictationModalState.isOpen=false → выход');
             return;
           }
           if (!dictationModalState.dictationStarted) {
-            console.log('[DM:bindEnterToCheck] dictationModalState.dictationStarted=false → выход');
             return;
           }
           if (!e) return;
@@ -5242,7 +5228,6 @@
           // В режимах p3 и p4 Enter не запускает проверку текста
           const mode = getExerciseMode();
           if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') return;
-          console.log('[DM:bindEnterToCheck] Enter нажат, вызываем checkText()');
           e.preventDefault();
           e.stopPropagation();
           if (typeof window.checkText === 'function') window.checkText();
