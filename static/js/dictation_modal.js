@@ -1607,6 +1607,8 @@
                   }
                 }
 
+                // Начисляем деньги только если reward > 0 и ещё не платили за этот цикл
+                let moneyToAdd = 0;
                 if (reward > 0 && cycleId > 0 && paidCycleId !== cycleId) {
                   try {
                     st.money_count = (Number(st.money_count) || 0) + reward;
@@ -1614,39 +1616,42 @@
                   } catch (e0ac1) {
                   }
                   st._paidTextRewardCycleId = cycleId;
+                  moneyToAdd = reward;
                   try {
                     playUiSound('coins_plus_audio');
                   } catch (e0sa) {
                   }
+                }
 
-                  const typeActivity = perfectNow >= 1 ? 'perfect' : (correctedNow > 0 ? 'corrected' : 'activity');
-                  if (typeActivity) {
-                    // Дельта: символы за эту попытку
-                    const charsThisAttempt = _ensureExpectedCharsLen(session);
-                    // Дельта: ошибки за эту попытку (mistake_count_current сбрасывается при resetSentenceUiFromSession)
-                    const mistakesThisAttempt = Number(st && st.mistake_count_current) || 0;
+                // handleActivity вызывается ВСЕГДА при allCorrect, независимо от награды.
+                // Каждое действие (звезда/полузвезда) должно отправляться в outbox.
+                const typeActivity = perfectNow >= 1 ? 'perfect' : (correctedNow > 0 ? 'corrected' : 'activity');
+                if (typeActivity) {
+                  // Дельта: символы за эту попытку
+                  const charsThisAttempt = _ensureExpectedCharsLen(session);
+                  // Дельта: ошибки за эту попытку (mistake_count_current сбрасывается при resetSentenceUiFromSession)
+                  const mistakesThisAttempt = Number(st && st.mistake_count_current) || 0;
 
-                    // Проверяем, будет ли это действие последним (завершает ли диктант).
-                    // Если после этого действия все предложения будут завершены — передаём
-                    // completionCount=1 и successNumber (текущий номер успеха).
-                    // success — это не отдельное движение, а флаг на последнем activity.
-                    let compCount = 0;
-                    let succNumber = 0;
-                    try {
-                      // success отправляется только один раз.
-                      // Если session.completionCount уже > 0 — значит success уже был отправлен,
-                      // и повторные доработки (полузвезды → звезды) не должны увеличивать successes.
-                      if (_isDictationFullyCompleted(session) && (Number(session.completionCount) || 0) === 0) {
-                        const nextCompletionCount = (Number(session.completionCount) || 0) + 1;
-                        compCount = 1;
-                        succNumber = nextCompletionCount;
-                        console.log('[DM:checkText] последнее действие, передаём completionCount=1 successNumber=' + succNumber);
-                      }
-                    } catch (eCompDetect) {
+                  // Проверяем, будет ли это действие последним (завершает ли диктант).
+                  // Если после этого действия все предложения будут завершены — передаём
+                  // completionCount=1 и successNumber (текущий номер успеха).
+                  // success — это не отдельное движение, а флаг на последнем activity.
+                  let compCount = 0;
+                  let succNumber = 0;
+                  try {
+                    // success отправляется только один раз.
+                    // Если session.completionCount уже > 0 — значит success уже был отправлен,
+                    // и повторные доработки (полузвезды → звезды) не должны увеличивать successes.
+                    if (_isDictationFullyCompleted(session) && (Number(session.completionCount) || 0) === 0) {
+                      const nextCompletionCount = (Number(session.completionCount) || 0) + 1;
+                      compCount = 1;
+                      succNumber = nextCompletionCount;
+                      console.log('[DM:checkText] последнее действие, передаём completionCount=1 successNumber=' + succNumber);
                     }
-
-                    await handleActivity(typeActivity, st, key, session, reward, mistakesThisAttempt, charsThisAttempt, compCount, succNumber);
+                  } catch (eCompDetect) {
                   }
+
+                  await handleActivity(typeActivity, st, key, session, moneyToAdd, mistakesThisAttempt, charsThisAttempt, compCount, succNumber);
                 }
 
                 if (nextOutcome && nextOutcome !== prevOutcome) {
@@ -3399,6 +3404,24 @@
     try {
       updateTaskProgressFromSession(session);
     } catch (eTask) {
+    }
+
+    // Если это действие завершает диктант (completionCount > 0) —
+    // принудительно отправляем все накопленные данные на сервер.
+    // Важно: flushAll вызывается ПОСЛЕ updateTaskProgressFromSession,
+    // чтобы showCompletionModal (вызванная из updateTaskProgressFromSession)
+    // успела увеличить session.completionCount.
+    // Это гарантирует, что флаг (Number(session.completionCount) || 0) === 0
+    // сработает корректно при повторных доработках.
+    if (Number(completionCount) > 0) {
+      try {
+        const ob = window.OutboxBatcher;
+        if (ob && typeof ob.flushAll === 'function') {
+          await ob.flushAll();
+        }
+      } catch (eFlush) {
+        console.warn('[DM:handleActivity] ошибка flushAll:', eFlush);
+      }
     }
 
     // Обновляем видимость кнопки "Далее" только для текстовых активностей.
