@@ -1345,60 +1345,36 @@ Many-to-many: ученик может быть в нескольких груп�
 
 **Как данные попадают в `history_by_day` (цепочка):**
 
-Данные попадают в таблицу через два серверных endpoint'а, которые вызываются клиентом:
+Все данные (звёзды, полузвёзды, аудио, success) отправляются через **единый endpoint** `POST /api/statistics/success` и **единую очередь** в IndexedDB с одним hbd-ключом.
 
-### Endpoint A: `POST /api/statistics/activity` (активность)
+### Единый endpoint: `POST /api/statistics/success`
 
-Назначение: сохранить факт получения звезды/полузвезды/микрофона + сопутствующие данные (ошибки, символы, деньги).
+Назначение: сохранить все данные диктанта — активность (звёзды, полузвёзды, микрофоны) и успешное завершение.
 
 **Клиент → Сервер:**
-- Клиент вызывает `OutboxBatcher.enqueueActivity({ type, count, leadTimeMs, dictationId, date, dictationLanguageCode, selectedSentencePositions, mistakeCount, numberOfCharacters, moneyCount })`
-- `OutboxBatcher` накапливает данные в IndexedDB (единая таблица `outbox`, ключ: `act:${userId}:${dateId}:${dictationId}:${selPosStr}`) и отправляет батчем по таймеру `BATCH_INTERVAL_MS`
-- `fetch POST /api/statistics/activity` с payload:
+- Клиент вызывает `OutboxBatcher.enqueueActivity()` при каждом действии (звезда, полузвезда, аудио)
+- `OutboxBatcher` накапливает данные в IndexedDB (store `outbox`, ключ: `hbd:${userId}:${dictationId}:${positions}:${datePlan}:${dateFact}:${dateStart}`)
+- При каждом вызове `enqueueActivity()` данные **мержатся** (суммируются дельты) в существующую запись по тому же ключу
+- Отправляется `fetch POST /api/statistics/success` с payload:
   ```json
   {
     "dictation_id": 123,
-    "date": "20260614",
+    "date": "2026-07-24",
+    "date_start": "2026-07-24T10:22:48",
+    "date_plan": "2026-07-24",
     "perfect_count": 1,
     "corrected_count": 0,
     "audio_count": 0,
-    "money_count": 3,
+    "money_earned": 3,
     "mistake_count": 2,
     "monenumber_of_characters": 58,
     "lead_time_ms": 45000,
+    "attempts_total": 0,
+    "completion_count": 0,
+    "success_number": 0,
     "dictation_language_code": "en",
-    "selected_sentence_positions": null
-  }
-  ```
-
-**Сервер (`routes/statistics.py`):**
-- `POST /api/statistics/activity` → функция `save_activity()`
-- Вызывает `add_activity_bulk()` из `helpers/db_history.py`
-- `add_activity_bulk()`:
-  1. Начисляет деньги: `INSERT INTO user_money_ledger (user_id, dt, ...)` за каждое действие
-  2. Вызывает `_upsert_history_by_day()` — UPSERT в `history_by_day` со всеми счётчиками, включая `activity_count_delta`, `money_dt_delta`, `mistake_delta`, `monenumber_of_characters_delta`, `perfect_count`, `corrected_count`, `audio_count`, `lead_time`
-
-### Endpoint B: `POST /api/statistics/success` (завершение диктанта)
-
-Назначение: сохранить факт полного завершения диктанта (медаль).
-
-**Клиент → Сервер:**
-- Клиент вызывает `OutboxBatcher.enqueueSuccess(payload)` при завершении диктанта
-- Отправляется в той же очереди (тип `success`):
-  ```json
-  {
-    "dictation_id": 123,
-    "perfect_count": 10,
-    "corrected_count": 2,
-    "audio_count": 8,
-    "attempts_total": 20,
-    "mistake_count": 3,
-    "monenumber_of_characters": 1493,
-    "time_ms": 300000,
-    "dictation_language_code": "en",
-    "sentences_data": [...],
-    "completed_at_ms": 1718389987000,
-    "completed_at_tz_offset_min": 180
+    "selected_sentence_positions": null,
+    "source_group_id": null
   }
   ```
 
@@ -1406,14 +1382,14 @@ Many-to-many: ученик может быть в нескольких груп�
 - `POST /api/statistics/success` → функция `save_success()`
 - Вызывает `add_success()` из `helpers/db_history.py`
 - `add_success()`:
-  1. Вызывает `_upsert_history_by_day()` с `successes_delta=1`, `mistake_delta`, `monenumber_of_characters_delta`, `lead_time_delta`
-  2. **НЕ обновляет** `perfect_count`, `corrected_count`, `audio_count`, `activity_count`, `money_dt_count` — эти поля уже обновлены в `add_activity_bulk()` во время диктанта
+  1. Начисляет деньги: `INSERT INTO user_money_ledger (user_id, dt, ...)` за каждое действие
+  2. Вызывает `_upsert_history_by_day()` — UPSERT в `history_by_day` со всеми дельтами
 
 ### Внутренняя функция `_upsert_history_by_day()`
 
 Находится в `helpers/db_history.py`. Это UPSERT:
 ```sql
-INSERT INTO history_by_day (user_id, teacher_id, dictation_language_code, dictation_id, positions, date_plan, date_fact, date_start, perfect_count, corrected_count, audio_count, lead_time, mistake_count, monenumber_of_characters, successes, activity_count, money_dt_count, money_kt_count, ...)
+INSERT INTO history_by_day (user_id, teacher_id, dictation_language_code, dictation_id, positions, date_plan, date_fact, date_start, perfect_count, corrected_count, audio_count, lead_time, mistake_count, monenumber_of_characters, successes, activity_count, money_dt_count, ...)
 VALUES (...)
 ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
 DO UPDATE SET
@@ -1426,21 +1402,42 @@ DO UPDATE SET
     successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
     activity_count = COALESCE(history_by_day.activity_count, 0) + EXCLUDED.activity_count,
     money_dt_count = COALESCE(history_by_day.money_dt_count, 0) + EXCLUDED.money_dt_count,
-    money_kt_count = COALESCE(history_by_day.money_kt_count, 0) + EXCLUDED.money_kt_count,
     ...
 ```
+Если `successes_delta != 0`, дополнительно вызывается `_recalc_number_successes()` — пересчитывает `number_successes` (порядковый номер успеха) во всех строках `history_by_day` для данного `(user_id, dictation_id, positions)`.
 
 ### Клиентский модуль `OutboxBatcher` (`static/js/outbox_batcher.js`)
 
 **Единая очередь в IndexedDB (store `outbox`):**
-- Записи типа `activity` (ключ: `act:${userId}:${dateId}:${dictationId}:${selPosStr}`)
-- Записи типа `success` (ключ: `${userId}:${rawId}:${dateId}`)
-- Activity-записи накапливаются (мержатся при повторном вызове): суммируются `perfect_count`, `corrected_count`, `audio_count`, `money_count`, `mistake_count`, `monenumber_of_characters`, `lead_time_ms_total`
+- Единственный тип записей с ключом `hbd:${userId}:${dictationId}:${positions}:${datePlan}:${dateFact}:${dateStart}`
+- Ключ соответствует уникальному ключу `history_by_day` (см. выше)
+- Записи накапливаются (мержатся при повторном вызове `enqueueActivity()`): суммируются все дельты
+
+**Структура записи в IndexedDB:**
+```javascript
+{
+  key: "hbd:1:70:[]:2026-07-24:2026-07-24:2026-07-24T10:22:48",
+  payload: {
+    userId, dictationId, positions, datePlan, dateFact, dateStart,
+    dictationLanguageCode, sourceGroupId,
+    perfect_count, corrected_count, audio_count,
+    money_earned, mistake_count, monenumber_of_characters,
+    lead_time_ms_total, attempts_total,
+    successes, success_number,
+    // synced_* — дельта-трекинг (что уже отправлено на сервер)
+    synced_perfect_count, synced_corrected_count, synced_audio_count,
+    synced_money_earned, synced_mistake_count, synced_monenumber_of_characters,
+    synced_lead_time_ms_total, synced_attempts_total, synced_successes
+  }
+}
+```
+
+**Дельта-трекинг:** Поля `synced_*` хранят последнее отправленное значение. При `_flushOutbox()` вычисляется разница между текущим значением и synced — это дельта, которая отправляется на сервер. После успешной отправки synced обновляется.
 
 **Режим отправки:**
-- Единый таймер `BATCH_INTERVAL_MS` (по умолчанию 600000 мс = 10 минут)
-- При срабатывании таймера отправляются **все** накопленные записи (и activity, и success)
-- После успешной отправки запись удаляется из IndexedDB
+- Единый таймер `BATCH_INTERVAL_MS` (по умолчанию 300000 мс = 5 минут для отладки, 1800000 = 30 минут в проде)
+- При срабатывании таймера отправляются **все** накопленные записи
+- После успешной отправки synced-поля обновляются, запись НЕ удаляется (остаётся для последующих дельт)
 
 **Триггеры отправки:**
 - Таймер (каждые `BATCH_INTERVAL_MS`)
@@ -1448,12 +1445,35 @@ DO UPDATE SET
 - Явный вызов `OutboxBatcher.flushAll()` (при завершении диктанта)
 - Сигнал от Service Worker (`syncOutbox`)
 
-**Константы (для отладки):**
-- `BATCH_INTERVAL_MS = 600000` (10 минут; для отладки можно поставить 30000 = 30 секунд)
-- `MAX_BATCH_SIZE` — не используется (отправляем всё скопом)
-
 **Отображение в UI:**
 - Статус-бар (`sw_status_bar.js`) показывает `queue: N (M:M:S)` где N — количество записей в IndexedDB, а M:M:S — время до следующей отправки
+
+### Поток данных: от действия пользователя до БД
+
+1. **Пользователь нажимает Enter** (проверка текста) или **записывает аудио**
+2. **`dictation_modal.js`** → `checkText()` или `onRecognitionComplete`:
+   - Вычисляет награду (монеты) через `getPricingValue()`
+   - Определяет `typeActivity`: `'perfect'` (звезда), `'corrected'` (полузвезда), `'audio'` (микрофон)
+   - Проверяет, завершён ли диктант полностью через `_isDictationFullyCompleted(session)`
+   - Если да — устанавливает `compCount=1` и `succNumber = completionCount + 1`
+   - Вызывает `handleActivity(type, st, key, session, moneyCount, mistakeCount, charsCount, compCount, succNumber)`
+3. **`handleActivity()`** → вызывает `ob.enqueueActivity({...})`
+4. **`OutboxBatcher.enqueueActivity()`**:
+   - Строит hbd-ключ
+   - Читает существующую запись из IndexedDB (или создаёт новую)
+   - Суммирует дельты: `perfect_count += 1`, `money_earned += reward`, `mistake_count += mistakes`, и т.д.
+   - Если `compCount > 0`: `successes += compCount`, `success_number = succNumber`
+   - Сохраняет запись в IndexedDB
+   - Если `compCount > 0`: вызывает `flushAll()` для немедленной отправки
+5. **`OutboxBatcher._flushOutbox()`**:
+   - Читает все записи из IndexedDB
+   - Для каждой вычисляет дельты: `perfectDelta = current - synced`
+   - Отправляет `fetch POST /api/statistics/success` с дельтами
+   - После успеха обновляет synced-поля в IndexedDB
+6. **Сервер `save_success()`** → `add_success()`:
+   - Начисляет деньги в `user_money_ledger`
+   - Вызывает `_upsert_history_by_day()` с дельтами
+   - Если `successes_delta > 0`: вызывает `_recalc_number_successes()` и `_update_history_current_successes_only()`
 
 ### Деньги: `user_money_ledger` и баланс
 
