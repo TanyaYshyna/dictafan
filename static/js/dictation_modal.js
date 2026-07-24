@@ -1644,7 +1644,10 @@
                     // success отправляется только один раз.
                     // Если session.completionCount уже > 0 — значит success уже был отправлен,
                     // и повторные доработки (полузвезды → звезды) не должны увеличивать successes.
-                    if (_isDictationFullyCompleted(session) && (Number(session.completionCount) || 0) === 0) {
+                    const _isFullyComp = _isDictationFullyCompleted(session);
+                    const _curCompCount = Number(session.completionCount) || 0;
+                    console.log('[DM] 🎯 completion check: isFullyCompleted=' + _isFullyComp + ' completionCount=' + _curCompCount + ' key=' + key);
+                    if (_isFullyComp && _curCompCount === 0) {
                       compCount = 1;
                       succNumber = (Number(session.completionCount) || 0) + 1;
                       console.log('[DM] ✅ success: text completionCount=1');
@@ -3758,7 +3761,10 @@
                 // success отправляется только один раз.
                 // Если session.completionCount уже > 0 — значит success уже был отправлен,
                 // и повторные доработки не должны увеличивать successes.
-                if (_isDictationFullyCompleted(session) && (Number(session.completionCount) || 0) === 0) {
+                const _isFullyCompAudio = _isDictationFullyCompleted(session);
+                const _curCompCountAudio = Number(session.completionCount) || 0;
+                console.log('[DM:audio] 🎯 completion check: isFullyCompleted=' + _isFullyCompAudio + ' completionCount=' + _curCompCountAudio + ' key=' + _key);
+                if (_isFullyCompAudio && _curCompCountAudio === 0) {
                   const nextCompletionCount = (Number(session.completionCount) || 0) + 1;
                   audioCompCount = 1;
                   audioSuccNumber = nextCompletionCount;
