@@ -203,7 +203,6 @@
           return this._startRecordingOnly();
         }
 
-        try { console.log('[UnifiedSpeechRecognition] startRecording ВЫЗВАН, mode=' + this.state.mode + ', language=' + this.state.language); } catch (e) {}
         this._audioChunks = [];
         this._audioBlob = null;
         this._finalText = '';
@@ -213,13 +212,10 @@
 
         var am = window.AudioManager;
         if (!am || typeof am.startUserRecording !== 'function') {
-          try { console.log('[UnifiedSpeechRecognition] AudioManager not loaded'); } catch (e) {}
           throw new Error('AudioManager_not_loaded');
         }
         var mimeType = this._getSupportedMimeType();
-        try { console.log('[UnifiedSpeechRecognition] AudioManager.startUserRecording...'); } catch (e) {}
         var started = await am.startUserRecording({ mimeType: mimeType });
-        try { console.log('[UnifiedSpeechRecognition] AudioManager вернул:', started ? 'ok' : 'null'); } catch (e) {}
         this._mediaStream = started && started.stream ? started.stream : null;
         this._mediaRecorder = started && started.recorder ? started.recorder : null;
 
@@ -235,7 +231,6 @@
         this._recordingTimer = setTimeout(function () {
           try {
             if (self.state.isRecording && mySessionId === self._sessionId) {
-              try { console.log('[UnifiedSpeechRecognition] Автостоп: запись длилась более 30с'); } catch (e) {}
               self.stopRecording('max_duration');
             }
           } catch (e) {
@@ -250,7 +245,6 @@
             setTimeout(function () {
               try {
                 if ((self.state.mode === 'online' || self.state.mode === 'route') && self.state.isRecording) {
-                  try { console.log('[UnifiedSpeechRecognition] startRecording: вызываем _initWebSpeech, язык =', self.state.language); } catch (e) {}
                   self._initWebSpeech();
                 }
               } catch (e) {
@@ -273,7 +267,6 @@
               // Don't await — load in background, stopRecording() will await if needed.
               this._whisperLoadPromise = mm.loadLanguageModel('en', modelSize);
               this._whisperLoadPromise.then(function () {
-                try { console.log('[UnifiedSpeechRecognition] Whisper model loaded'); } catch (e) {}
               }).catch(function (err) {
                 try { console.error('[UnifiedSpeechRecognition] Whisper load error:', err); } catch (e) {}
               });
@@ -425,9 +418,7 @@
               var modelKey = mm._getModelKey('en', modelSize);
               var storedModel = window.WhisperModels && window.WhisperModels.get ? window.WhisperModels.get(modelKey) : null;
               if (!storedModel || !storedModel.recognizer) {
-                try { console.log('[UnifiedSpeechRecognition] Whisper model not in memory, loading ' + modelSize + '...'); } catch (e) {}
                 await mm.loadLanguageModel('en', modelSize);
-                try { console.log('[UnifiedSpeechRecognition] Whisper model loaded'); } catch (e) {}
               }
               var result = await mm.transcribe(this._audioBlob, langCode, modelSize);
               var transcribed = result && result.text ? String(result.text).trim() : '';
@@ -587,7 +578,6 @@
       };
 
       try {
-        try { console.log('[UnifiedSpeechRecognition] _initWebSpeech: rec.start() с языком', rec.lang); } catch (e) {}
         rec.start();
       } catch (e) {
         try { console.log('[UnifiedSpeechRecognition] _initWebSpeech: rec.start() ошибка:', e); } catch (e2) {}
