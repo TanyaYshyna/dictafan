@@ -1,4 +1,10 @@
 window.Desktop = window.Desktop || {
+  /** Активный язык для фильтрации стола */
+  _activeLanguage: null,
+
+  /** Экземпляр LanguageSelector для левой панели */
+  _langSelector: null,
+
   ensureDictationKartDeps() {
     try {
       if (typeof window.escapeHtml !== 'function') {
@@ -610,9 +616,9 @@ window.Desktop = window.Desktop || {
       const adminSection = document.getElementById('desktopToolPaletteAdmin');
       if (!adminSection) return;
       // TODO: когда появится роль администратора — заменить условие ниже на проверку роли
-      // const isAdmin = window.UM && window.UM.userData && String(window.UM.userData.role || '').toLowerCase() === 'admin';
-      const isAdmin = false; // пока скрыто для всех
-      adminSection.style.display = isAdmin ? '' : 'none';
+      // const isVisible = window.UM && window.UM.userData && String(window.UM.userData.role || '').toLowerCase() === 'admin';
+      const isVisible = true; // пока видно всем
+      adminSection.style.display = isVisible ? '' : 'none';
     } catch (e) {
     }
   },
@@ -672,6 +678,168 @@ window.Desktop = window.Desktop || {
         this.stubAction(action);
       });
     });
+  },
+
+  /**
+   * Инициализирует селектор языка на левой панели.
+   * Собирает список языков: изучаемые языки пользователя + языки с рабочего стола.
+   * Кеширует расширенный список в IDB для офлайн-доступа.
+   */
+  async initLangSelector() {
+    const container = document.getElementById('desktopLangSelector');
+    if (!container) return;
+
+    try {
+      if (!window.LanguageManager || !window.LanguageManager.getLanguageData) return;
+    } catch (e) {
+      return;
+    }
+
+    const languageData = window.LanguageManager.getLanguageData();
+    if (!languageData) return;
+
+    // 1. База — изучаемые языки пользователя
+    let availableLangs = [];
+    try {
+      if (window.UM && window.UM.userData && Array.isArray(window.UM.userData.learning_languages)) {
+        availableLangs = window.UM.userData.learning_languages.filter(Boolean);
+      }
+    } catch (e) {
+    }
+
+    // 2. Пытаемся загрузить кешированный расширенный список
+    let cachedLangs = null;
+    try {
+      if (typeof window.idbGet === 'function') {
+        const cached = await window.idbGet('desk_items', 'desk_lang_list');
+        if (cached && Array.isArray(cached.languages) && cached.languages.length) {
+          cachedLangs = cached.languages;
+        }
+      }
+    } catch (e) {
+    }
+
+    // 3. Если есть кеш — дополняем изучаемые языки языками из кеша
+    if (cachedLangs) {
+      const merged = new Set(availableLangs);
+      cachedLangs.forEach(function (lc) { if (lc) merged.add(lc); });
+      availableLangs = Array.from(merged);
+    }
+
+    // Если список пуст — показываем хотя бы currentLearning
+    if (availableLangs.length === 0) {
+      try {
+        if (window.UM && window.UM.userData && window.UM.userData.current_learning) {
+          availableLangs = [window.UM.userData.current_learning];
+        }
+      } catch (e) {
+      }
+    }
+
+    const currentLearning = (function () {
+      try {
+        if (window.UM && window.UM.userData && window.UM.userData.current_learning) {
+          return window.UM.userData.current_learning;
+        }
+      } catch (e) {
+      }
+      return availableLangs[0] || 'en';
+    })();
+
+    this._activeLanguage = currentLearning;
+
+    try {
+      this._langSelector = new LanguageSelector({
+        container: container,
+        mode: 'learning-selector-compact',
+        nativeLanguage: (function () {
+          try { return window.UM.userData.native_language || 'ru'; } catch (e) { return 'ru'; }
+        })(),
+        learningLanguages: availableLangs,
+        currentLearning: currentLearning,
+        learningAvailableLanguages: availableLangs,
+        languageData: languageData,
+        onLanguageChange: (function (self) {
+          return function (data) {
+            if (data && data.currentLearning) {
+              self._activeLanguage = data.currentLearning;
+              // Перезагружаем стол с фильтрацией по новому языку
+              self.loadDeskItems().catch(function () {});
+            }
+          };
+        })(this),
+      });
+      this._langSelector.render();
+    } catch (e) {
+      // fallback: если LanguageSelector не загружен, просто показываем флаг через простой HTML
+      try {
+        const flagCode = (function () {
+          try {
+            if (window.LanguageManager && typeof window.LanguageManager.getCountryCode === 'function') {
+              return window.LanguageManager.getCountryCode(currentLearning);
+            }
+          } catch (e) {}
+          return currentLearning;
+        })();
+        container.innerHTML = '<div class="tool-palette-lang-fallback" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">'
+          + '<img src="/static/flags/' + flagCode + '.svg" style="width:20px;height:15px;border-radius:2px;object-fit:cover;" alt="">'
+          + '</div>';
+      } catch (e2) {
+      }
+    }
+  },
+
+  /**
+   * Дополняет список доступных языков селектора языками из items рабочего стола.
+   * Сохраняет расширенный список в IDB-кеш.
+   */
+  _supplementLangListFromItems(items) {
+    if (!Array.isArray(items) || items.length === 0) return;
+
+    // Собираем уникальные языки из items
+    const deskLangs = new Set();
+    items.forEach(function (item) {
+      try {
+        if (item && item.language_code) {
+          deskLangs.add(item.language_code);
+        }
+      } catch (e) {
+      }
+    });
+
+    if (deskLangs.size === 0) return;
+
+    // Получаем текущий список из селектора
+    let currentLangs = [];
+    try {
+      if (this._langSelector && Array.isArray(this._langSelector.options.learningAvailableLanguages)) {
+        currentLangs = this._langSelector.options.learningAvailableLanguages;
+      }
+    } catch (e) {
+    }
+
+    // Сливаем
+    const merged = new Set(currentLangs);
+    deskLangs.forEach(function (lc) { if (lc) merged.add(lc); });
+    const mergedArr = Array.from(merged);
+
+    // Обновляем селектор
+    try {
+      if (this._langSelector) {
+        this._langSelector.options.learningAvailableLanguages = mergedArr;
+        this._langSelector.options.learningLanguages = mergedArr;
+        this._langSelector.render();
+      }
+    } catch (e) {
+    }
+
+    // Кешируем расширенный список в IDB
+    try {
+      if (typeof window.idbPut === 'function') {
+        window.idbPut('desk_items', { key: 'desk_lang_list', languages: mergedArr, updatedAt: Date.now() }).catch(function () {});
+      }
+    } catch (e) {
+    }
   },
 
   initUserMenu() {
@@ -838,13 +1006,31 @@ window.Desktop = window.Desktop || {
       return;
     }
 
+    // Фильтруем по активному языку, если он выбран
+    const activeLang = this._activeLanguage;
+    let filteredItems = items;
+    if (activeLang) {
+      filteredItems = items.filter(function (item) {
+        try {
+          return item && item.language_code && String(item.language_code).toLowerCase() === String(activeLang).toLowerCase();
+        } catch (e) {
+          return true;
+        }
+      });
+    }
+
+    if (filteredItems.length === 0) {
+      container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Немає диктантів для цієї мови</div>';
+      return;
+    }
+
     this.ensureDictationKartDeps();
 
     container.innerHTML = '';
     const grid = document.createElement('div');
     grid.className = 'shorts-grid';
 
-    for (const item of items) {
+    for (const item of filteredItems) {
       try {
         if (window.DictationKart && typeof window.DictationKart.createDeskCardElement === 'function') {
           const el = window.DictationKart.createDeskCardElement(item);
@@ -933,6 +1119,13 @@ window.Desktop = window.Desktop || {
         }
 
         this.renderDeskCards(data.items);
+
+        // Дополняем список языков селектора языками с рабочего стола
+        try {
+          this._supplementLangListFromItems(data.items);
+        } catch (e) {
+        }
+
         try {
           if (typeof window.idbPut === 'function') {
             await window.idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: data.items });
@@ -965,6 +1158,7 @@ window.Desktop = window.Desktop || {
         if (!window.UM || typeof window.UM.isAuthenticated !== 'function') return false;
         if (!window.UM.isInitialized) return false;
         if (!window.UM.isAuthenticated()) return false;
+        this.initLangSelector().catch(function () {});
         this.loadDeskItems().catch(() => { });
         return true;
       } catch (e) {
@@ -984,6 +1178,7 @@ window.Desktop = window.Desktop || {
         if (a && !a.style.backgroundImage) a.style.backgroundImage = 'url(/static/icons/default-avatar-small.svg)';
       } catch (e) {
       }
+      this.initLangSelector().catch(function () {});
       this.loadDeskItems().catch(() => { });
       this.toggleAdminSection();
     });
