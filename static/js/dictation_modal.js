@@ -1641,16 +1641,16 @@
                   let compCount = 0;
                   let succNumber = 0;
                   try {
-                    // success отправляется только один раз.
-                    // Если session.completionCount уже > 0 — значит success уже был отправлен,
-                    // и повторные доработки (полузвезды → звезды) не должны увеличивать successes.
-                    const _isFullyComp = _isDictationFullyCompleted(session);
-                    const _curCompCount = Number(session.completionCount) || 0;
-                    console.log('[DM] 🎯 completion check: isFullyCompleted=' + _isFullyComp + ' completionCount=' + _curCompCount + ' key=' + key);
-                    if (_isFullyComp && _curCompCount === 0) {
+                    // success отправляется, когда диктант полностью выполнен.
+                    // session.completionCount — это глобальный порядковый номер успеха
+                    // (сколько раз диктант был успешно завершён за всё время).
+                    // Он может быть > 0 от предыдущих завершений, это нормально.
+                    // Мы всегда передаём compCount=1 при полном выполнении,
+                    // а succNumber = следующий порядковый номер.
+                    if (_isDictationFullyCompleted(session)) {
                       compCount = 1;
                       succNumber = (Number(session.completionCount) || 0) + 1;
-                      console.log('[DM] ✅ success: text completionCount=1');
+                      console.log('[DM] ✅ success: text completionCount=1 succNumber=' + succNumber);
                     }
                   } catch (eCompDetect) {
                     console.warn('[DM:checkText] ошибка в определении completion:', eCompDetect);
@@ -3758,16 +3758,12 @@
               let audioCompCount = 0;
               let audioSuccNumber = 0;
               try {
-                // success отправляется только один раз.
-                // Если session.completionCount уже > 0 — значит success уже был отправлен,
-                // и повторные доработки не должны увеличивать successes.
-                const _isFullyCompAudio = _isDictationFullyCompleted(session);
-                const _curCompCountAudio = Number(session.completionCount) || 0;
-                console.log('[DM:audio] 🎯 completion check: isFullyCompleted=' + _isFullyCompAudio + ' completionCount=' + _curCompCountAudio + ' key=' + _key);
-                if (_isFullyCompAudio && _curCompCountAudio === 0) {
-                  const nextCompletionCount = (Number(session.completionCount) || 0) + 1;
+                // success отправляется, когда диктант полностью выполнен.
+                // session.completionCount — это глобальный порядковый номер успеха,
+                // может быть > 0 от предыдущих завершений — это нормально.
+                if (_isDictationFullyCompleted(session)) {
                   audioCompCount = 1;
-                  audioSuccNumber = nextCompletionCount;
+                  audioSuccNumber = (Number(session.completionCount) || 0) + 1;
                   console.log('[DM:onRecognitionComplete] последнее действие (audio), передаём completionCount=1 successNumber=' + audioSuccNumber);
                 }
               } catch (eCompDetectAudio) {
