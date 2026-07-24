@@ -1645,12 +1645,12 @@
                     // Если session.completionCount уже > 0 — значит success уже был отправлен,
                     // и повторные доработки (полузвезды → звезды) не должны увеличивать successes.
                     if (_isDictationFullyCompleted(session) && (Number(session.completionCount) || 0) === 0) {
-                      const nextCompletionCount = (Number(session.completionCount) || 0) + 1;
                       compCount = 1;
-                      succNumber = nextCompletionCount;
-                      console.log('[DM:checkText] последнее действие, передаём completionCount=1 successNumber=' + succNumber);
+                      succNumber = (Number(session.completionCount) || 0) + 1;
+                      console.log('[DM] ✅ success: text completionCount=1');
                     }
                   } catch (eCompDetect) {
+                    console.warn('[DM:checkText] ошибка в определении completion:', eCompDetect);
                   }
 
                   await handleActivity(typeActivity, st, key, session, moneyToAdd, mistakesThisAttempt, charsThisAttempt, compCount, succNumber);
@@ -3342,6 +3342,7 @@
   async function handleActivity(type, st, key, session, moneyCount, mistakeCount, numberOfCharacters, completionCount = 0, successNumber = 0) {
     try {
       if (!type || !st || key == null || !session) {
+        console.warn('[DM:handleActivity] пропущено: type=' + type + ' st=' + !!st + ' key=' + key + ' session=' + !!session);
         return;
       }
       
@@ -3350,6 +3351,8 @@
         const dictationId = getCurrentDictationIdForDb();
         const dictationLanguageCode = _getDictationLanguageCode();
         const selectedSentencePositions = _getSelectedSentencePositions(session);
+        const cc = Number(completionCount) || 0;
+        const sn = Number(successNumber) || 0;
         const enqueued = await ob.enqueueActivity({
           type: type,
           count: 1,
@@ -3364,8 +3367,8 @@
           dateStart: session.dateStart || null,
           sourceGroupId: session.sourceGroupId || null,
           planDate: session.planDate || null,
-          completionCount: Number(completionCount) || 0,
-          successNumber: Number(successNumber) || 0,
+          completionCount: cc,
+          successNumber: sn,
         });
         if (!enqueued) {
           console.warn('[DM:handleActivity] enqueueActivity вернул false', { type, dictationId });
