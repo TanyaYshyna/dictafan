@@ -161,6 +161,15 @@
 
 .dictation-editor-modal__lang-pair {
   flex-shrink: 0;
+  position: relative;
+}
+
+/* Дропдаун для выбора языка перевода в редакторе */
+.dictation-editor-modal__lang-pair .flag-pair-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1100;
 }
 
 .dictation-editor-modal__lang-pair .flag-pair-combo {
