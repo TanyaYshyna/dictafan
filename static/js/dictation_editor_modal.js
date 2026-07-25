@@ -596,7 +596,8 @@ function _renderTable() {
     tdCheckbox.appendChild(checkboxBtn);
     tr.appendChild(tdCheckbox);
 
-    // Перевод
+    // Перевод — показываем данные из первого языка перевода (langBlocks[1]),
+    // при переключении языка через дропдаун данные переписываются _updateTranslationDisplay()
     var tdTrans = document.createElement('td');
     tdTrans.className = 'col-translation panel-translation';
     var transInput = document.createElement('input');
@@ -607,8 +608,10 @@ function _renderTable() {
     transInput.dataset.field = 'text';
     transInput.dataset.lang = langTr;
     transInput.addEventListener('change', function () {
-      if (state.content && langTr) {
-        var sentence = state.content.getSentenceForLang(key, langTr);
+      // Используем this.dataset.lang — он обновляется _updateTranslationDisplay()
+      var currentLang = this.dataset.lang || '';
+      if (state.content && currentLang) {
+        var sentence = state.content.getSentenceForLang(key, currentLang);
         if (sentence) {
           sentence.text = this.value;
           _setDirtyFlags({ db: true });
@@ -633,6 +636,7 @@ function _renderTable() {
     playTransBtn.style.cursor = 'pointer';
     playTransBtn.style.padding = '2px';
     playTransBtn.innerHTML = '<i data-lucide="' + ((trSentence && trSentence.audio) ? 'play' : 'hammer') + '"></i>';
+    // dataset.lang будет обновляться _updateTranslationDisplay() при смене языка
     tdPlayTrans.appendChild(playTransBtn);
     tr.appendChild(tdPlayTrans);
 
@@ -2035,31 +2039,62 @@ function _syncTranslationLanguages(translationLangs, currentDisplayLang) {
 }
 
 /**
- * Обновляет отображение текущего языка перевода (подсветку в таблице и хедере).
+ * Обновляет содержимое столбца перевода данными из выбранного языка.
+ * Переписывает текст и аудио в единственном столбце перевода.
  */
 function _updateTranslationDisplay(currentLang) {
   if (!currentLang) return;
-  // Подсвечиваем столбец с этим языком в таблице и скрываем остальные
+  if (!state.content || !state.content.langBlocks) return;
+
+  // Находим блок перевода для выбранного языка
+  var trBlock = null;
+  for (var i = 0; i < state.content.langBlocks.length; i++) {
+    if (state.content.langBlocks[i].lang === currentLang) {
+      trBlock = state.content.langBlocks[i];
+      break;
+    }
+  }
+  if (!trBlock) return;
+
   var table = document.getElementById('editorModalSentencesTable');
-  if (table) {
-    var headerCells = table.querySelectorAll('thead th.col-translation');
-    headerCells.forEach(function(th) {
-      var lang = th.dataset ? th.dataset.lang : '';
-      if (lang === currentLang) {
-        th.style.display = '';
-      } else {
-        th.style.display = 'none';
+  if (!table) return;
+
+  // Обновляем заголовок столбца перевода
+  var headerCell = table.querySelector('thead th.col-translation');
+  if (headerCell) {
+    headerCell.textContent = 'Переклад (' + (currentLang || '').toUpperCase() + ')';
+  }
+
+  // Обновляем каждую строку таблицы
+  var rows = table.querySelectorAll('tbody tr');
+  rows.forEach(function(tr) {
+    var key = tr.dataset.key;
+    if (!key) return;
+
+    var trSentence = trBlock.sentences.find(function(ts) { return ts.key === key; }) || null;
+
+    // Обновляем поле ввода перевода
+    var transInput = tr.querySelector('td.col-translation input');
+    if (transInput) {
+      transInput.value = trSentence ? (trSentence.text || '') : '';
+      transInput.dataset.lang = currentLang;
+    }
+
+    // Обновляем кнопку аудио перевода
+    var playTransBtn = tr.querySelector('td.col-play-translation .audio-btn');
+    if (playTransBtn) {
+      playTransBtn.dataset.lang = currentLang;
+      playTransBtn.dataset.state = (trSentence && trSentence.audio) ? 'ready' : 'creating';
+      var icon = playTransBtn.querySelector('i[data-lucide]');
+      if (icon) {
+        icon.setAttribute('data-lucide', (trSentence && trSentence.audio) ? 'play' : 'hammer');
       }
-    });
-    var bodyCells = table.querySelectorAll('tbody td.col-translation');
-    bodyCells.forEach(function(td) {
-      var lang = td.dataset ? td.dataset.lang : '';
-      if (lang === currentLang) {
-        td.style.display = '';
-      } else {
-        td.style.display = 'none';
-      }
-    });
+    }
+  });
+
+  // Обновляем иконки lucide
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
   }
 }
 
