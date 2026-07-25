@@ -1888,8 +1888,11 @@ function _initLanguageFlags() {
           _syncTranslationLanguages(langs, currentLang);
         }
       });
+      if (state.headerLangPairSelector && typeof state.headerLangPairSelector.init === 'function') {
+        state.headerLangPairSelector.init();
+      }
     } else {
-      // Режим "Дополнение" — флаги только для отображения (неактивны)
+      // Режим "Дополнение" — флаги для просмотра существующего диктанта
       if (translationLangs.length === 0) {
         state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
           mode: 'flag-single',
@@ -1897,6 +1900,9 @@ function _initLanguageFlags() {
           nativeLanguage: validOrig,
           languageData: languageData
         });
+        if (state.headerLangPairSelector && typeof state.headerLangPairSelector.init === 'function') {
+          state.headerLangPairSelector.init();
+        }
       } else if (translationLangs.length === 1) {
         var validTr = languageData[translationLangs[0]] ? translationLangs[0] : '';
         state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
@@ -1905,13 +1911,26 @@ function _initLanguageFlags() {
           nativeLanguage: validTr || validOrig,
           languageData: languageData
         });
+        if (state.headerLangPairSelector && typeof state.headerLangPairSelector.init === 'function') {
+          state.headerLangPairSelector.init();
+        }
       } else {
+        // Несколько переводов — правый флаг открывает выпадающий список выбора языка
         state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
-          mode: 'flag-pair-fixed',
+          mode: 'flag-pair-dropdown-right',
           currentLearning: validOrig,
           nativeLanguage: translationLangs[0],
-          languageData: languageData
+          nativeLanguages: translationLangs,
+          languageData: languageData,
+          onLanguageChange: function(values) {
+            var newLang = values.nativeLanguage || '';
+            if (!newLang) return;
+            _updateTranslationDisplay(newLang);
+          }
         });
+        if (state.headerLangPairSelector && typeof state.headerLangPairSelector.init === 'function') {
+          state.headerLangPairSelector.init();
+        }
       }
     }
   } catch (e) {
