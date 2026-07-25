@@ -4663,9 +4663,9 @@
     return sentences;
   }
 
-  async function ensureDictationContentLoadedToRuntime({ dictationIdFormatted }) {
+  async function ensureDictationContentLoadedToRuntime({ dictationIdFormatted, langOriginal }) {
     const store = getRuntimeStore();
-    console.log(' dictationIdFormatted=' + dictationIdFormatted + ', store=' + (store ? 'есть' : 'null'));
+    console.log(' dictationIdFormatted=' + dictationIdFormatted + ', langOriginal=' + langOriginal + ', store=' + (store ? 'есть' : 'null'));
     if (!store) {
      throw new Error('DictationRuntime_not_loaded');
     }
@@ -4746,7 +4746,7 @@
       throw new Error('empty_sentences');
     }
 
-    store.setContentSentences({ dictationId, sentences });
+    store.setContentSentences({ dictationId, sentences, originalLanguage: langOriginal });
     return true;
   }
 

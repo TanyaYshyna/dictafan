@@ -628,6 +628,30 @@ window.DictationKart = window.DictationKart || {
           const dictationId = Number(cardEl.getAttribute('data-dictation-id'));
           const title = cardEl.querySelector('.short-title');
           const dictationTitle = title ? String(title.textContent || '').trim() : '';
+
+          // Читаем языки перевода из data-атрибутов карточки
+          var rawTranslations = cardEl.getAttribute('data-available-translations') || '[]';
+          var availableTranslations = [];
+          try { availableTranslations = JSON.parse(rawTranslations); } catch (e3) { availableTranslations = []; }
+          if (!Array.isArray(availableTranslations)) availableTranslations = [];
+
+          var langOriginal = (cardEl.getAttribute('data-lang-original') || '').toLowerCase();
+
+          // Показываем модалку выбора языка перевода (даже если язык один — хороший стиль)
+          var match = href.match(/\/dictation\/(dict_\d+)\//);
+          var dictIdFormatted = match ? match[1] : ('dict_' + dictationId);
+
+          if (availableTranslations.length >= 1 && window.DictationLanguageModal && typeof window.DictationLanguageModal.open === 'function') {
+            window.DictationLanguageModal.open({
+              dictationId: dictIdFormatted,
+              langOriginal: langOriginal,
+              translationLanguages: availableTranslations,
+              cardEl: cardEl,
+            });
+            return;
+          }
+
+          // Fallback: если модалка не загружена — открываем сразу
           if (Number.isFinite(dictationId) && dictationId > 0 && typeof window.openDictationLaunch === 'function') {
             window.openDictationLaunch(dictationId, href, cardEl, dictationTitle);
           } else {
@@ -1427,15 +1451,10 @@ window.DictationKart = window.DictationKart || {
       ? item.translation_languages.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean)
       : [];
 
-    const pick = window._pickTranslationLanguageForOpen
-      ? window._pickTranslationLanguageForOpen({
-          preferredNative: nativeLang,
-          availableTranslations,
-          fallbackLang: item.language_translation || nativeLang || langOriginal || 'en',
-        })
-      : { lang: item.language_translation || nativeLang || langOriginal || 'en', reason: '' };
-
-    const langTranslation = pick.lang;
+    const preferredTrLang = nativeLang && availableTranslations.includes(nativeLang)
+      ? nativeLang
+      : (availableTranslations.length ? availableTranslations[0] : '');
+    const langTranslation = preferredTrLang || item.language_translation || nativeLang || langOriginal || 'en';
     const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
     const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
     const editV2Url = `/editor_v2/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
@@ -1447,8 +1466,6 @@ window.DictationKart = window.DictationKart || {
 
     const coverSrc = coverUrl || '/static/data/covers/cover_en.webp';
     const coverLoading = 'lazy';
-
-    const noticeMessage = pick && pick.reason ? String(pick.reason) : '';
 
     const menu = this.renderMenuHtml({
       context: 'desk',
@@ -1467,8 +1484,8 @@ window.DictationKart = window.DictationKart || {
     });
 
     return `
-      <div class="short-card dictation-kart desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
-        <div class="short-thumb" data-href="${openUrl}" data-lang-notice="${window.escapeHtml(noticeMessage)}" role="link" tabindex="0">
+      <div class="short-card dictation-kart desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}" data-lang-original="${langOriginal}" data-available-translations="${window.escapeHtml(JSON.stringify(availableTranslations))}">
+        <div class="short-thumb" data-href="${openUrl}" role="link" tabindex="0">
           <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async" draggable="false" onerror="this.onerror=null;this.src='/static/data/covers/cover_en.webp'">
           <div class="card-progress-stats">
             <span class="card-medal-badge" data-dictation-id="${dictationId}" style="display:none;">
@@ -1547,7 +1564,7 @@ window.DictationKart = window.DictationKart || {
     });
 
     return `
-      <div class="short-card dictation-kart dictation-kart--book-row ${isOnDesk ? 'short-card--on-desk' : 'short-card--off-desk'}" data-dictation-id="${dbId}" data-action="toggle-desk" data-edit-url="${editUrl}">
+      <div class="short-card dictation-kart dictation-kart--book-row ${isOnDesk ? 'short-card--on-desk' : 'short-card--off-desk'}" data-dictation-id="${dbId}" data-action="toggle-desk" data-edit-url="${editUrl}" data-lang-original="${langOriginal}" data-available-translations="${window.escapeHtml(JSON.stringify(availableTranslations))}">
         <div class="short-thumb">
           <img src="${coverUrl}" alt="${d.title || 'Обложка диктанта'}" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
         </div>
@@ -1605,15 +1622,10 @@ window.DictationKart = window.DictationKart || {
       ? item.translation_languages.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean)
       : [];
 
-    const pick = window._pickTranslationLanguageForOpen
-      ? window._pickTranslationLanguageForOpen({
-          preferredNative: nativeLang,
-          availableTranslations,
-          fallbackLang: item.language_translation || nativeLang || langOriginal || 'en',
-        })
-      : { lang: item.language_translation || nativeLang || langOriginal || 'en', reason: '' };
-
-    const langTranslation = pick.lang;
+    const preferredTrLang = nativeLang && availableTranslations.includes(nativeLang)
+      ? nativeLang
+      : (availableTranslations.length ? availableTranslations[0] : '');
+    const langTranslation = preferredTrLang || item.language_translation || nativeLang || langOriginal || 'en';
     const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
     const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
     const editV2Url = `/editor_v2/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
@@ -1627,15 +1639,14 @@ window.DictationKart = window.DictationKart || {
       ? item.sentences_count
       : (parseInt(item.sentences_count, 10) || 0);
 
-    const noticeMessage = pick && pick.reason ? String(pick.reason) : '';
-
     node.setAttribute('data-dictation-id', String(dictationId || ''));
     node.setAttribute('data-desk-item-id', String(item.id || ''));
+    node.setAttribute('data-lang-original', String(langOriginal || ''));
+    node.setAttribute('data-available-translations', String(JSON.stringify(availableTranslations)));
 
     const thumb = node.querySelector('.short-thumb');
     if (thumb) {
       thumb.setAttribute('data-href', openUrl);
-      thumb.setAttribute('data-lang-notice', noticeMessage);
     }
 
     const img = node.querySelector('img.short-cover');
@@ -1732,6 +1743,8 @@ window.DictationKart = window.DictationKart || {
 
     node.setAttribute('data-dictation-id', String(dbId || ''));
     node.setAttribute('data-edit-url', editUrl);
+    node.setAttribute('data-lang-original', String(langOriginal || ''));
+    node.setAttribute('data-available-translations', String(JSON.stringify(availableTranslations)));
 
     const img = node.querySelector('.short-thumb img');
     if (img) {
