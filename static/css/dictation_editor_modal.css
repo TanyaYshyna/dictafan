@@ -162,13 +162,17 @@
 .dictation-editor-modal__lang-pair {
   flex-shrink: 0;
   position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
-/* Дропдаун для выбора языка перевода в редакторе */
-.dictation-editor-modal__lang-pair .flag-pair-dropdown {
+/* Дропдаун для выбора языка перевода в редакторе — правый флаг */
+/* left вычисляется динамически через JS в _initLanguageFlags() */
+.dictation-editor-modal__lang-pair .flag-pair-dropdown[data-side="right"] {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
+  right: auto;
   z-index: 1100;
 }
 
