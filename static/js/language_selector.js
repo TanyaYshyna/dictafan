@@ -23,6 +23,7 @@ class LanguageSelector {
             learningLanguages: ['en'],
             currentLearning: 'en',
             languageData: null,
+            leftDropdown: false,
             onLanguageChange: null,
             ...options
         };
@@ -1560,6 +1561,84 @@ class LanguageSelector {
         `;
     }
 
+    createFlagPairCheckboxes() {
+        const leftLang = this.options.currentLearning;
+        const rightLang = this.options.nativeLanguage;
+        const allLangs = Object.keys(this.languageData || {});
+        const checkedLangs = new Set(
+            (Array.isArray(this.options.nativeLanguages) ? this.options.nativeLanguages : [])
+                .map(x => String(x || '').trim().toLowerCase())
+                .filter(Boolean)
+        );
+        const currentRight = String(rightLang || '').trim().toLowerCase();
+        const showRight = rightLang && rightLang !== '';
+
+        // Левый флаг
+        const leftHtml = `
+            <div class="flag-pair-side flag-pair-side--left" ${this.options.leftDropdown ? 'data-side="left"' : ''}>
+                ${this.createFlagElement(leftLang)}
+            </div>
+        `;
+
+        // Правый флаг (кликабельный)
+        const rightHtml = showRight ? `
+            <div class="flag-pair-side flag-pair-side--right" data-side="right">
+                ${this.createFlagElement(rightLang)}
+            </div>
+        ` : '';
+
+        // Левый dropdown (если leftDropdown)
+        const leftDropdownHtml = this.options.leftDropdown
+            ? `
+                <div class="header-selector-dropdown flag-pair-dropdown" data-side="left" style="display: none;">
+                    <div class="header-dropdown-options">
+                        ${allLangs.map(code => {
+                            const c = String(code || '').trim().toLowerCase();
+                            if (!c) return '';
+                            return `
+                                <div class="header-dropdown-option ${c === String(leftLang).toLowerCase() ? 'selected' : ''}" data-side="left" data-value="${code}">
+                                    ${this.createFlagElement(code)}
+                                    <span class="header-option-text">${this.getLanguageName(code)}</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `
+            : '';
+
+        // Правая панель с чекбоксами
+        const rightPanelHtml = `
+            <div class="header-selector-dropdown flag-pair-checkboxes-panel" data-side="right" style="display: none;">
+                <div class="learning-flags-list" style="border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; background: var(--color-panel-bg, #fff); padding: 8px; max-height: 240px; overflow: auto;">
+                    ${allLangs.map(code => {
+                        const c = String(code || '').trim().toLowerCase();
+                        if (!c) return '';
+                        const isChecked = checkedLangs.has(c);
+                        const isCurrent = currentRight && c === currentRight;
+                        return `
+                            <div class="learning-flag-row flag-pair-checkboxes-row" data-lang="${c}" data-side="right" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius: 10px; ${isCurrent ? 'background: var(--color-hover, #f8f9fa);' : ''}">
+                                <button type="button" class="topbar-icon-btn checkbox-btn learning-flag-checkbox flag-pair-checkbox-btn" data-lang="${c}" data-side="right" aria-label="${this.getLanguageName(c)}" style="width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center;"></button>
+                                ${this.createFlagElement(c, 'small')}
+                                <button type="button" class="learning-flag-toggle flag-pair-toggle-btn" data-lang="${c}" data-side="right" style="all: unset; cursor: pointer; flex: 1; min-width: 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${this.getLanguageName(c)}</button>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+
+        return `
+            <div class="flag-pair-combo" data-mode="flag-pair-checkboxes">
+                ${leftHtml}
+                ${showRight ? '<i data-lucide="arrow-big-right"></i>' : ''}
+                ${rightHtml}
+            </div>
+            ${leftDropdownHtml}
+            ${rightPanelHtml}
+        `;
+    }
+
     createHeaderSelector() {
         const nativeLang = this.options.nativeLanguage;
         const learningLang = this.options.currentLearning;
@@ -1662,6 +1741,9 @@ class LanguageSelector {
                 break;
             case 'flag-pair-dropdown-left':
                 html = this.createFlagPairDropdown({ leftDropdown: true, rightDropdown: false });
+                break;
+            case 'flag-pair-checkboxes':
+                html = this.createFlagPairCheckboxes();
                 break;
             case 'header-selector':
                 html = this.createHeaderSelector();
@@ -2074,22 +2156,43 @@ class LanguageSelector {
             }
         }
 
-        // 5. Обработчики для режимов flag-pair-dropdown-*
+        // 5. Обработчики для режимов flag-pair-dropdown-* и flag-pair-checkboxes
         if (this.options.mode === 'flag-pair-dropdown-both'
             || this.options.mode === 'flag-pair-dropdown-right'
-            || this.options.mode === 'flag-pair-dropdown-left') {
+            || this.options.mode === 'flag-pair-dropdown-left'
+            || this.options.mode === 'flag-pair-checkboxes') {
 
             const combo = this.options.container.querySelector('.flag-pair-combo');
             const dropdowns = this.options.container.querySelectorAll('.flag-pair-dropdown');
+            const checkboxPanels = this.options.container.querySelectorAll('.flag-pair-checkboxes-panel');
 
             const closeAll = () => {
                 dropdowns.forEach(d => {
+                    try { d.style.display = 'none'; } catch (e) {}
+                });
+                checkboxPanels.forEach(d => {
                     try { d.style.display = 'none'; } catch (e) {}
                 });
             };
 
             const openSide = (side) => {
                 if (!side) return;
+                // Для checkbox-режима правая сторона — это checkbox-панель
+                if (this.options.mode === 'flag-pair-checkboxes' && side === 'right') {
+                    checkboxPanels.forEach(d => {
+                        if (d && d.dataset && d.dataset.side === side) {
+                            const isVisible = d.style.display === 'block';
+                            d.style.display = isVisible ? 'none' : 'block';
+                        } else {
+                            try { if (d) d.style.display = 'none'; } catch (e) {}
+                        }
+                    });
+                    // Закрываем левый dropdown если открыт
+                    dropdowns.forEach(d => {
+                        try { if (d) d.style.display = 'none'; } catch (e) {}
+                    });
+                    return;
+                }
                 dropdowns.forEach(d => {
                     if (d && d.dataset && d.dataset.side === side) {
                         const isVisible = d.style.display === 'block';
@@ -2105,8 +2208,6 @@ class LanguageSelector {
                     const sideEl = e.target.closest('[data-side]');
                     const side = sideEl ? sideEl.dataset.side : '';
                     if (!side) {
-                        // UX: clicking on the arrow / empty area should still open the dropdown.
-                        // For single-side dropdowns, open that side by default.
                         if (this.options.mode === 'flag-pair-dropdown-right') {
                             e.stopPropagation();
                             openSide('right');
@@ -2125,6 +2226,7 @@ class LanguageSelector {
                 });
             }
 
+            // --- Обработчики для левого dropdown (header-dropdown-option) ---
             dropdowns.forEach(d => {
                 if (!d) return;
                 d.querySelectorAll('.header-dropdown-option').forEach(opt => {
@@ -2134,14 +2236,94 @@ class LanguageSelector {
                         const value = opt.dataset.value;
                         if (side === 'left') {
                             this.options.currentLearning = value;
-                        } else if (side === 'right') {
+                            // При смене оригинала закрываем левый dropdown
+                            dropdowns.forEach(dd => { try { dd.style.display = 'none'; } catch (e2) {} });
+                            this.render();
+                            this.triggerChange();
+                        } else if (side === 'right' && this.options.mode !== 'flag-pair-checkboxes') {
                             this.options.nativeLanguage = value;
+                            this.render();
+                            this.triggerChange();
                         }
-                        this.render();
-                        this.triggerChange();
                     });
                 });
             });
+
+            // --- Обработчики для режима flag-pair-checkboxes (правая панель) ---
+            if (this.options.mode === 'flag-pair-checkboxes') {
+                const rightPanel = this.options.container.querySelector('.flag-pair-checkboxes-panel');
+                if (rightPanel) {
+                    // Чекбокс: переключение языка в nativeLanguages
+                    rightPanel.addEventListener('click', (e) => {
+                        const checkboxBtn = e.target.closest('.flag-pair-checkbox-btn');
+                        if (checkboxBtn) {
+                            e.stopPropagation();
+                            const lang = checkboxBtn.dataset.lang;
+                            if (!lang) return;
+                            const lc = String(lang).trim().toLowerCase();
+                            const current = new Set(
+                                (Array.isArray(this.options.nativeLanguages) ? this.options.nativeLanguages : [])
+                                    .map(x => String(x || '').trim().toLowerCase())
+                                    .filter(Boolean)
+                            );
+                            if (current.has(lc)) {
+                                // Убираем язык — если это был последний, оставляем хотя бы один
+                                if (current.size > 1) {
+                                    current.delete(lc);
+                                    this.options.nativeLanguages = Array.from(current);
+                                    // Если убранный язык был текущим отображаемым, переключаем на первый из оставшихся
+                                    if (String(this.options.nativeLanguage || '').trim().toLowerCase() === lc) {
+                                        const remaining = Array.from(current);
+                                        this.options.nativeLanguage = remaining[0] || '';
+                                    }
+                                } else {
+                                    // Не удаляем последний язык
+                                    return;
+                                }
+                            } else {
+                                // Добавляем язык
+                                current.add(lc);
+                                this.options.nativeLanguages = Array.from(current);
+                                // Если это первый добавленный язык, делаем его текущим
+                                if (!this.options.nativeLanguage) {
+                                    this.options.nativeLanguage = lang;
+                                }
+                            }
+                            // Обновляем состояние чекбоксов без полного перерендера
+                            this._renderCheckboxPanelIcons();
+                            this._updateRightFlagImage();
+                            this.triggerChange({
+                                nativeLanguage: this.options.nativeLanguage,
+                                learningLanguages: [...this.options.learningLanguages],
+                                currentLearning: this.options.currentLearning,
+                                nativeLanguages: [...this.options.nativeLanguages]
+                            });
+                            return;
+                        }
+
+                        // Клик по строке языка (toggle-btn) — установить как текущий отображаемый
+                        const toggleBtn = e.target.closest('.flag-pair-toggle-btn');
+                        if (toggleBtn) {
+                            e.stopPropagation();
+                            const lang = toggleBtn.dataset.lang;
+                            if (!lang) return;
+                            const lc = String(lang).trim().toLowerCase();
+                            this.options.nativeLanguage = lang;
+                            // Перерисовываем панель: подсвечиваем новую строку
+                            this._renderCheckboxPanelCurrentHighlight(lc);
+                            this._updateRightFlagImage();
+                            this.triggerChange({
+                                nativeLanguage: this.options.nativeLanguage,
+                                learningLanguages: [...this.options.learningLanguages],
+                                currentLearning: this.options.currentLearning,
+                                nativeLanguages: [...this.options.nativeLanguages]
+                            });
+                        }
+                    });
+                }
+                // Инициализируем иконки чекбоксов при первом рендере
+                this._renderCheckboxPanelIcons();
+            }
 
             if (!this._flagPairDropdownBound) {
                 this._flagPairDropdownBound = true;
@@ -3114,7 +3296,8 @@ class LanguageSelector {
         const changeData = additionalData || {
             nativeLanguage: this.options.nativeLanguage,
             learningLanguages: [...this.options.learningLanguages],
-            currentLearning: this.options.currentLearning
+            currentLearning: this.options.currentLearning,
+            nativeLanguages: [...(Array.isArray(this.options.nativeLanguages) ? this.options.nativeLanguages : [])]
         };
 
         if (typeof this.options.onLanguageChange === 'function') {
@@ -3126,7 +3309,8 @@ class LanguageSelector {
         const result = {
             nativeLanguage: this.options.nativeLanguage,
             learningLanguages: [...this.options.learningLanguages],
-            currentLearning: this.options.currentLearning
+            currentLearning: this.options.currentLearning,
+            nativeLanguages: [...(Array.isArray(this.options.nativeLanguages) ? this.options.nativeLanguages : [])]
         };
         return result;
     }
@@ -3135,10 +3319,61 @@ class LanguageSelector {
         if (values.nativeLanguage !== undefined) this.options.nativeLanguage = values.nativeLanguage;
         if (values.learningLanguages) this.options.learningLanguages = [...values.learningLanguages];
         if (values.currentLearning) this.options.currentLearning = values.currentLearning;
+        if (values.nativeLanguages) this.options.nativeLanguages = [...values.nativeLanguages];
 
         if (this.isInitialized) {
             this.render();
         }
+    }
+
+    // Вспомогательный метод: обновить иконки чекбоксов в панели без полного перерендера
+    _renderCheckboxPanelIcons() {
+        const panel = this.options.container.querySelector('.flag-pair-checkboxes-panel');
+        if (!panel) return;
+        const checkedLangs = new Set(
+            (Array.isArray(this.options.nativeLanguages) ? this.options.nativeLanguages : [])
+                .map(x => String(x || '').trim().toLowerCase())
+                .filter(Boolean)
+        );
+        const checkboxes = panel.querySelectorAll('.flag-pair-checkbox-btn');
+        checkboxes.forEach(btn => {
+            const lang = btn.dataset.lang;
+            if (!lang) return;
+            const lc = String(lang).trim().toLowerCase();
+            const isChecked = checkedLangs.has(lc);
+            this._renderLucideCheckboxButton(btn, isChecked, false);
+        });
+    }
+
+    // Вспомогательный метод: обновить подсветку текущей строки в панели
+    _renderCheckboxPanelCurrentHighlight(currentLangLc) {
+        const panel = this.options.container.querySelector('.flag-pair-checkboxes-panel');
+        if (!panel) return;
+        const rows = panel.querySelectorAll('.flag-pair-checkboxes-row');
+        rows.forEach(row => {
+            const lang = row.dataset.lang;
+            if (!lang) return;
+            const lc = String(lang).trim().toLowerCase();
+            if (currentLangLc && lc === currentLangLc) {
+                row.style.background = 'var(--color-hover, #f8f9fa)';
+            } else {
+                row.style.background = '';
+            }
+        });
+    }
+
+    // Вспомогательный метод: обновить изображение правого флага без полного перерендера
+    _updateRightFlagImage() {
+        const combo = this.options.container.querySelector('.flag-pair-combo');
+        if (!combo) return;
+        const rightSide = combo.querySelector('.flag-pair-side--right');
+        if (!rightSide) return;
+        const lang = this.options.nativeLanguage;
+        if (!lang) {
+            rightSide.innerHTML = '';
+            return;
+        }
+        rightSide.innerHTML = this.createFlagElement(lang);
     }
 
     destroy() {
