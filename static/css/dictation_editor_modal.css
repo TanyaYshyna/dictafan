@@ -126,13 +126,37 @@
   padding: 16px 5vw 16px;
 }
 
-/* ===== HEADER CONTAINER (флаги + название + id) ===== */
+/* ===== HEADER CONTAINER (флаги + badge + название + id) ===== */
 .dictation-editor-modal__header-container {
   display: flex;
   align-items: center;
   gap: 16px;
   margin-bottom: 12px;
   flex-wrap: wrap;
+}
+
+/* Режим редактора: Начальное заполнение / Дополнение */
+.dictation-editor-modal__mode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #c8e6c9;
+}
+
+.dictation-editor-modal__mode-badge[data-mode="append"] {
+  background: #f5f5f5;
+  color: #757575;
+  border-color: #e0e0e0;
 }
 
 .dictation-editor-modal__lang-pair {

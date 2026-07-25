@@ -15,6 +15,8 @@ const state = {
   isOpen: false,
   config: null,
   headerLangPairSelector: null,
+  /** 'fill' — начальное заполнение, 'append' — дополнение */
+  editorMode: 'fill',
   /** @type {DictationContent|null} */
   content: null,
   currentTabName: 'general',
@@ -1848,7 +1850,6 @@ function _initLanguageFlags() {
     if (!languageData || !state.config) return;
 
     const orig = _normalizeLangCode(state.config.originalLanguage);
-
     const validOrig = languageData[orig] ? orig : '';
 
     container.innerHTML = '';
@@ -1866,35 +1867,195 @@ function _initLanguageFlags() {
       }
     }
 
-    if (translationLangs.length === 0) {
-      // Если нет языков перевода — показываем только оригинал
+    const mode = state.editorMode || 'fill';
+
+    if (mode === 'fill') {
+      // Режим "Начальное заполнение" — используем flag-pair-checkboxes
+      // Левый флаг: язык оригинала (фиксированный)
+      // Правый флаг: открывает панель со всеми языками и чекбоксами
       state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
-        mode: 'flag-single',
+        mode: 'flag-pair-checkboxes',
         currentLearning: validOrig,
-        nativeLanguage: validOrig,
-        languageData: languageData
-      });
-    } else if (translationLangs.length === 1) {
-      // Один язык перевода — показываем пару флагов
-      var validTr = languageData[translationLangs[0]] ? translationLangs[0] : '';
-      state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
-        mode: 'flag-pair-fixed',
-        currentLearning: validOrig,
-        nativeLanguage: validTr || validOrig,
-        languageData: languageData
+        nativeLanguage: translationLangs[0] || '',
+        nativeLanguages: translationLangs.length > 0 ? translationLangs : [],
+        languageData: languageData,
+        onLanguageChange: function(values) {
+          var langs = values.nativeLanguages || [];
+          var currentLang = values.nativeLanguage || (langs.length > 0 ? langs[0] : '');
+          if (currentLang && langs.indexOf(currentLang) === -1) {
+            currentLang = langs[0] || '';
+          }
+          _syncTranslationLanguages(langs, currentLang);
+        }
       });
     } else {
-      // Несколько языков перевода — показываем выпадающий список
-      state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
-        mode: 'flag-pair-dropdown',
-        currentLearning: validOrig,
-        nativeLanguage: translationLangs[0], // первый язык по умолчанию
-        languageData: languageData,
-        rightDropdown: true, // правый флаг — выпадающий список
-      });
+      // Режим "Дополнение" — флаги только для отображения (неактивны)
+      if (translationLangs.length === 0) {
+        state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
+          mode: 'flag-single',
+          currentLearning: validOrig,
+          nativeLanguage: validOrig,
+          languageData: languageData
+        });
+      } else if (translationLangs.length === 1) {
+        var validTr = languageData[translationLangs[0]] ? translationLangs[0] : '';
+        state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
+          mode: 'flag-pair-fixed',
+          currentLearning: validOrig,
+          nativeLanguage: validTr || validOrig,
+          languageData: languageData
+        });
+      } else {
+        state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
+          mode: 'flag-pair-fixed',
+          currentLearning: validOrig,
+          nativeLanguage: translationLangs[0],
+          languageData: languageData
+        });
+      }
     }
   } catch (e) {
     console.warn('[dictationEditorModal] _initLanguageFlags error', e);
+  }
+}
+
+/**
+ * Синхронизирует langBlocks при изменении списка языков перевода.
+ * @param {string[]} translationLangs - массив языков (отмеченных чекбоксами)
+ * @param {string} currentDisplayLang - текущий отображаемый язык перевода
+ */
+function _syncTranslationLanguages(translationLangs, currentDisplayLang) {
+  try {
+    if (!state.content || !state.content.langBlocks || state.content.langBlocks.length === 0) return;
+    if (!Array.isArray(translationLangs)) return;
+
+    var origLang = state.content.langBlocks[0].lang;
+    var origSentences = state.content.langBlocks[0].sentences;
+
+    // Нормализуем входные языки
+    var newLangs = translationLangs
+      .map(function(l) { return String(l || '').trim().toLowerCase(); })
+      .filter(Boolean);
+
+    // Проверяем, что оригинал не равен языку перевода
+    newLangs = newLangs.filter(function(l) { return l !== origLang; });
+
+    // Убираем дубликаты
+    newLangs = newLangs.filter(function(l, i, arr) { return arr.indexOf(l) === i; });
+
+    // Получаем текущие языки из langBlocks (кроме оригинала)
+    var currentLangs = [];
+    for (var i = 1; i < state.content.langBlocks.length; i++) {
+      currentLangs.push(state.content.langBlocks[i].lang);
+    }
+
+    // Определяем, какие языки добавить, какие удалить
+    var langsToAdd = newLangs.filter(function(l) { return currentLangs.indexOf(l) === -1; });
+    var langsToRemove = currentLangs.filter(function(l) { return newLangs.indexOf(l) === -1; });
+
+    if (langsToAdd.length === 0 && langsToRemove.length === 0) {
+      // Языки не изменились — только обновляем текущий отображаемый
+      if (currentDisplayLang && state.config) {
+        state.config.translationLanguage = currentDisplayLang;
+      }
+      _updateTranslationDisplay(currentDisplayLang);
+      return;
+    }
+
+    // Удаляем блоки для убранных языков
+    if (langsToRemove.length > 0) {
+      state.content.langBlocks = state.content.langBlocks.filter(function(block) {
+        return langsToRemove.indexOf(block.lang) === -1;
+      });
+    }
+
+    // Добавляем блоки для новых языков (с пустыми предложениями)
+    if (langsToAdd.length > 0) {
+      langsToAdd.forEach(function(lang) {
+        // Создаём пустые предложения для нового языка (копируем ключи из оригинала)
+        var emptySentences = origSentences.map(function(s) {
+          return {
+            key: s.key,
+            position: s.position != null ? Number(s.position) : null,
+            text: '',
+            audio: '',
+            audio_file: null,
+            audio_mic: null,
+            start: '',
+            end: '',
+            checked: false,
+            explanation: '',
+          };
+        });
+        state.content.langBlocks.push({ lang: lang, sentences: emptySentences });
+      });
+    }
+
+    // Обновляем config.translationLanguage
+    if (currentDisplayLang && state.config) {
+      state.config.translationLanguage = currentDisplayLang;
+    }
+
+    // Помечаем dirty
+    _setDirtyFlags({ db: true });
+
+    // Перерисовываем таблицу и таблицу переводов
+    _renderTable();
+    _renderTranslationsTable();
+    _updateAutoRegenerateAllBtnVisibility();
+    _updateTranslationDisplay(currentDisplayLang);
+
+    console.log('[dictationEditorModal] _syncTranslationLanguages done', {
+      added: langsToAdd,
+      removed: langsToRemove,
+      currentDisplay: currentDisplayLang
+    });
+  } catch (e) {
+    console.warn('[dictationEditorModal] _syncTranslationLanguages error', e);
+  }
+}
+
+/**
+ * Обновляет отображение текущего языка перевода (подсветку в таблице и хедере).
+ */
+function _updateTranslationDisplay(currentLang) {
+  if (!currentLang) return;
+  // Подсвечиваем столбец с этим языком в таблице и скрываем остальные
+  var table = document.getElementById('editorModalSentencesTable');
+  if (table) {
+    var headerCells = table.querySelectorAll('thead th.col-translation');
+    headerCells.forEach(function(th) {
+      var lang = th.dataset ? th.dataset.lang : '';
+      if (lang === currentLang) {
+        th.style.display = '';
+      } else {
+        th.style.display = 'none';
+      }
+    });
+    var bodyCells = table.querySelectorAll('tbody td.col-translation');
+    bodyCells.forEach(function(td) {
+      var lang = td.dataset ? td.dataset.lang : '';
+      if (lang === currentLang) {
+        td.style.display = '';
+      } else {
+        td.style.display = 'none';
+      }
+    });
+  }
+}
+
+/**
+ * Отображает режим редактора в хедере модалки.
+ */
+function _updateEditorModeDisplay() {
+  var modeEl = document.getElementById('dictationEditorModalMode');
+  if (!modeEl) return;
+  if (state.editorMode === 'fill') {
+    modeEl.textContent = 'Начальное заполнение';
+    modeEl.dataset.mode = 'fill';
+  } else {
+    modeEl.textContent = 'Дополнение';
+    modeEl.dataset.mode = 'append';
   }
 }
 
@@ -3224,6 +3385,11 @@ function open(config) {
   state.isOpen = true;
   state.dirtyFlags = { db: false, audio: false, cover: false };
 
+  // Определяем режим редактора:
+  // - isNewDictation === true → "Начальное заполнение" (fill)
+  // - иначе → "Дополнение" (append)
+  state.editorMode = (config && config.isNewDictation) ? 'fill' : 'append';
+
   // Сбрасываем shared audio состояние (оно могло остаться от предыдущего открытия)
   state._sharedAudioFilename = null;
   state._sharedAudioUrl = null;
@@ -3451,6 +3617,7 @@ function open(config) {
   // Инициализация
   _setupUserSection();
   _initLanguageFlags();
+  _updateEditorModeDisplay();
   _initFormFields();
   _initLevelSelector();
   _initVoiceModeRadios();
@@ -4806,10 +4973,17 @@ window.NewDictationFillModal = {
         audioOrder = '';
       }
 
+      var trLanguagesList = langs.translationLanguages || [];
+      // Если нет translationLanguages, используем langTr
+      if (trLanguagesList.length === 0 && langTr) {
+        trLanguagesList = [langTr];
+      }
+
       var config = this._editorConfig;
       config.title = title;
       config.originalLanguage = langOrig;
-      config.translationLanguage = langTr || '';
+      config.translationLanguage = langTr || (trLanguagesList.length > 0 ? trLanguagesList[0] : '');
+      config.translationLanguages = trLanguagesList;
       config.level = config.level || 'A1';
       config.audio_order = audioOrder;
       config.sentences = flatSentences;
@@ -4893,41 +5067,18 @@ window.NewDictationFillModal = {
    * Получить выбранные языки из LanguageSelector.
    */
   _getSelectedLanguages: function () {
-    var result = { original: '', translation: '' };
+    var result = { original: '', translation: '', translationLanguages: [] };
     try {
       if (this._languageSelector && typeof this._languageSelector.getValues === 'function') {
         var values = this._languageSelector.getValues();
         if (values) {
           result.original = values.currentLearning || '';
           result.translation = values.nativeLanguage || '';
+          result.translationLanguages = Array.isArray(values.nativeLanguages) ? values.nativeLanguages : [];
         }
       }
     } catch (e) {
       console.warn('[NewDictationFillModal] _getSelectedLanguages error', e);
-    }
-
-    // Fallback: читаем из data-атрибутов
-    if (!result.original) {
-      try {
-        var container = document.getElementById('newDictationFillLangPair');
-        if (container) {
-          var leftFlag = container.querySelector('.language-selector-flag-left');
-          if (leftFlag) {
-            result.original = leftFlag.getAttribute('data-lang') || '';
-          }
-        }
-      } catch (e) {}
-    }
-    if (!result.translation) {
-      try {
-        var container = document.getElementById('newDictationFillLangPair');
-        if (container) {
-          var rightFlag = container.querySelector('.language-selector-flag-right');
-          if (rightFlag) {
-            result.translation = rightFlag.getAttribute('data-lang') || '';
-          }
-        }
-      } catch (e) {}
     }
 
     return result;
@@ -4935,6 +5086,8 @@ window.NewDictationFillModal = {
 
   /**
    * Инициализация LanguageSelector для выбора пары языков.
+   * Левый флаг: выпадающий список ВСЕХ языков (выбор изучаемого языка)
+   * Правый флаг: панель с чекбоксами всех языков (выбор языков перевода)
    */
   _initLanguageSelector: function () {
     var self = this;
@@ -4958,7 +5111,6 @@ window.NewDictationFillModal = {
         var defaultLearning = 'en';
         var nativeLang = 'ru';
         try {
-          // Пробуем получить из USER_LANGUAGE_DATA (устанавливается на странице /library)
           if (window.USER_LANGUAGE_DATA) {
             if (window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage) {
               defaultLearning = String(window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage);
@@ -4967,7 +5119,6 @@ window.NewDictationFillModal = {
               nativeLang = String(window.USER_LANGUAGE_DATA.nativeLanguage || window.USER_LANGUAGE_DATA.nativeLang).toLowerCase();
             }
           } else if (window.UM && typeof window.UM.getCurrentUser === 'function') {
-            // На desktop USER_LANGUAGE_DATA не установлен — читаем напрямую из UM
             var user = window.UM.getCurrentUser();
             if (user) {
               if (user.current_learning) defaultLearning = String(user.current_learning).toLowerCase();
@@ -4979,34 +5130,34 @@ window.NewDictationFillModal = {
           nativeLang = 'ru';
         }
 
-        var allLangs = Object.keys(languageData)
-          .map(function (x) { return String(x || '').toLowerCase(); })
-          .filter(Boolean);
-
-        var leftList = allLangs;
-        // Добавляем пустую строку "—" (без перевода) в начало списка языков перевода
-        var rightList = allLangs.filter(function (x) { return x !== defaultLearning; });
-        rightList.unshift('');
-
         container.innerHTML = '';
 
         self._languageSelector = window.initLanguageSelector('newDictationFillLangPair', {
-          mode: 'flag-pair-dropdown-both',
+          mode: 'flag-pair-checkboxes',
+          leftDropdown: true,  // левый флаг открывает список всех языков
           currentLearning: defaultLearning,
           nativeLanguage: nativeLang,
-          learningLanguages: leftList,
-          nativeLanguages: rightList,
+          nativeLanguages: [nativeLang],  // по умолчанию только родной язык
           languageData: languageData,
           onLanguageChange: function (values) {
-            // При смене языка обновляем списки
             try {
               var leftV = values && values.currentLearning ? String(values.currentLearning).toLowerCase() : '';
               var rightV = values && values.nativeLanguage ? String(values.nativeLanguage).toLowerCase() : '';
+              // Если оригинал = перевод, сбрасываем правый на другой язык
               if (leftV && rightV === leftV) {
-                // Если выбрали одинаковые — сбрасываем правый
-                values.nativeLanguage = allLangs.find(function (x) { return x !== leftV; }) || 'ru';
+                var allLangs = Object.keys(languageData)
+                  .map(function (x) { return String(x || '').toLowerCase(); })
+                  .filter(Boolean);
+                var newRight = allLangs.find(function (x) { return x !== leftV; }) || 'ru';
+                values.nativeLanguage = newRight;
+                // Обновляем и в LanguageSelector
+                if (self._languageSelector) {
+                  self._languageSelector.setValues({
+                    nativeLanguage: newRight,
+                    nativeLanguages: values.nativeLanguages || [newRight]
+                  });
+                }
               }
-              // Если rightV пустой (выбран "—"), ничего не делаем — это валидное состояние "без перевода"
             } catch (e) {}
           }
         });
@@ -5164,10 +5315,6 @@ function _updateEditorFromFillConfig(config) {
     idSpan.textContent = displayId || 'новий';
   }
 
-  // Языковые флаги отображаются через LanguageSelector в #editorModalLangPair
-  // (инициализируется в _initLanguageFlags()). Код ниже удалён, т.к. элемента
-  // #dictation-editor-modal-lang-flags не существует в HTML-шаблоне.
-
   // Устанавливаем статическую обложку-заглушку для языка (если нет загруженной обложки)
   var coverImg = document.getElementById('dictationEditorModalCoverImage');
   if (coverImg && (!coverImg.src || coverImg.src === window.location.href || coverImg.src.endsWith('/'))) {
@@ -5194,9 +5341,21 @@ function _updateEditorFromFillConfig(config) {
   if (config.originalLanguage || config.translationLanguage) {
     try {
       if (state.headerLangPairSelector && typeof state.headerLangPairSelector.setValues === 'function') {
+        // Собираем языки перевода из config.translationLanguages или из langBlocks
+        var trLangs = [];
+        if (config.translationLanguages && Array.isArray(config.translationLanguages)) {
+          trLangs = config.translationLanguages;
+        } else if (config.translationLanguage) {
+          trLangs = [config.translationLanguage];
+        } else if (state.content && state.content.langBlocks && state.content.langBlocks.length > 1) {
+          for (var i = 1; i < state.content.langBlocks.length; i++) {
+            trLangs.push(state.content.langBlocks[i].lang);
+          }
+        }
         state.headerLangPairSelector.setValues({
           currentLearning: config.originalLanguage || '',
-          nativeLanguage: config.translationLanguage || '',
+          nativeLanguage: config.translationLanguage || (trLangs.length > 0 ? trLangs[0] : ''),
+          nativeLanguages: trLangs
         });
       }
     } catch (e) {
