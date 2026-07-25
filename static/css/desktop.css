@@ -184,7 +184,9 @@
   left: 56px;
   top: auto;
   bottom: auto;
-  min-width: 200px;
+  width: max-content;
+  min-width: 180px;
+  max-width: 260px;
   max-height: 300px;
   overflow-y: auto;
   background: var(--color-surface, #fff);

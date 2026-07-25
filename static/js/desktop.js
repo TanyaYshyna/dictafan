@@ -5,6 +5,9 @@ window.Desktop = window.Desktop || {
   /** Экземпляр LanguageSelector для левой панели */
   _langSelector: null,
 
+  /** Все загруженные items рабочего стола (для переключения языка без запроса) */
+  _allDeskItems: [],
+
   ensureDictationKartDeps() {
     try {
       if (typeof window.escapeHtml !== 'function') {
@@ -763,8 +766,27 @@ window.Desktop = window.Desktop || {
           return function (data) {
             if (data && data.currentLearning) {
               self._activeLanguage = data.currentLearning;
-              // Перезагружаем стол с фильтрацией по новому языку
-              self.loadDeskItems().catch(function () {});
+              if (self._allDeskItems && self._allDeskItems.length > 0) {
+                // Показываем спиннер, потом с небольшой задержкой перерисовываем
+                try {
+                  if (window.DictationKart && typeof window.DictationKart._showLoadingIndicator === 'function') {
+                    window.DictationKart._showLoadingIndicator('Зміна мови…');
+                  }
+                } catch (e) {
+                }
+                // setTimeout(0) даёт браузеру отрисовать спиннер до синхронной перерисовки
+                setTimeout(function () {
+                  self.renderDeskCards(self._allDeskItems);
+                  try {
+                    if (window.DictationKart && typeof window.DictationKart._hideLoadingIndicator === 'function') {
+                      window.DictationKart._hideLoadingIndicator();
+                    }
+                  } catch (e) {
+                  }
+                }, 0);
+              } else {
+                self.loadDeskItems().catch(function () {});
+              }
             }
           };
         })(this),
@@ -1088,6 +1110,7 @@ window.Desktop = window.Desktop || {
         const cached = await window.idbGet('desk_items', 'latest');
         const items = cached && Array.isArray(cached.items) ? cached.items : [];
         if (items.length) {
+          this._allDeskItems = items;
           this.renderDeskCards(items);
         }
       }
@@ -1095,6 +1118,13 @@ window.Desktop = window.Desktop || {
     }
 
     // stage 1: server
+    try {
+      if (window.DictationKart && typeof window.DictationKart._showLoadingIndicator === 'function') {
+        window.DictationKart._showLoadingIndicator('Завантаження…');
+      }
+    } catch (e) {
+    }
+
     try {
       const data = await (async () => {
         const res = await fetch('/desk/api/items', {
@@ -1118,6 +1148,7 @@ window.Desktop = window.Desktop || {
         } catch (e) {
         }
 
+        this._allDeskItems = data.items;
         this.renderDeskCards(data.items);
 
         // Дополняем список языков селектора языками с рабочего стола
@@ -1149,6 +1180,13 @@ window.Desktop = window.Desktop || {
       }
     } catch (e) {
       // keep cache render
+    }
+
+    try {
+      if (window.DictationKart && typeof window.DictationKart._hideLoadingIndicator === 'function') {
+        window.DictationKart._hideLoadingIndicator();
+      }
+    } catch (e) {
     }
   },
 
