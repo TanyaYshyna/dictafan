@@ -3617,7 +3617,6 @@ function open(config) {
   // Инициализация
   _setupUserSection();
   _initLanguageFlags();
-  _updateEditorModeDisplay();
   _initFormFields();
   _initLevelSelector();
   _initVoiceModeRadios();
@@ -4663,6 +4662,19 @@ window.NewDictationFillModal = {
     // Сброс ID
     var idSpan = document.getElementById('newDictationFillId');
     if (idSpan) idSpan.textContent = 'новий';
+
+    // Отображаем бейдж режима: Начальное заполнение / Дополнение
+    var modeBadge = document.getElementById('newDictationFillMode');
+    if (modeBadge) {
+      var isNew = editorConfig && editorConfig.isNewDictation;
+      if (isNew) {
+        modeBadge.textContent = 'Начальное заполнение';
+        modeBadge.dataset.mode = 'fill';
+      } else {
+        modeBadge.textContent = 'Дополнение';
+        modeBadge.dataset.mode = 'append';
+      }
+    }
 
     // Сброс radio
     var autoRadio = document.querySelector('input[name="newDictationVoiceMode"][value="auto"]');
