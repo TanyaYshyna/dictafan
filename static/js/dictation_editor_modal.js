@@ -1930,15 +1930,40 @@ function _initLanguageFlags() {
             var newLang = values.nativeLanguage || '';
             if (!newLang) return;
             _updateTranslationDisplay(newLang);
+            // После ререндера в LanguageSelector сбрасывается inline-left,
+            // поэтому перепозиционируем дропдаун под правым флагом
+            _positionRightDropdown(container);
           }
         });
         if (state.headerLangPairSelector && typeof state.headerLangPairSelector.init === 'function') {
           state.headerLangPairSelector.init();
+          // После рендеринга позиционируем дропдаун под правым флагом
+          _positionRightDropdown(container);
         }
       }
     }
   } catch (e) {
     console.warn('[dictationEditorModal] _initLanguageFlags error', e);
+  }
+}
+
+/**
+ * Позиционирует дропдаун правого флага так, чтобы его левый верхний угол
+ * совпадал с левым нижним углом правого флага (флага перевода).
+ * Вычисляет offsetLeft правого флага внутри контейнера и устанавливает left.
+ */
+function _positionRightDropdown(container) {
+  try {
+    if (!container) return;
+    var rightSide = container.querySelector('.flag-pair-side--right');
+    var dropdown = container.querySelector('.flag-pair-dropdown[data-side="right"]');
+    if (!rightSide || !dropdown) return;
+    // offsetLeft даёт позицию относительно offsetParent.
+    // Так как контейнер имеет position: relative, offsetParent = контейнер.
+    dropdown.style.left = rightSide.offsetLeft + 'px';
+    dropdown.style.right = 'auto';
+  } catch (e) {
+    console.warn('[dictationEditorModal] _positionRightDropdown error', e);
   }
 }
 
