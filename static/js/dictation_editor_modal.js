@@ -1479,7 +1479,7 @@ function _renderTranslationsTable() {
     var actionTd = document.createElement('td');
     var deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
-    deleteBtn.className = 'dictation-editor-modal__table-control-btn delete-btn';
+    deleteBtn.className = 'translations-delete-btn';
     deleteBtn.title = 'Удалить язык перевода';
     deleteBtn.innerHTML = '<i data-lucide="trash-2"></i>';
     deleteBtn.addEventListener('click', function () {
@@ -1509,7 +1509,6 @@ function _openAddTranslationModal() {
   });
 
   var origLang = state.config ? state.config.originalLanguage : '';
-  var nativeLang = state.config ? state.config.translationLanguage : '';
 
   // Создаём LanguageSelector для выбора языка
   var selectorContainer = document.getElementById('addTranslationLangSelector');
@@ -1520,16 +1519,12 @@ function _openAddTranslationModal() {
   if (window.LanguageManager && typeof window.initLanguageSelector === 'function') {
     var languageData = window.LanguageManager.getLanguageData();
     if (languageData) {
-      // Фильтруем: показываем только языки, которых ещё нет в langBlocks,
-      // не равные оригинальному языку и не равные языку перевода (родному языку пользователя)
-      var filteredData = {};
-      Object.keys(languageData).forEach(function (code) {
-        if (!existingLangs[code] && code !== origLang && code !== nativeLang) {
-          filteredData[code] = languageData[code];
-        }
+      // Фильтруем: показываем все языки, кроме оригинала и уже добавленных переводов
+      var availableCodes = Object.keys(languageData).filter(function (code) {
+        return !existingLangs[code] && code !== origLang;
       });
 
-      if (Object.keys(filteredData).length === 0) {
+      if (availableCodes.length === 0) {
         selectorContainer.textContent = 'Все доступные языки уже добавлены';
         selectorContainer.style.color = '#888';
         selectorContainer.style.textAlign = 'center';
@@ -1537,20 +1532,31 @@ function _openAddTranslationModal() {
         return;
       }
 
-      // Берём первый доступный язык как значение по умолчанию для отображения флага
-      var availableCodes = Object.keys(filteredData);
-      var defaultLang = availableCodes.length > 0 ? availableCodes[0] : '';
+      // Используем native-selector — выпадающий список со всеми доступными языками
       var selector = window.initLanguageSelector('addTranslationLangSelector', {
-        mode: 'flag-single',
-        currentLearning: defaultLang,
-        nativeLanguage: defaultLang,
-        languageData: filteredData
+        mode: 'native-selector',
+        nativeLanguage: availableCodes[0],
+        nativeLanguages: availableCodes,
+        languageData: languageData
       });
+      if (typeof selector.init === 'function') {
+        selector.init();
+      }
 
       // Сохраняем ссылку на селектор
       modal._langSelector = selector;
     }
   }
+
+  // Закрытие выпадающего списка при клике на оверлее модалки
+  modal.addEventListener('click', function _closeOnOverlay(e) {
+    if (e.target === modal) {
+      var openOptions = selectorContainer.querySelector('.custom-select-options');
+      if (openOptions) {
+        openOptions.style.display = 'none';
+      }
+    }
+  }, { once: true });
 
   modal.style.display = 'flex';
 }
@@ -1571,7 +1577,7 @@ async function _handleAddTranslationConfirm() {
   if (!selector || typeof selector.getValues !== 'function') return;
 
   var values = selector.getValues();
-  var selectedLang = values.currentLearning || '';
+  var selectedLang = values.nativeLanguage || '';
   if (!selectedLang) return;
 
   // Проверяем, не добавлен ли уже этот язык
