@@ -288,17 +288,16 @@
           <!-- Вкладка 5: Озвучка перевода (авто) -->
           <div id="tab-voice-translations" class="dictation-editor-modal__tab-content">
             <div class="dictation-editor-modal__translations-content">
-              <div class="dictation-editor-modal__translations-toolbar">
-                <button type="button" id="editorModalAddTranslationBtn" class="dictation-editor-modal__table-control-btn add-btn"
-                  title="Добавить язык перевода">
-                  <i data-lucide="plus"></i>
-                </button>
-              </div>
               <table id="editorModalTranslationsTable" class="dictation-editor-modal__translations-table">
                 <thead>
                   <tr>
                     <th>Язык перевода</th>
-                    <th></th>
+                    <th class="col-actions">
+                      <button type="button" id="editorModalAddTranslationBtn" class="translations-add-btn"
+                        title="Добавить язык перевода">
+                        <i data-lucide="plus"></i>
+                      </button>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

@@ -1770,12 +1770,6 @@
   padding: 12px;
 }
 
-.dictation-editor-modal__translations-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 8px;
-}
-
 .dictation-editor-modal__translations-table {
   width: 100%;
   border-collapse: collapse;
@@ -1783,7 +1777,7 @@
 
 .dictation-editor-modal__translations-table th,
 .dictation-editor-modal__translations-table td {
-  padding: 8px 12px;
+  padding: 0;
   text-align: left;
   border-bottom: 1px solid var(--color-border-light, #e9ecef);
 }
@@ -1796,32 +1790,61 @@
   letter-spacing: 0.5px;
 }
 
-.dictation-editor-modal__translations-table td:last-child {
+.dictation-editor-modal__translations-table td:last-child,
+.dictation-editor-modal__translations-table th.col-actions {
   width: 40px;
+  padding: 0;
   text-align: center;
 }
 
-.dictation-editor-modal__translations-table .delete-lang-btn {
-  display: inline-flex;
+/* Кнопка добавления перевода — на всю ячейку шапки */
+.dictation-editor-modal__translations-table .translations-add-btn {
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 100%;
+  height: 100%;
+  min-height: 32px;
   padding: 0;
   border: none;
+  border-radius: 0;
   background: transparent;
+  color: var(--color-text-secondary, #6b7280);
   cursor: pointer;
+}
+
+.dictation-editor-modal__translations-table .translations-add-btn:hover {
+  background: transparent;
+  color: #27ae60;
+}
+
+.dictation-editor-modal__translations-table .translations-add-btn i {
+  width: 16px;
+  height: 16px;
+}
+
+/* Кнопка удаления перевода — на всю ячейку строки */
+.dictation-editor-modal__translations-table .translations-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text-secondary, #999);
-  border-radius: 4px;
-  transition: color 0.2s, background 0.2s;
+  cursor: pointer;
 }
 
-.dictation-editor-modal__translations-table .delete-lang-btn:hover {
+.dictation-editor-modal__translations-table .translations-delete-btn:hover {
+  background: transparent;
   color: #e74c3c;
-  background: rgba(231, 76, 60, 0.08);
 }
 
-.dictation-editor-modal__translations-table .delete-lang-btn i {
+.dictation-editor-modal__translations-table .translations-delete-btn i {
   width: 16px;
   height: 16px;
 }
