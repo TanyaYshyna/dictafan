@@ -3747,6 +3747,7 @@
               // Если да — обновляем кнопку "Далее" и ставим таймер на паузу.
               try {
                 const completion = computeSentenceCompletionState(st);
+                console.log('[DM:audio] ▶ st:', JSON.stringify({ perfect: st.number_of_perfect, corrected: st.number_of_corrected, audio: st.number_of_audio }), ' completion:', JSON.stringify(completion));
                 if (completion.textOk && completion.audioOk) {
                   updateNextButtonVisibilityFromSession(session);
                   _pauseDictationTimer();
