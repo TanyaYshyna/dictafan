@@ -45,8 +45,10 @@
     /**
      * Устанавливает предложения из плоского массива с language_code.
      * Группирует по language_code в langBlocks.
+     * @param {Array} sentences - плоский массив предложений
+     * @param {string} [originalLanguage] - код языка оригинала (будет первым блоком)
      */
-    setSentences(sentences) {
+    setSentences(sentences, originalLanguage) {
       if (!Array.isArray(sentences)) {
         return;
       }
@@ -59,10 +61,20 @@
         if (!grouped[lang]) grouped[lang] = [];
         grouped[lang].push(s);
       }
-      this.langBlocks = Object.keys(grouped).map((lang) => ({
+      // Сортируем блоки: оригинальный язык — первым, остальные — в исходном порядке
+      const origLang = String(originalLanguage || '').trim().toLowerCase();
+      const blocks = Object.keys(grouped).map((lang) => ({
         lang,
         sentences: grouped[lang].map((s, idx) => this._normalizeSentence(s, idx)),
       }));
+      if (origLang) {
+        blocks.sort((a, b) => {
+          if (a.lang === origLang) return -1;
+          if (b.lang === origLang) return 1;
+          return 0;
+        });
+      }
+      this.langBlocks = blocks;
     }
 
     _normalizeSentence(s, idx) {
@@ -497,9 +509,9 @@
       return this._contents.get(key);
     }
 
-    setContentSentences({ dictationId, sentences }) {
+    setContentSentences({ dictationId, sentences, originalLanguage }) {
       const content = this.getOrCreateContent({ dictationId });
-      content.setSentences(sentences);
+      content.setSentences(sentences, originalLanguage);
       return content;
     }
 
