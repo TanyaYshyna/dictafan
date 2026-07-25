@@ -3292,7 +3292,7 @@ function open(config) {
       var hasSentences = existingBlocks && existingBlocks.length > 0 &&
         existingBlocks[0].sentences && existingBlocks[0].sentences.length > 0;
       if (!hasSentences) {
-        state.content.setSentences(rawSentences);
+        state.content.setSentences(rawSentences, langOrig);
       }
     }
     // Если content уже существовал и в нём есть audio_or_order — используем его
@@ -3324,6 +3324,14 @@ function open(config) {
       langBlocks = Object.keys(grouped).map(function (lc) {
         return { lang: lc, sentences: grouped[lc] };
       });
+      // Сортируем: оригинальный язык — первым
+      if (langOrig) {
+        langBlocks.sort(function (a, b) {
+          if (a.lang === langOrig) return -1;
+          if (b.lang === langOrig) return 1;
+          return 0;
+        });
+      }
     } else {
       // Если нет sentences, создаём пустые блоки для оригинального и переводного языков
       if (langOrig) langBlocks.push({ lang: langOrig, sentences: [] });
@@ -3360,6 +3368,14 @@ function open(config) {
       fallbackLangBlocks = Object.keys(grouped).map(function (lc) {
         return { lang: lc, sentences: grouped[lc] };
       });
+      // Сортируем: оригинальный язык — первым
+      if (langOrig) {
+        fallbackLangBlocks.sort(function (a, b) {
+          if (a.lang === langOrig) return -1;
+          if (b.lang === langOrig) return 1;
+          return 0;
+        });
+      }
     } else {
       if (langOrig) fallbackLangBlocks.push({ lang: langOrig, sentences: [] });
       if (langTr && langTr !== langOrig) fallbackLangBlocks.push({ lang: langTr, sentences: [] });
@@ -3387,7 +3403,7 @@ function open(config) {
         var orig = this.langBlocks[0];
         return orig ? orig.sentences.map(function (s) { return s.key; }) : [];
       },
-      setSentences: function (sentences) {
+      setSentences: function (sentences, originalLanguage) {
         if (!Array.isArray(sentences)) return;
         var grouped = {};
         sentences.forEach(function (s) {
@@ -3410,6 +3426,14 @@ function open(config) {
         this.langBlocks = Object.keys(grouped).map(function (lc) {
           return { lang: lc, sentences: grouped[lc] };
         });
+        // Сортируем: оригинальный язык — первым
+        if (originalLanguage) {
+          this.langBlocks.sort(function (a, b) {
+            if (a.lang === originalLanguage) return -1;
+            if (b.lang === originalLanguage) return 1;
+            return 0;
+          });
+        }
       },
     };
   }
@@ -4794,7 +4818,7 @@ window.NewDictationFillModal = {
       // чтобы _renderTable() в _updateEditorFromFillConfig могла прочитать sentences
       if (state.content) {
         if (typeof state.content.setSentences === 'function') {
-          state.content.setSentences(flatSentences);
+          state.content.setSentences(flatSentences, langOrig);
         }
       }
 
@@ -5209,6 +5233,14 @@ function _updateEditorFromFillConfig(config) {
       langBlocks = Object.keys(grouped).map(function (lc) {
         return { lang: lc, sentences: grouped[lc] };
       });
+      // Сортируем: оригинальный язык — первым
+      if (config.originalLanguage) {
+        langBlocks.sort(function (a, b) {
+          if (a.lang === config.originalLanguage) return -1;
+          if (b.lang === config.originalLanguage) return 1;
+          return 0;
+        });
+      }
       state.content = new DictationContent({
         dictationId: config.dictationId || '',
         langBlocks: langBlocks,
@@ -5238,6 +5270,14 @@ function _updateEditorFromFillConfig(config) {
       fallbackLangBlocks = Object.keys(grouped).map(function (lc) {
         return { lang: lc, sentences: grouped[lc] };
       });
+      // Сортируем: оригинальный язык — первым
+      if (config.originalLanguage) {
+        fallbackLangBlocks.sort(function (a, b) {
+          if (a.lang === config.originalLanguage) return -1;
+          if (b.lang === config.originalLanguage) return 1;
+          return 0;
+        });
+      }
       state.content = {
         dictationId: config.dictationId || '',
         audio_or_order: config.audio_order || '',
@@ -5260,7 +5300,7 @@ function _updateEditorFromFillConfig(config) {
           var orig = this.langBlocks[0];
           return orig ? orig.sentences.map(function (s) { return s.key; }) : [];
         },
-        setSentences: function (sentences) {
+        setSentences: function (sentences, originalLanguage) {
           if (!Array.isArray(sentences)) return;
           var grouped = {};
           sentences.forEach(function (s) {
@@ -5283,6 +5323,14 @@ function _updateEditorFromFillConfig(config) {
           this.langBlocks = Object.keys(grouped).map(function (lc) {
             return { lang: lc, sentences: grouped[lc] };
           });
+          // Сортируем: оригинальный язык — первым
+          if (originalLanguage) {
+            this.langBlocks.sort(function (a, b) {
+              if (a.lang === originalLanguage) return -1;
+              if (b.lang === originalLanguage) return 1;
+              return 0;
+            });
+          }
         },
       };
     }
