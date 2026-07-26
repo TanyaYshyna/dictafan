@@ -1548,17 +1548,6 @@ function _openAddTranslationModal() {
     }
   }
 
-  // Закрытие выпадающего списка при клике на оверлее модалки
-  // persistent — срабатывает при каждом клике по оверлею
-  modal.addEventListener('click', function _closeOnOverlay(e) {
-    if (e.target === modal) {
-      var openOptions = selectorContainer.querySelector('.custom-select-options');
-      if (openOptions) {
-        openOptions.style.display = 'none';
-      }
-    }
-  });
-
   modal.style.display = 'flex';
 }
 
@@ -1589,9 +1578,12 @@ async function _handleAddTranslationConfirm() {
     return;
   }
 
-  // Показываем лоадер
-  var loadingOverlay = document.getElementById('addTranslationLoadingOverlay');
-  if (loadingOverlay) loadingOverlay.style.display = 'flex';
+  // Показываем универсальный лоадер
+  try {
+    if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.show === 'function') {
+      window.DesktopLoadingModal.show('Створення перекладу...');
+    }
+  } catch (e) {}
 
   try {
     // Добавляем новый блок языка в langBlocks
@@ -1687,10 +1679,11 @@ async function _handleAddTranslationConfirm() {
     _bindAudioPlaybackHandlers();
     _setDirtyFlags({ db: true, audio: voiceMode === 'auto' });
   } finally {
-    // Скрываем лоадер в любом случае (успех или ошибка)
+    // Скрываем универсальный лоадер в любом случае (успех или ошибка)
     try {
-      var loadingOverlay = document.getElementById('addTranslationLoadingOverlay');
-      if (loadingOverlay) loadingOverlay.style.display = 'none';
+      if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') {
+        window.DesktopLoadingModal.hide();
+      }
     } catch (e) {
       console.warn('[dictationEditorModal] error hiding loading overlay', e);
     }
@@ -1705,12 +1698,11 @@ function _openRemoveTranslationModal(langCode) {
       buttons: [
         {
           text: 'Удалить',
-          class: 'modal-btn modal-btn-danger',
-          callback: function () {
+          type: 'danger',
+          onClick: function () {
             _removeTranslationLanguage(langCode);
           }
         },
-        { text: 'Отмена', class: 'modal-btn modal-btn-secondary transparent' },
       ]
     });
   } else {
@@ -1723,6 +1715,13 @@ function _openRemoveTranslationModal(langCode) {
 function _removeTranslationLanguage(langCode) {
   if (!state.content || !state.content.langBlocks) return;
 
+  // Показываем универсальный лоадер
+  try {
+    if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.show === 'function') {
+      window.DesktopLoadingModal.show('Видалення мови перекладу...');
+    }
+  } catch (e) {}
+
   var index = -1;
   for (var i = 0; i < state.content.langBlocks.length; i++) {
     if (state.content.langBlocks[i].lang === langCode) {
@@ -1731,15 +1730,29 @@ function _removeTranslationLanguage(langCode) {
     }
   }
 
-  if (index === -1) return;
-  if (index === 0) return; // Не удаляем оригинал
+  if (index === -1) {
+    try { if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') window.DesktopLoadingModal.hide(); } catch (e) {}
+    return;
+  }
+  if (index === 0) {
+    try { if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') window.DesktopLoadingModal.hide(); } catch (e) {}
+    return; // Не удаляем оригинал
+  }
 
   state.content.langBlocks.splice(index, 1);
 
   _renderTranslationsTable();
+  _initLanguageFlags();
   _renderTable();
   _bindAudioPlaybackHandlers();
   _setDirtyFlags({ db: true });
+
+  // Скрываем лоадер
+  try {
+    if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') {
+      window.DesktopLoadingModal.hide();
+    }
+  } catch (e) {}
 }
 
 /* ===== ВИДИМОСТЬ КНОПКИ "ПЕРЕЗАПОЛНИТЬ ВСЕ АВТО" ===== */
