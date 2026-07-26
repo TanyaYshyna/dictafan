@@ -99,7 +99,7 @@
           var btn = document.createElement('button');
           btn.className = 'desktop-confirm-custom-btn';
           if (btnOpts.type === 'danger') {
-            btn.classList.add('button-color-red');
+            btn.classList.add('button-color-pink');
           } else if (btnOpts.type === 'primary') {
             btn.classList.add('button-color-yellow');
           } else {
