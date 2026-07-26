@@ -467,12 +467,27 @@ function _renderTable() {
   var tbody = table.querySelector('tbody');
   if (!tbody) return;
 
-  // Получаем langBlocks: langBlocks[0] — оригинал, langBlocks[1] — перевод (если есть)
+  // Получаем langBlocks: langBlocks[0] — оригинал, остальные — переводы
   var langBlocks = state.content ? state.content.langBlocks : [];
   var origBlock = langBlocks.length > 0 ? langBlocks[0] : null;
-  var trBlock = langBlocks.length > 1 ? langBlocks[1] : null;
   var origSentences = origBlock ? origBlock.sentences : [];
   var langOrig = origBlock ? origBlock.lang : (state.config?.originalLanguage || '');
+
+  // Выбираем блок перевода по текущему языку из config (если есть несколько)
+  var currentTrLang = (state.config && state.config.translationLanguage) || '';
+  var trBlock = null;
+  if (currentTrLang && langBlocks.length > 1) {
+    for (var i = 1; i < langBlocks.length; i++) {
+      if (langBlocks[i].lang === currentTrLang) {
+        trBlock = langBlocks[i];
+        break;
+      }
+    }
+  }
+  // Fallback: если не нашли по currentTrLang — берём первый переводной блок
+  if (!trBlock && langBlocks.length > 1) {
+    trBlock = langBlocks[1];
+  }
   var langTr = trBlock ? trBlock.lang : (state.config?.translationLanguage || '');
 
   tbody.innerHTML = '';
@@ -1648,13 +1663,16 @@ async function _handleAddTranslationConfirm() {
             });
             var trData = await trResp.json();
             console.log('[dictationEditorModal] відповідь перекладу для', s.key, trData);
-            if (trData.success && trData.translated_text) {
-              // Находим соответствующее предложение в новом блоке
-              var newBlock = state.content.langBlocks.find(function (b) { return b.lang === selectedLang; });
-              if (newBlock) {
-                var targetSentence = newBlock.sentences.find(function (ns) { return ns.key === s.key; });
-                if (targetSentence) {
-                  targetSentence.text = trData.translated_text;
+            if (trData.success) {
+              // Сервер может вернуть поле 'translation' или 'translated_text'
+              var translatedText = trData.translation || trData.translated_text || '';
+              if (translatedText) {
+                var newBlock = state.content.langBlocks.find(function (b) { return b.lang === selectedLang; });
+                if (newBlock) {
+                  var targetSentence = newBlock.sentences.find(function (ns) { return ns.key === s.key; });
+                  if (targetSentence) {
+                    targetSentence.text = translatedText;
+                  }
                 }
               }
             }
