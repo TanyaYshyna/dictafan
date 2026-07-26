@@ -23,7 +23,7 @@
     {% block bootstrap_scripts %}
     <script>
         try {
-            const supported = ['en', 'uk', 'ru', 'ar'];
+            const supported = ['en', 'uk', 'ru', 'ar', 'tr'];
             const storedRaw = (localStorage.getItem('ui_lang') || '').toString().trim().toLowerCase();
             const stored = supported.includes(storedRaw) ? storedRaw : '';
 

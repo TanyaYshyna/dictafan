@@ -1,0 +1,768 @@
+{
+  "profile": {
+    "page_title": "Kullanıcı profili - DiktaFun",
+    "header": "Kullanıcı profili",
+    "common": {
+      "save": "Kaydet",
+      "cancel": "İptal",
+      "close": "Kapat",
+      "copy": "Kopyala",
+      "refresh": "Yenile",
+      "yes": "Evet",
+      "toggle_section_aria": "Daralt/genişlet",
+      "error": "Hata",
+      "saved": "Kaydedildi",
+      "updated": "Güncellendi",
+      "copied": "Kopyalandı",
+      "link_copied": "Bağlantı kopyalandı",
+      "copy_manually": "Bağlantıyı manuel olarak kopyalayın",
+      "saving_changes": "Değişiklikler kaydediliyor...",
+      "profile_saved": "Profil kaydedildi!",
+      "service_worker_inactive": "Service Worker etkin değil"
+    },
+    "ui_language": {
+      "label": "Arayüz dili",
+      "label_inline": "Arayüz",
+      "save_error": "Dil kaydedilemedi"
+    },
+    "native_language": {
+      "label": "Ana dil:"
+    },
+    "learning_languages": {
+      "label": "Öğrenilen diller:",
+      "at_least_one": "En az bir dil seçin"
+    },
+    "learning_language": {
+      "label": "Öğrenilen dil:"
+    },
+    "name": {
+      "label": "Ad"
+    },
+    "email": {
+      "label": "E-posta"
+    },
+    "password": {
+      "label": "Şifre",
+      "placeholder": "Yeni şifre girin",
+      "show_aria": "Şifreyi göster"
+    },
+    "avatar": {
+      "alt": "Avatar",
+      "upload": "Yükle"
+    },
+    "topbar": {
+      "back_to_dictations": "Dikteye geri dön",
+      "save": "Kaydet"
+    },
+    "sections": {
+      "languages": "Diller",
+      "activity_goal": "Günlük aktivite hedefi",
+      "local_models": "Konuşma tanıma türleri",
+      "dictation_settings": "Dikte ayarları",
+      "assignment_history": "Ödev geçmişi",
+      "groups": "Gruplar"
+    },
+    "activity_goal": {
+      "label": "Günlük aktivite hedefi:",
+      "help": "Başlıkta bugünkü ilerlemeyi göstermek için kullanılır (örn. 78/100)."
+    },
+    "activity_plan": {
+      "time": "Süre",
+      "minutes": "dk",
+      "money": "Para",
+      "coins": "para",
+      "increase": "Artır",
+      "decrease": "Azalt"
+    },
+    "audio": {
+      "explanations": {
+        "label": "Açıklamalar:",
+        "o": "orijinal ses",
+        "t": "çeviri sesi"
+      },
+      "play_audio": {
+        "title": "Sesi oynat:",
+        "order_title": "Cümle içinde ses çalma sırası",
+        "on_start": "başlangıçta:",
+        "on_typo": "hatada:",
+        "on_success": "başarılı olduğunda:",
+        "sequence_title": "Yalnızca 't' (çeviri) ve 'o' (orijinal) harflerini kullanın"
+      },
+      "repeats": {
+        "label": "Ses tekrarları:",
+        "title": "Toplam ses tekrar sayısı (0 ile 5 arası)"
+      },
+      "required_star_half": {
+        "title": "1 yıldız sayılması için kaç yarım yıldız gerekli (3 ile 9 arası)"
+      },
+      "only_audio": {
+        "label": "Yalnızca ses (metin girişi yok):",
+        "title": "Etkinleştirilirse metin giriş alanı devre dışı kalır"
+      },
+      "show_hint": {
+        "label": "İpucunu göster:",
+        "title": "Etkinleştirilirse doğru cümle metni gösterilir"
+      },
+      "speech_recognition": {
+        "label": "Konuşma tanıma:",
+        "mode_local": "yerel",
+        "mode_internet": "internet",
+        "local_model_not_downloaded": "Yerel model indirilmedi",
+        "local_model_not_selected": "Yerel model seçilmedi"
+      },
+      "test_recording": {
+        "label": "Kayıt testi:",
+        "record": "Kaydet",
+        "placeholder": "Tanınan metin burada görünecek"
+      }
+    },
+    "assignment_history": {
+      "retention": {
+        "label": "Ödev geçmişini sakla",
+        "days_0": "0 gün",
+        "days_7": "7 gün",
+        "days_30": "30 gün",
+        "help": "Ödev geçmişi 30 güne kadar saklanır. Eski öğeler silinebilir."
+      }
+    },
+    "telegram": {
+      "teacher_notifications": {
+        "title": "Telegram'da öğrenci bildirimlerini al",
+        "label": "Telegram'da öğrenci bildirimlerini al"
+      },
+      "self_reports": {
+        "title": "Dikte sonuçlarımı Telegram'da gönder",
+        "label_html": "Dikte sonuçlarımı Telegram'da<br>gönder"
+      },
+      "status": {
+        "linked": "Bağlandı (chat_id: {chat_id})",
+        "not_linked": "Bağlanmadı"
+      },
+      "link": {
+        "title": "Telegram'ı bağla",
+        "toggle_aria": "Telegram bağlama bölümünü daralt/genişlet",
+        "get_code": "Kod al",
+        "open_bot": "Botu aç",
+        "open_bot_title": "Telegram'da botu aç",
+        "code_placeholder": "kod",
+        "copy_start_cmd_title": "/start komutunu panoya kopyala",
+        "refresh_status_title": "Sayfayı yenilemeden durumu güncelle",
+        "code_received": "Kod alındı",
+        "get_code_first": "Önce bir kod alın"
+      },
+      "errors": {
+        "profile_refresh_failed": "Profil yenilenemedi"
+      },
+      "help": {
+        "prefix": "Telegram'ı bağlamak için:",
+        "prefix_other": "Başka bir hesabı bağlamak için:",
+        "step1": "- «<span class=\"telegram-inline-icon\"><i data-lucide=\"key\"></i></span> Kod al»a tıklayın,",
+        "step2": "- ardından <span class=\"telegram-inline-icon\"><i data-lucide=\"copy\"></i></span> düğmesini kullanarak Telegram komutunu gönderin"
+      }
+    },
+    "groups": {
+      "my_groups": {
+        "title": "Gruplarım"
+      },
+      "table": {
+        "id": "ID",
+        "name": "Ad"
+      },
+      "errors": {
+        "name_required": "Ad gereklidir"
+      },
+      "details": {
+        "select_left": "Soldan bir grup seçin"
+      },
+      "filter": {
+        "title": "Filtre",
+        "active": "sadece aktif",
+        "all": "tümünü göster"
+      },
+      "actions": {
+        "create_group_title": "Yeni grup",
+        "delete_group_title": "Grubu sil/arşivle",
+        "created": "Grup oluşturuldu",
+        "archived": "Grup arşivlendi",
+        "restored": "Grup geri yüklendi"
+      },
+      "invite_link": {
+        "label": "Davet bağlantısı",
+        "copy": "Kopyala",
+        "create": "Davet oluştur",
+        "create_button": "Davet",
+        "errors": {
+          "get_failed": "Bağlantı alınamadı"
+        }
+      },
+      "students": {
+        "title": "Öğrenciler",
+        "invite_email_title": "Yeni öğrenci (e-posta)",
+        "invite_link_title": "Öğrenci davet et (bağlantı)",
+        "delete_title": "Öğrenciyi kaldır",
+        "empty": "Henüz öğrenci yok",
+        "select_student": "Bir öğrenci seçin",
+        "cannot_remove_pending_invite": "Kaldırılamıyor: öğrenci henüz daveti kabul etmedi",
+        "removed": "Öğrenci kaldırıldı"
+      },
+      "memberships": {
+        "title": "İçinde olduğum gruplar",
+        "leave_title": "Gruptan ayrıl"
+      },
+      "invites": {
+        "title": "Davetler",
+        "accept": "Kabul et",
+        "accepted": "Davet kabul edildi",
+        "decline": "Reddet",
+        "declined": "Davet reddedildi",
+        "pending": "beklemede"
+      },
+      "modal": {
+        "title": "Grup",
+        "name": "Ad",
+        "description": "Açıklama"
+      },
+      "restore": {
+        "confirm": "Grup geri yüklensin mi?"
+      },
+      "invite_email": {
+        "modal_title": "Yeni öğrenci (e-posta)",
+        "email_label": "Öğrenci e-postası",
+        "send": "Davet et"
+      }
+    },
+    "models": {
+      "all_models": "Tüm modeller",
+      "languages": "Diller",
+      "method_google": "Google servisleri",
+      "method_server_whisper_tiny": "Sunucuda Whisper Tiny",
+      "method_device_whisper_tiny": "Cihazda Whisper Tiny",
+      "method_device_whisper_base": "Cihazda Whisper Base",
+      "method_device_whisper_small": "Cihazda Whisper Small",
+      "browser_storage": "Tarayıcı depolama:",
+      "loading_info": "Bilgi yükleniyor...",
+      "calculating_storage": "Depolama kullanımı hesaplanıyor...",
+      "downloaded_prefix": "İndirilen:",
+      "no_downloaded_models": "indirilen model yok",
+      "download_modal": {
+        "title": "Model indirme",
+        "preparing": "İndirme hazırlanıyor…",
+        "downloading": "İndiriliyor…"
+      },
+      "storage": {
+        "stats": "Kullanılan: {used} | Toplam: {total}",
+        "models_short": "Modeller: {count} ({size})",
+        "used": "Kullanılan:",
+        "available": "Kullanılabilir:",
+        "total": "Toplam:",
+        "models": "Modeller:",
+        "models_count": "{count} ({size})",
+        "downloaded_models": "İndirilen modeller:",
+        "models_size": "Modellerin boyutu:"
+      }
+    },
+    "auth": {
+      "please_login": "Lütfen giriş yapın"
+    },
+    "errors": {
+      "load_failed": "Profil yüklenemedi: {message}",
+      "save_failed": "Kaydetme başarısız: {message}"
+    },
+    "password_toggle": {
+      "show": "Şifreyi göster",
+      "hide": "Şifreyi gizle"
+    },
+    "exit_modal": {
+      "title": "Masaüstüne geri dön?",
+      "message": "Mevcut değişikliklerinizle ne yapalım?",
+      "stay": "Kal",
+      "exit": "Çık"
+    },
+    "crop_modal": {
+      "title": "Avatarı kırp"
+    }
+  },
+  "dictation": {
+    "topbar": {
+      "show_statistics": "İstatistikleri göster",
+      "settings": "Ayarlar",
+      "save": "Kaydet",
+      "back_to_list": "Dikte listesine geri dön",
+      "streak_title": "Seri günleri",
+      "cover_alt": "Dikte kapağı"
+    },
+    "start_button": {
+      "start": "BAŞLA",
+      "continue": "Devam!!!",
+      "new_start": "YENİDEN BAŞLA",
+      "victory": "Zafer! Harika iş!!!"
+    },
+    "start_modal": {
+      "select_all": "Tümünü seç",
+      "original": "orijinal",
+      "translation": "çeviri",
+      "direct_order": "doğrudan sıra",
+      "shuffle_order": "karıştır",
+      "reset": "Baştan başla",
+      "send_interim_report": "Ara rapor gönder",
+      "settings": "Ayarlar",
+      "exit": "Dikteden çık",
+      "close": "Kapat",
+      "table": {
+        "choice": "Seçim",
+        "row_number": "Satır numarası",
+        "original": "Orijinal",
+        "sentence": "Cümle",
+        "code": "Kod",
+        "translation": "Çeviri"
+      }
+    },
+    "exit_modal": {
+      "title": "Masaüstüne geri dön?",
+      "message": "Mevcut ilerlemeyle ne yapalım?",
+      "unsaved_progress_confirm": "Kaydedilmemiş ilerleme var. Çıkmadan önce kaydedilsin mi?",
+      "saved_progress_next": "Tüm değişiklikler zaten kaydedildi. Ne yapmak istersiniz?",
+      "stay": "Kal",
+      "exit": "Çık"
+    },
+    "pause_modal": {
+      "title": "Duraklat (control + esc)",
+      "resume": "Devam et"
+    },
+    "settings_modal": {
+      "title": "Ayarlar",
+      "close": "Kapat",
+      "teacher_report": {
+        "title": "Telegram raporu",
+        "desc": "Dikte tamamlandıktan sonra raporu kim almalı"
+      }
+    },
+    "completion_modal": {
+      "title": "Tebrikler!",
+      "message": "Dikteyi başarıyla tamamladınız!",
+      "results_title": "Özet ve yeni oyun",
+      "results": "Özet ve yeni oyun",
+      "exit": "Çık"
+    },
+    "no_selection": {
+      "title": "Dikkat! Bir sorunumuz var!",
+      "message": "Lütfen yukarıdaki tabloda üzerinde çalışılacak cümleleri seçin.",
+      "ok": "Anladım"
+    },
+    "main": {
+      "check_title": "Yazmayı bitirdiğinizde Enter/Return tuşuna basın",
+      "check": "Kontrol et",
+      "next": "Sonraki",
+      "input_empty": "Henüz tek bir harf bile yazmadınız — neyi kontrol etmek istiyorsunuz?",
+      "input_min_half": "Kontrol etmeden önce cümlenin en az yarısını yazın.",
+      "virtual_keyboard": "Klavyeyi göster",
+      "unsaved_progress": "Kaydedilmemiş ilerleme var (Ctrl/⌘ + S — kaydet)",
+      "recording_indicator": "Kayıt göstergesi",
+      "recognition_mode": "Konuşma tanıma modu",
+      "paste_disabled": "Bu alana metin yapıştırmak devre dışı"
+    },
+    "teacher_report": {
+      "no_dictation_data": "Dikte verisi yok",
+      "loading": "Yükleniyor…",
+      "no_recipients": "Kullanılabilir alıcı yok",
+      "self_label": "Ben",
+      "teacher_fallback": "Öğretmen #{id}"
+    },
+    "assignment": {
+      "badge": "Ödev {id}"
+    },
+    "cache": {
+      "loading": "Önbelleğe yükleniyor…",
+      "fetching_dictation": "Dikte önbelleğe yükleniyor…"
+    },
+    "toasts": {
+      "progress_cleared": "Cümle ilerlemesi temizlendi.",
+      "cache_missing_fetching": "Önbellekte veri yok. İnternetten alınıyor…",
+      "progress_saved": "İlerleme kaydedildi",
+      "progress_save_failed": "İlerleme kaydedilemedi",
+      "progress_save_error": "Kaydederken hata oluştu",
+      "progress_saved_continue_later": "İlerleme kaydedildi. Daha sonra devam edebilirsiniz."
+    },
+    "alerts": {
+      "load_dictation_data_failed": "Dikte verileri yüklenemedi",
+      "interim_report_sent": "Ara rapor gönderildi",
+      "interim_report_failed": "Rapor gönderilemedi"
+    },
+    "speech": {
+      "processing": "Tanınıyor…",
+      "speak": "Konuş…",
+      "speak_offline": "Konuş… (çevrimdışı)",
+      "motivation_50": "Harika iş — çok ısrarlısınız!\n5 denemede %50'nin üzerindeki sesleri sayacağım!!!\nAma yanlış telaffuz edilenleri anadili konuşan birine veya öğretmene sormayı deneyin!",
+      "unavailable_browser": "Konuşma tanıma kullanılamıyor. Chrome, Edge veya Safari kullanın.",
+      "no_internet": "İnternet bağlantısı yok. Web Speech API'nin çalışması için internet gerekir.",
+      "recognition_error_prefix": "Tanıma hatası:",
+      "error_prefix": "Hata:"
+    },
+    "vk": {
+      "no_layout": "Klavye düzeni mevcut dil için kullanılamıyor"
+    },
+    "no_selection_errors": {
+      "message": "Lütfen yukarıdaki tabloda üzerinde çalışılacak cümleleri seçin.",
+      "load_failed_check_internet": "Dikte yüklenemedi. İnternetinizi kontrol edin ve sayfayı yenileyin.",
+      "cache_save_failed": "Dikte önbelleğe kaydedilemedi. Sayfayı yenileyin.",
+      "settings_disable_text_and_audio": "Ayarlarda hem metin hem de ses devre dışı. En az bir alıştırmayı etkinleştirin.",
+      "none_selected": "Dikte için hiçbir cümle seçilmedi",
+      "audio_not_cached_reload": "Ses önbelleğe alınmadı. Dikteyi yeniden yükleyin ve indirmesini bekleyin."
+    },
+    "main_status": {
+      "checking": "Kontrol ediliyor",
+      "excellent": "Mükemmel",
+      "good": "İyi",
+      "check_title": "Yazmayı bitirdiğinizde Enter/Return tuşuna basın"
+    }
+  },
+  "private_library": {
+    "page_title": "Özel kütüphane — DictaFan",
+    "common": {
+      "close": "Kapat",
+      "cancel": "İptal",
+      "save": "Kaydet"
+    },
+    "topbar": {
+      "logout_title": "Çıkış yap",
+      "streak_title": "Seri günleri"
+    },
+    "user_menu": {
+      "profile": "Kullanıcı profili",
+      "activity_report": "Aktivite raporu",
+      "rating": "Derecelendirme",
+      "plan_fact": "Plan-gerçek raporu",
+      "support": "Bana kahve ısmarla"
+    },
+    "delete_modal": {
+      "title": "Dikteyi sil",
+      "question_prefix": "Dikteyi silmek istediğinize emin misiniz",
+      "confirm": "Sil"
+    },
+    "home_library": {
+      "title": "Kütüphanem",
+      "my_books": "Kitaplarım",
+      "new_book": "Yeni kitap"
+    },
+    "toolbar": {
+      "create_dictation": "Dikte oluştur",
+      "my_library": "Kütüphanem",
+      "public_library": "Herkese açık kütüphane",
+      "plan": "Plan",
+      "assignments": "Ödevler",
+      "zoom_in": "Yakınlaştır",
+      "zoom_out": "Uzaklaştır"
+    },
+    "book_edit": {
+      "title_new": "Yeni kitap",
+      "cover_label": "Kitap kapağı",
+      "cover_alt": "Kapak",
+      "cover_upload": "Kapak yükle",
+      "book_title": "Başlık",
+      "author_optional": "Metin yazarı (isteğe bağlı)",
+      "author_materials_url": "Yazar materyalleri bağlantısı",
+      "url_placeholder": "https://...",
+      "original_language": "Orijinal dil",
+      "theme": "Konu",
+      "theme_placeholder": "şiirler, okul dikteleri, vb.",
+      "visibility": "Görünürlük",
+      "visibility_private": "Sadece bana görünür",
+      "visibility_public": "Herkese görünür (herkese açık kitap)",
+      "description": "Açıklama"
+    },
+    "section_edit": {
+      "title_new": "Yeni bölüm",
+      "number": "Bölüm numarası",
+      "number_placeholder": "Bölüm numarasını girin",
+      "name": "Bölüm başlığı",
+      "placeholder": "Bölüm başlığını girin"
+    },
+    "book_view": {
+      "title": "Kitap"
+    },
+    "public_library": {
+      "title": "Herkese açık kütüphane"
+    },
+    "move_dictation": {
+      "title": "Dikteyi bir kitaba taşı",
+      "choose_book": "Bir kitap seçin:",
+      "choose_book_placeholder": "-- Bir kitap seçin --",
+      "choose_section": "Bir bölüm seçin:",
+      "select": "Seç"
+    },
+    "crop": {
+      "title": "Kapağı kırp",
+      "apply": "Uygula"
+    },
+    "assignments": {
+      "max_7_days": "Maksimum 7 gün",
+      "exercises_modal_title": "Tüm alıştırmalar",
+      "exercises_column": "Alıştırmalar",
+      "modal_title": "Ödev",
+      "add_day": "Gün ekle",
+      "text_column": "Metin",
+      "no_sentences": "Cümle yok",
+      "toggle_all_select": "Tümünü seç",
+      "toggle_all_deselect": "Tümünün seçimini kaldır",
+      "select_sentence": "Cümle seç"
+    },
+    "reports": {
+      "rating_unavailable": "Derecelendirme kullanılamıyor",
+      "rating_open_failed": "Derecelendirme açılamadı",
+      "activity_unavailable": "Aktivite raporu kullanılamıyor",
+      "activity_open_failed": "Aktivite raporu açılamadı",
+      "plan_fact_unavailable": "Plan-gerçek raporu kullanılamıyor",
+      "plan_fact_open_failed": "Plan-gerçek raporu açılamadı"
+    },
+    "student_plan": {
+      "title": "Plan",
+      "prev_day": "Önceki gün",
+      "next_day": "Sonraki gün",
+      "today": "Bugün",
+      "refresh": "Verileri yenile",
+      "no_assignments": "Bu tarih için ödev yok",
+      "dictation_fallback_title": "Dikte {id}",
+      "cached_title": "Önbellekte",
+      "cached_badge": "önbellekte",
+      "group_fallback_title": "Grup {id}",
+      "group_generic_title": "Grup"
+    },
+    "translation_pick": {
+      "only_available": "‘{lang}’ için çeviri yok — mevcut tek çeviri açıldı.",
+      "other_available": "‘{lang}’ için çeviri yok — başka bir çeviri açıldı."
+    },
+    "dictation_card_actions": {
+      "title": "İşlemler",
+      "create_assignment_new": "Alıştırmalar",
+      "cache": "Önbellek",
+      "edit": "Düzenle",
+      "editor": "Düzenleyici",
+      "show_in_book": "Kitapta göster",
+      "remove_from_desk": "Masaüstünden kaldır",
+      "add_to_desk": "Masaüstüne ekle",
+      "create_assignment": "Ödev",
+      "move": "Taşı",
+      "delete": "Sil"
+    },
+    "teacher_students": {
+      "title": "Öğrenciler",
+      "subtitle": "%{pct} tamamlandı · {done}/{total}",
+      "none": "Henüz öğrenci yok",
+      "status_done": "tamamlandı",
+      "status_overdue": "gecikmiş",
+      "status_not_done": "yapılmadı",
+      "loading": "Yükleniyor…",
+      "load_failed": "Yüklenemedi"
+    },
+    "student_plan_launch": {
+      "sentences_from_assignment": "Ödevden cümleler",
+      "start": "Başla",
+      "dictation_fallback_title": "Dikte",
+      "assignment_for_date": "{date} için ödev",
+      "past_day_warning": "Bu ödev geçmiş bir güne ait. Sonuç bugün için 'diğer aktivite (plan dışı)' olarak sayılacaktır. Geçmiş günler değiştirilemez.",
+      "all_sentences": "Tüm cümleler",
+      "loading": "Yükleniyor…",
+      "no_sentences": "Cümle yok",
+      "load_sentences_failed": "Cümleler yüklenemedi"
+    }
+  },
+  "dictation_editor": {
+    "title": "Dikte düzenleyici",
+    "header": {
+      "streak_title": "Yanmaz seri toplamı",
+      "save": "Kaydet",
+      "back_to_list": "Dikte listesine geri dön",
+      "dictation_name": "Dikte adı:"
+    },
+    "tabs": {
+      "general": "1. Genel",
+      "audio": "2. Ses",
+      "dialog": "3. Diyalog",
+      "create_audio": "4. Ses oluştur",
+      "translations": "5. Çeviriler"
+    },
+    "general": {
+      "cover_upload": "Yükle",
+      "level": "Seviye:",
+      "author_materials_url": "Yazar materyalleri URL'si",
+      "url_placeholder": "https://..."
+    },
+    "audio": {
+      "mode_full": "Tam dosyayı göster",
+      "mode_sentence": "Geçerli cümle",
+      "mode_mic": "Mikrofon kaydı",
+      "mode_auto": "Otomatik doldur",
+      "current_audio_none": "Dalga biçimi için ses: seçilmedi",
+      "current_row_none": "Tablo satırı: seçilmedi",
+      "select_file": "Dosya seç",
+      "start": "Başlangıç:",
+      "end": "Bitiş:",
+      "cut_many_title": "Sesi 1000 parçaya böl",
+      "cut_many": "1000 parçaya"
+    },
+    "dialog": {
+      "is_dialog": "Bu bir diyalog",
+      "speakers": "Konuşmacılar",
+      "speaker_name": "Konuşmacı adı",
+      "remove_speaker": "Konuşmacıyı kaldır",
+      "add_speaker": "Konuşmacı ekle"
+    },
+    "table": {
+      "refill": "Tabloyu yeniden doldur",
+      "delete_row": "Satırı sil",
+      "add_row": "Satır ekle",
+      "toggle_explanation_title": "Açıklamayı göster/gizle",
+      "explanation": "Açıklama",
+      "prev_row": "Önceki satır",
+      "next_row": "Sonraki satır",
+      "original": "Orijinal",
+      "translation": "Çeviri",
+      "apply": "Uygula",
+      "edit_all_marked": "İşaretlenenlerin tümünü düzenle"
+    },
+    "start_modal": {
+      "title": "Dikte oluştur",
+      "create": "Dikte oluştur",
+      "translation_delimiter": "Çeviri satırı öneki:",
+      "name": "Başlık:",
+      "name_placeholder": "Bir başlık girin...",
+      "text": "Dikte metni:",
+      "text_placeholder": "Dikte metnini girin..."
+    },
+    "create_audio_file": {
+      "title": "Ses dosyası oluştur",
+      "file_name": "Dosya adı:",
+      "file_name_placeholder": "audio_op.mp3",
+      "hint": "Dosya dikte geçici klasörüne kaydedilecek"
+    },
+    "add_row": {
+      "title": "Yeni satır ekle",
+      "message_html": "<span id=\"addRowCurrentNumber\">{n}</span> numaralı satıra göre nereye yeni satır eklemek istiyorsunuz:"
+    },
+    "delete_row": {
+      "title": "Satırı sil",
+      "message_html": "<span id=\"deleteRowNumber\">{n}</span> numaralı satırı silmek istediğinize emin misiniz?",
+      "irreversible": "Bu işlem geri alınamaz!",
+      "key": "Anahtar:"
+    },
+    "mic": {
+      "title": "Mikrofon kaydı",
+      "text_for_record": "Kaydedilecek metin:",
+      "ready": "Kayda hazır",
+      "start": "Kaydı başlat",
+      "stop": "Durdur",
+      "listen": "Dinle",
+      "rerecord": "Yeniden kaydet",
+      "duration": "Süre: --:--",
+      "save": "Kaydı kaydet"
+    },
+    "exit": {
+      "title": "Masaüstüne geri dön?",
+      "message": "Mevcut değişikliklerinizle ne yapalım?",
+      "stay": "Kal",
+      "exit": "Çık"
+    },
+    "crop": {
+      "title": "Kapağı kırp"
+    },
+    "common": {
+      "close": "Kapat",
+      "create": "Oluştur",
+      "cancel": "İptal",
+      "delete": "Sil",
+      "apply": "Uygula"
+    }
+  },
+  "login_modal": {
+    "titles": {
+      "login_required": "Yetkilendirme gerekli",
+      "register": "Kayıt ol",
+      "forgot": "Şifre kurtarma",
+      "reset": "Yeni şifre"
+    },
+    "messages": {
+      "login_required": "Uygulamayı kullanmak için giriş yapmalısınız",
+      "login_required_alert": "Uygulamayı kullanmak için giriş yapmalısınız",
+      "register": "Diktelere ve kişisel hesabınıza erişim oluşturun",
+      "forgot": "E-postanızı girin — şifre sıfırlama bağlantısını e-posta veya Telegram ile göndereceğiz",
+      "reset": "Kodu yapıştırın ve yeni bir şifre belirleyin",
+      "reset_sent_email": "Hesap mevcutsa — e-postanıza şifre sıfırlama bağlantısı gönderildi.",
+      "reset_sent_telegram": "Hesap mevcutsa ve Telegram bağlıysa — Telegram'a şifre sıfırlama bağlantısı gönderildi.",
+      "password_updated": "Şifre güncellendi. Artık giriş yapabilirsiniz."
+    },
+    "fields": {
+      "username": "Kullanıcı adı",
+      "email": "E-posta",
+      "password": "Şifre",
+      "code": "Kod",
+      "new_password": "Yeni şifre"
+    },
+    "placeholders": {
+      "username": "Size nasıl hitap edelim?",
+      "password": "Şifreniz",
+      "password_min": "En az 6 karakter",
+      "code": "bağlantıdaki kodu yapıştırın"
+    },
+    "actions": {
+      "login": "Giriş yap",
+      "register": "Kayıt ol",
+      "forgot": "Şifremi unuttum?",
+      "switch_to_register": "Kayıt ol",
+      "switch_to_login": "Giriş yap",
+      "send": "Gönder",
+      "send_telegram": "Telegram'a gönder",
+      "back_to_login": "Girişe geri dön",
+      "save": "Kaydet",
+      "show_password": "Şifreyi göster",
+      "hide_password": "Şifreyi gizle"
+    },
+    "hints": {
+      "no_account_prefix": "Hesabınız yok mu?",
+      "already_registered_prefix": "Zaten kayıtlı mısınız?"
+    },
+    "language_selector": {
+      "native": "Ana dil",
+      "learning": "Öğrenme"
+    },
+    "errors": {
+      "enter_email": "E-postanızı girin",
+      "fill_all_fields": "Tüm alanları doldurun",
+      "fill_all_fields_formal": "Lütfen tüm alanları doldurun",
+      "password_min_len": "Şifre en az 6 karakter olmalıdır",
+      "native_learning_must_differ": "Ana dil ve öğrenilen dil farklı olmalıdır",
+      "login_failed": "Giriş hatası",
+      "login_network": "Giriş yaparken bir hata oluştu. Lütfen tekrar deneyin.",
+      "register_failed": "Kayıt hatası",
+      "register_network": "Kayıt olurken bir hata oluştu. Lütfen tekrar deneyin.",
+      "generic": "Hata"
+    },
+    "states": {
+      "sending": "Gönderiliyor…",
+      "saving": "Kaydediliyor…",
+      "logging_in": "Giriş yapılıyor…",
+      "creating_account": "Hesap oluşturuluyor…"
+    }
+  },
+  "desktop": {
+    "confirm": {
+      "title": "Değişiklikler kaydedilsin mi?",
+      "save": "Kaydet",
+      "exit": "Çık",
+      "close": "Kapat"
+    }
+  },
+  "support": {
+    "topbar": {
+      "title": "Bana kahve ısmarla"
+    },
+    "modal": {
+      "title": "Projeyi destekle",
+      "text": "DictaFan'ı beğendiyseniz, monobank üzerinden geliştirmeyi destekleyebilirsiniz.",
+      "open": "Kavanozu aç"
+    },
+    "build_update": {
+      "available": "Yeni bir sürüm mevcut",
+      "reload": "Yenile"
+    }
+  }
+}

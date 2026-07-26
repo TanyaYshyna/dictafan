@@ -344,16 +344,8 @@
         }
       }
 
-      // Отправляем авто-отчёт: себе (если включены self_reports) и учителям
-      let teacher_user_ids = [];
-      try {
-        const session = window.__dictationModalActiveSession;
-        const teacherUserId = session && session.teacherUserId ? Number(session.teacherUserId) : 0;
-        if (Number.isFinite(teacherUserId) && teacherUserId > 0) teacher_user_ids = [teacherUserId];
-      } catch (e) {
-        teacher_user_ids = [];
-      }
-
+      // Сервер сам определит всех учителей (через list_teacher_recipients_for_student_manual_report)
+      // независимо от переданных teacher_user_ids (см. teacher_report_send).
       // Отправляем всегда, даже если нет учителя (отправится себе)
       const send_to_self = true;
 
@@ -365,7 +357,7 @@
         },
         body: JSON.stringify({
           dictation_id: dictationIdForDb,
-          teacher_user_ids,
+          teacher_user_ids: [],
           send_to_self,
           report_header_mode: (reportHeaderMode != null ? String(reportHeaderMode) : 'success'),
           completion_count_after: finalCompletionCountAfter,

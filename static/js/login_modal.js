@@ -345,7 +345,7 @@ class LoginModal {
         if (!wrap) return;
 
         wrap.innerHTML = '';
-        const supported = ['en', 'uk', 'ru', 'ar'];
+        const supported = ['en', 'uk', 'ru', 'ar', 'tr'];
         let current = this._getUiLang();
         try {
             const stored = (localStorage.getItem('ui_lang') || '').trim().toLowerCase();

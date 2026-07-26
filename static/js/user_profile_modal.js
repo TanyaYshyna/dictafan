@@ -192,7 +192,7 @@ function initializeUiLangSelector() {
     console.log('=== LOG #14: initializeUiLangSelector');
     const container = document.getElementById('uiLangSelectorContainer');
     if (!container) return;
-    const supported = ['en', 'uk', 'ru', 'ar'];
+    const supported = ['en', 'uk', 'ru', 'ar', 'tr'];
     let current = '';
     try { current = (document.documentElement && document.documentElement.lang) ? String(document.documentElement.lang) : ''; } catch (e) { current = ''; }
     current = String(current || '').trim().toLowerCase();

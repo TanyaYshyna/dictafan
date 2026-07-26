@@ -1570,6 +1570,8 @@ async function _handleAddTranslationConfirm() {
   var selectedLang = values.nativeLanguage || '';
   if (!selectedLang) return;
 
+  console.log('[dictationEditorModal] _handleAddTranslationConfirm: починаємо додавання', { selectedLang });
+
   // Проверяем, не добавлен ли уже этот язык
   var langBlocks = state.content ? state.content.langBlocks : [];
   var alreadyExists = langBlocks.some(function (block) { return block.lang === selectedLang; });
@@ -1586,6 +1588,8 @@ async function _handleAddTranslationConfirm() {
   } catch (e) {}
 
   try {
+    console.log('[dictationEditorModal] _handleAddTranslationConfirm: створюємо пусті речення для', selectedLang);
+
     // Добавляем новый блок языка в langBlocks
     if (state.content && state.content.langBlocks) {
       // Создаём пустые предложения для нового языка (по количеству предложений оригинала)
@@ -1615,6 +1619,8 @@ async function _handleAddTranslationConfirm() {
 
     _closeAddTranslationModal();
 
+    console.log('[dictationEditorModal] _handleAddTranslationConfirm: модалку закрито, починаємо переклад на', selectedLang);
+
     // Автоматически переводим все строки на новый язык
     var dictationId = state.config ? state.config.dictationId : '';
     var origLang = state.config ? state.config.originalLanguage : '';
@@ -1629,6 +1635,7 @@ async function _handleAddTranslationConfirm() {
       for (var i = 0; i < origBlock.sentences.length; i++) {
         var s = origBlock.sentences[i];
         if (s.text) {
+          console.log('[dictationEditorModal] перекладаємо речення', s.key, 'з', origLang, 'на', selectedLang);
           try {
             var trResp = await fetch('/translate', {
               method: 'POST',
@@ -1640,6 +1647,7 @@ async function _handleAddTranslationConfirm() {
               })
             });
             var trData = await trResp.json();
+            console.log('[dictationEditorModal] відповідь перекладу для', s.key, trData);
             if (trData.success && trData.translated_text) {
               // Находим соответствующее предложение в новом блоке
               var newBlock = state.content.langBlocks.find(function (b) { return b.lang === selectedLang; });
@@ -1672,9 +1680,26 @@ async function _handleAddTranslationConfirm() {
       }
     }
 
+    console.log('[dictationEditorModal] оновлюємо інтерфейс для', selectedLang);
+
     // Обновляем таблицу языков, флаги в шапке и основную таблицу
     _renderTranslationsTable();
     _initLanguageFlags();
+
+    // Переключаем флаг в шапке на новый язык, чтобы пользователь сразу увидел результат
+    var allTranslationLangs = [];
+    if (state.content && state.content.langBlocks && state.content.langBlocks.length > 1) {
+      for (var i = 1; i < state.content.langBlocks.length; i++) {
+        allTranslationLangs.push(state.content.langBlocks[i].lang);
+      }
+    }
+    if (state.headerLangPairSelector && typeof state.headerLangPairSelector.setValues === 'function') {
+      state.headerLangPairSelector.setValues({
+        nativeLanguage: selectedLang,
+        nativeLanguages: allTranslationLangs
+      });
+    }
+    _updateTranslationDisplay(selectedLang);
     _renderTable();
     _bindAudioPlaybackHandlers();
     _setDirtyFlags({ db: true, audio: voiceMode === 'auto' });
@@ -1745,7 +1770,7 @@ function _removeTranslationLanguage(langCode) {
   _initLanguageFlags();
   _renderTable();
   _bindAudioPlaybackHandlers();
-  _setDirtyFlags({ db: true });
+  _setDirtyFlags({ db: true, audio: true });
 
   // Скрываем лоадер
   try {
@@ -5634,6 +5659,8 @@ window.DictationEditorModal = {
   open: open,
   close: _closeEditorModal,
   init: init,
+  /** Доступ к внутреннему state для отладки через консоль */
+  state: state,
 };
 
 // Авто-инициализация при загрузке DOM

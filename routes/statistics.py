@@ -615,7 +615,14 @@ def teacher_report_recipients():
 @statistics_bp.route('/teacher_report/send', methods=['POST'])
 @jwt_required()
 def teacher_report_send():
-    """Send Telegram report after dictation completion to selected recipients (self + teachers)."""
+    """Send Telegram report after dictation completion to selected recipients (self + teachers).
+
+    Поведение:
+    - Если teacher_user_ids передан и не пустой — фильтруем по переданным ID.
+    - Если teacher_user_ids пустой — автоматически определяем всех учителей
+      (как в test_send для промежуточного отчёта).
+    - Отправляем себе, если send_to_self=True и telegram_self_reports_enabled=True.
+    """
     current_email = get_jwt_identity()
     user = get_user_by_email(current_email)
     if not user:
@@ -659,14 +666,32 @@ def teacher_report_send():
     except Exception:
         pass
 
-    # teachers: filter for this student + language + teacher telegram
+    # Определяем chat_ids учителей:
+    # Если teacher_user_ids передан и не пустой — фильтруем по переданным ID.
+    # Если teacher_user_ids пустой — автоматически определяем всех учителей.
     chat_ids = []
     try:
-        chat_ids = filter_manual_teacher_chat_ids(
-            int(user.get('id')),
-            teacher_user_ids,
-            dictation_language_code=dictation_lang,
-        )
+        teacher_ids_norm = [x for x in teacher_user_ids if x is not None]
+        if teacher_ids_norm:
+            # Фильтруем по переданным ID (старое поведение)
+            chat_ids = filter_manual_teacher_chat_ids(
+                int(user.get('id')),
+                teacher_ids_norm,
+                dictation_language_code=dictation_lang,
+            )
+        else:
+            # Автоматически определяем всех учителей (как в test_send)
+            teachers = list_teacher_recipients_for_student_manual_report(
+                int(user.get('id')),
+                dictation_language_code=dictation_lang,
+            )
+            for teacher in teachers:
+                try:
+                    cid = teacher.get('telegram_chat_id')
+                    if cid is not None:
+                        chat_ids.append(int(cid))
+                except Exception:
+                    continue
     except Exception:
         chat_ids = []
 
