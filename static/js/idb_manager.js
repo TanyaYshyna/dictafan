@@ -66,6 +66,12 @@
           }
         } catch (e) {
         }
+        try {
+          if (!db.objectStoreNames.contains('draft_save_queue')) {
+            db.createObjectStore('draft_save_queue', { keyPath: 'key' });
+          }
+        } catch (e) {
+        }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
