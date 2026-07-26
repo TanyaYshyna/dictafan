@@ -2004,6 +2004,14 @@ class LanguageSelector {
             this.options.container.querySelectorAll('.model-select-dropdown').forEach(dropdown => {
                 dropdown.style.display = 'none';
             });
+
+            // Закрываем все дропдауны флагов (flag-pair-dropdown, flag-pair-checkboxes-panel)
+            this.options.container.querySelectorAll('.flag-pair-dropdown').forEach(dropdown => {
+                dropdown.style.display = 'none';
+            });
+            this.options.container.querySelectorAll('.flag-pair-checkboxes-panel').forEach(panel => {
+                panel.style.display = 'none';
+            });
         });
 
         // 2. Обработчики для выпадающих списков моделей

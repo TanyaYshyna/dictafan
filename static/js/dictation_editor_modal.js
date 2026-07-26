@@ -3400,9 +3400,98 @@ async function _handleSave() {
       flags.db = true;
     }
 
-    // Этап 1: Сохраняем текст/БД (если dirty db)
+    // НОВО: Используем очередь сохранения SaveQueueBatcher (для нестабильного интернета)
+    if (window.SaveQueueBatcher && typeof window.SaveQueueBatcher.enqueueSave === 'function') {
+      try {
+        console.log('[dictationEditorModal] Сохраняю через SaveQueueBatcher...');
+
+        // Добавляем флаг dirty audio — чтобы при отправке batcher знал
+        saveData._audioDirty = flags.audio;
+
+        // Пишем в очередь IndexedDB
+        var queueKey = await window.SaveQueueBatcher.enqueueSave(effectiveDictationId, saveData);
+
+        if (queueKey) {
+          // Пытаемся сразу отправить
+          await window.SaveQueueBatcher.flushAll();
+
+          // Проверяем осталась ли запись в очереди
+          var queueInfo = await window.SaveQueueBatcher.getQueueInfo();
+
+          if (queueInfo.pending === 0) {
+            // Отправлено успешно
+            saved = true;
+            _setDirtyFlags({ db: false, audio: false, cover: false });
+            console.log('[dictationEditorModal] Данные сохранены через очередь');
+
+            // Добавляем диктант на рабочий стол
+            try {
+              var newDbId = state.config ? state.config.dbId : null;
+              if (newDbId) {
+                var deskResp = await fetch('/desk/api/items', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                  },
+                  body: JSON.stringify({ dictation_id: Number(newDbId) })
+                });
+                if (deskResp.ok) {
+                  try {
+                    if (window.DictationKart && typeof window.DictationKart._showToast === 'function') {
+                      window.DictationKart._showToast('Диктант додано на робочий стіл', { durationMs: 2200 });
+                    }
+                  } catch (e) {}
+                }
+              }
+            } catch (e) {
+              console.warn('[dictationEditorModal] Ошибка добавления на стол:', e);
+            }
+
+            // Обновляем десктоп
+            try {
+              if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
+                await window.Desktop.loadDeskItems();
+              }
+            } catch (e) {}
+          } else {
+            // Данные в очереди — не все отправилось, но локально сохранено
+            console.log('[dictationEditorModal] Данные сохранены локально, ожидают отправки');
+            _setDirtyFlags({ db: false, audio: false, cover: false });
+            saved = true;
+
+            // Показываем тост об отсроченной отправке
+            try {
+              if (window.DictationKart && typeof window.DictationKart._showToast === 'function') {
+                window.DictationKart._showToast('Дані збережено локально, надішлемо при з\'єднанні', { durationMs: 3000 });
+              }
+            } catch (e) {}
+          }
+
+          // Если есть dirty audio — пытаемся загрузить на B2 сейчас (если онлайн)
+          if (flags.audio && navigator.onLine) {
+            try {
+              await _uploadDraftAudioToB2(effectiveDictationId, token);
+              _setDirtyFlags({ audio: false });
+            } catch (audioErr) {
+              console.warn('[dictationEditorModal] Аудио не загрузилось (останется в кеше):', audioErr);
+              // Не фатально — аудио осталось в MEDIA_CACHE_PERSIST
+            }
+          }
+
+          console.log('[dictationEditorModal] Сохранение через очередь завершено');
+          return saved;
+        } else {
+          console.warn('[dictationEditorModal] SaveQueueBatcher.enqueueSave не удался — fallback на прямой fetch');
+        }
+      } catch (e) {
+        console.warn('[dictationEditorModal] Ошибка SaveQueueBatcher:', e, '— fallback на прямой fetch');
+      }
+    }
+
+    // Этап 1: Сохраняем текст/БД (если dirty db) — старый путь, если SaveQueueBatcher не доступен
     if (flags.db) {
-      console.log('[dictationEditorModal] Сохраняю текст/БД...');
+      console.log('[dictationEditorModal] Сохраняю текст/БД (прямой fetch)...');
       var dbResponse = await fetch('/save_dictation_final', {
         method: 'POST',
         headers: {

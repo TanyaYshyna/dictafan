@@ -630,6 +630,53 @@ const state = {
   5. Сервер (`save_dictation_final`) декодирует `cover_b64` и сохраняет как `cover.webp` в temp-папку
   6. Существующая логика копирует `cover.webp` из temp в финальную папку (`static/data/dictations/<dictation_id>/cover.webp`) и в B2 (`dictations_covers/<numeric_id>.webp`)
 
+### SaveQueueBatcher — очередь сохранения при нестабильном интернете
+
+**Файлы**: [`static/js/save_queue_batcher.js`](../static/js/save_queue_batcher.js) (новый модуль, создан 2026-07-26)
+
+**Назначение**: При нестабильном интернете данные не теряются, а сохраняются в IndexedDB и отправляются на сервер при первой возможности.
+
+**Store в IndexedDB**: `draft_save_queue` (ключ: `save:{dictationId}:{timestamp}`)
+
+**Структура записи:**
+```javascript
+{
+ key: 'save:dict_123:1712345678000',
+ type: 'draft_save',
+ dictationId: 'dict_123',
+ payload: { /* полный saveData как в _handleSave */ },
+ status: 'pending',  // 'pending' | 'sending' | 'failed'
+ createdAt: 1712345678000,
+ updatedAt: 1712345678000,
+ retryCount: 0,
+ lastError: null,
+}
+```
+
+**Поток выполнения:**
+1. `_handleSave()` → `SaveQueueBatcher.enqueueSave(dictationId, saveData)` — пишет в IndexedDB
+2. `SaveQueueBatcher.flushAll()` — читает все pending-записи и отправляет на сервер (`POST /save_dictation_final`)
+3. При успехе — запись удаляется из очереди
+4. При ошибке — запись остаётся, `retryCount++`, повтор через 15 секунд
+5. После `MAX_RETRY_COUNT` (20) попыток — статус меняется на `failed`
+
+**Автоматические триггеры отправки:**
+- Периодический таймер (каждые 15 секунд проверяет очередь)
+- `window.online` — при появлении интернета
+- Явный вызов `SaveQueueBatcher.flushAll()` из `_handleSave()`
+
+**Интеграция с `_handleSave()`** ([`static/js/dictation_editor_modal.js:3404`](../static/js/dictation_editor_modal.js:3404)):
+- Если `SaveQueueBatcher` доступен — сохранение идёт через очередь
+- Сначала `enqueueSave()` (всегда в IndexedDB)
+- Потом `flushAll()` — если сеть есть, запись уходит сразу
+- Если `queueInfo.pending === 0` — всё сохранено, обновляем десктоп
+- Если `queueInfo.pending > 0` — данные в очереди, показываем тост "Дані збережено локально"
+- Если `flags.audio && navigator.onLine` — аудио загружается на B2 отдельно
+
+**Отличие от OutboxBatcher:**
+- `OutboxBatcher` — очередь для статистики (звёзды, монеты, успехи), работает с `history_by_day`
+- `SaveQueueBatcher` — очередь для сохранения самих диктантов (текст, метаданные, обложка)
+
 ### Управление языками перевода (вкладка 5)
 
 **Вкладка 5 "Озвучка перевода (авто)"** — таблица языков перевода с кнопками +/−.

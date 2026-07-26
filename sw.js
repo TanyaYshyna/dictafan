@@ -1157,6 +1157,12 @@ self.addEventListener('message', (event) => {
         return;
       }
 
+      if (action === 'saveQueueCleanup') {
+        // SW просто подтверждает получение — cleanup уже сделан на клиенте
+        respond({ success: true });
+        return;
+      }
+
       respond({ success: false, error: 'unknown_action' });
     } catch (e) {
       respond({ success: false, error: String(e) });
