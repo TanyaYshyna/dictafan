@@ -151,8 +151,9 @@ translator = Translator()
 def translate_text():
     data = request.json
     text = data['text']
-    lang_original = data.get('language_original', 'en')  # По умолчанию автоопределение
-    lang_translation = data.get('language_translation', 'ru')
+    # Клиент шлёт source_lang/target_lang, поддерживаем также старые имена для обратной совместимости
+    lang_original = data.get('source_lang', data.get('language_original', 'en'))
+    lang_translation = data.get('target_lang', data.get('language_translation', 'ru'))
     try:
         translation = translator.translate(text, src=lang_original, dest=lang_translation).text
         return jsonify({"translation": translation})

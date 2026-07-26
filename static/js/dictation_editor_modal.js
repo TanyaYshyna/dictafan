@@ -1663,15 +1663,16 @@ async function _handleAddTranslationConfirm() {
             });
             var trData = await trResp.json();
             console.log('[dictationEditorModal] відповідь перекладу для', s.key, trData);
-            if (trData.success) {
-              // Сервер может вернуть поле 'translation' или 'translated_text'
-              var translatedText = trData.translation || trData.translated_text || '';
+            // Сервер возвращает {"translation": "..."} без поля success
+            if (trData.translation) {
+              var translatedText = trData.translation || '';
               if (translatedText) {
                 var newBlock = state.content.langBlocks.find(function (b) { return b.lang === selectedLang; });
                 if (newBlock) {
                   var targetSentence = newBlock.sentences.find(function (ns) { return ns.key === s.key; });
                   if (targetSentence) {
                     targetSentence.text = translatedText;
+                    console.log('[dictationEditorModal] збережено переклад для', s.key, ':', translatedText);
                   }
                 }
               }
@@ -1699,6 +1700,11 @@ async function _handleAddTranslationConfirm() {
     }
 
     console.log('[dictationEditorModal] оновлюємо інтерфейс для', selectedLang);
+
+    // Устанавливаем текущий язык перевода в config — _renderTable() использует его для поиска блока
+    if (state.config) {
+      state.config.translationLanguage = selectedLang;
+    }
 
     // Обновляем таблицу языков, флаги в шапке и основную таблицу
     _renderTranslationsTable();
@@ -1783,6 +1789,15 @@ function _removeTranslationLanguage(langCode) {
   }
 
   state.content.langBlocks.splice(index, 1);
+
+  // Если удалённый язык был активным в config, переключаемся на первый доступный перевод
+  if (state.config && state.config.translationLanguage === langCode) {
+    var remainingLangs = [];
+    for (var i = 1; i < state.content.langBlocks.length; i++) {
+      remainingLangs.push(state.content.langBlocks[i].lang);
+    }
+    state.config.translationLanguage = remainingLangs.length > 0 ? remainingLangs[0] : '';
+  }
 
   _renderTranslationsTable();
   _initLanguageFlags();
@@ -3238,6 +3253,13 @@ async function _handleSave() {
   var saveBtn = document.getElementById('dictationEditorModalSaveBtn');
   if (!saveBtn) return false;
 
+  // Показываем универсальный лоадер с правильным текстом "Збереження даних"
+  try {
+    if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.show === 'function') {
+      window.DesktopLoadingModal.show('Збереження даних...');
+    }
+  } catch (e) {}
+
   saveBtn.disabled = true;
   var originalHTML = saveBtn.innerHTML;
   saveBtn.innerHTML = '<i data-lucide="loader-2"></i>';
@@ -3523,6 +3545,13 @@ async function _handleSave() {
       lucide.createIcons();
     }
     saveBtn.disabled = false;
+
+    // Скрываем универсальный лоадер
+    try {
+      if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') {
+        window.DesktopLoadingModal.hide();
+      }
+    } catch (e) {}
   }
 
   return saved;
