@@ -48,6 +48,38 @@ const state = {
   _micPanel: null,
 };
 
+/* ===== Хранилище контента через DictationSessionsStore ===== */
+function _getEditorRuntimeStore() {
+  try {
+    // Используем общий синглтон, как dictation_modal.js и active_dictations_modal.js
+    if (window.__dictationRuntimeStore) return window.__dictationRuntimeStore;
+    if (!window.DictationRuntime || !window.DictationRuntime.DictationSessionsStore) return null;
+    window.__dictationRuntimeStore = new window.DictationRuntime.DictationSessionsStore({
+      maxSessions: window.DictationRuntime.MAX_OPEN_SESSIONS || 5,
+    });
+    return window.__dictationRuntimeStore;
+  } catch (e) {
+    return null;
+  }
+}
+
+/* ===== Сохранение/восстановление последнего языка перевода ===== */
+function _saveLastTranslationLanguage(dictationId, lang) {
+  if (!dictationId || !lang) return;
+  try {
+    localStorage.setItem('editorLastTrLang_' + dictationId, lang);
+  } catch (e) {}
+}
+
+function _loadLastTranslationLanguage(dictationId) {
+  if (!dictationId) return '';
+  try {
+    return localStorage.getItem('editorLastTrLang_' + dictationId) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
 /* ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===== */
 
 function _normalizeLangCode(code) {
@@ -3409,7 +3441,7 @@ async function _handleSave() {
         saveData._audioDirty = flags.audio;
 
         // Пишем в очередь IndexedDB
-        var queueKey = await window.SaveQueueBatcher.enqueueSave(effectiveDictationId, saveData);
+        var queueKey = await window.SaveQueueBatcher.enqueueSave(normalizedId, saveData);
 
         if (queueKey) {
           // Пытаемся сразу отправить
@@ -3471,7 +3503,7 @@ async function _handleSave() {
           // Если есть dirty audio — пытаемся загрузить на B2 сейчас (если онлайн)
           if (flags.audio && navigator.onLine) {
             try {
-              await _uploadDraftAudioToB2(effectiveDictationId, token);
+              await _uploadDraftAudioToB2(normalizedId, token);
               _setDirtyFlags({ audio: false });
             } catch (audioErr) {
               console.warn('[dictationEditorModal] Аудио не загрузилось (останется в кеше):', audioErr);
@@ -3656,6 +3688,14 @@ function open(config) {
   }
 
   state.config = config || {};
+
+  // Восстанавливаем последний язык перевода из localStorage (поверх того, что пришло из config)
+  var dictationId = config ? config.dictationId || '' : '';
+  var savedTrLang = _loadLastTranslationLanguage(dictationId);
+  if (savedTrLang && state.config) {
+    state.config.translationLanguage = savedTrLang;
+  }
+
   console.log('[dictationEditorModal] open() config:', JSON.stringify(state.config));
   state.isOpen = true;
   state.dirtyFlags = { db: false, audio: false, cover: false };
@@ -3665,7 +3705,7 @@ function open(config) {
   // - иначе → "Дополнение" (append)
   state.editorMode = (config && config.isNewDictation) ? 'fill' : 'append';
 
-  // Сбрасываем shared audio состояние (оно могло остаться от предыдущего открытия)
+  // Сбрасываем shared audio состояние
   state._sharedAudioFilename = null;
   state._sharedAudioUrl = null;
   state._sharedAudioDuration = null;
@@ -3713,19 +3753,17 @@ function open(config) {
   var selfWaveformContainer = document.getElementById('editorModalSelfAudioWaveform');
   if (selfWaveformContainer) selfWaveformContainer.innerHTML = '';
 
-  // Создаём DictationContent
-  var dictationId = config.dictationId || '';
+  // Создаём / получаем DictationContent через DictationSessionsStore
   var langOrig = config.originalLanguage || '';
   var langTr = config.translationLanguage || '';
   var rawSentences = config.sentences || [];
   var audioOrderFromConfig = config.audio_order || '';
   var audioUserSharedFromConfig = config.audio_user_shared || null;
 
-  // Пробуем получить content из DictationRuntime (если он уже загружен)
-  if (typeof DictationRuntime !== 'undefined' && DictationRuntime.getOrCreateContent) {
-    state.content = DictationRuntime.getOrCreateContent({
-      dictationId: dictationId,
-    });
+  var store = _getEditorRuntimeStore();
+  if (store) {
+    // Используем DictationSessionsStore — он сам кеширует content через _contents Map
+    state.content = store.getOrCreateContent({ dictationId: dictationId });
     // Если content уже существовал и в нём есть langBlocks — используем их,
     // иначе устанавливаем sentences из config
     if (rawSentences && rawSentences.length > 0) {
@@ -3752,7 +3790,7 @@ function open(config) {
       state.content.audio_or_shared = audioUserSharedFromConfig;
     }
   } else if (typeof DictationContent !== 'undefined') {
-    // Группируем rawSentences по language_code в langBlocks
+    // Создаём DictationContent напрямую (без хранилища)
     var langBlocks = [];
     if (rawSentences && rawSentences.length > 0) {
       var grouped = {};
@@ -4236,10 +4274,18 @@ function _closeEditorModal() {
     return;
   }
   state.isOpen = false;
+
+  // Сохраняем последний язык перевода в localStorage (до закрытия, пока state.config ещё жив)
+  var closingDictationId = state.config && state.config.dictationId ? String(state.config.dictationId).trim() : '';
+  if (closingDictationId && state.config && state.config.translationLanguage) {
+    _saveLastTranslationLanguage(closingDictationId, state.config.translationLanguage);
+  }
+
   state.config = null;
   state.headerLangPairSelector = null;
-  // НЕ удаляем state.content из DictationRuntime — он может использоваться
-  // другими компонентами (DictationKart, DictationModal). Просто сбрасываем ссылку.
+  // НЕ удаляем state.content из DictationSessionsStore — он остаётся в _contents Map
+  // и будет автоматически использован при следующем open() для того же dictationId.
+  // Просто сбрасываем локальную ссылку.
   state.content = null;
   state.currentDictation = null;
   state.dirtyFlags = { db: false, audio: false, cover: false };

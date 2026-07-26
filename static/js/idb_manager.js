@@ -3,7 +3,7 @@
     return;
   }
 
-  const DB_VERSION = 2;
+  const DB_VERSION = 3;
 
   async function openDraftDb() {
     return await new Promise((resolve, reject) => {
