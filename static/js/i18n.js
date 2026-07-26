@@ -1,5 +1,5 @@
 (function () {
-    const SUPPORTED = ['en', 'uk', 'ru', 'ar'];
+    const SUPPORTED = ['en', 'uk', 'ru', 'ar', 'tr'];
     const DEFAULT_LANG = 'en';
 
     function getHtmlLang() {

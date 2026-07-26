@@ -8,7 +8,7 @@ from flask import request
 from helpers.user_helpers import get_current_user
 
 
-SUPPORTED_UI_LANGS = ("en", "uk", "ru", "ar")
+SUPPORTED_UI_LANGS = ("en", "uk", "ru", "ar", "tr")
 DEFAULT_UI_LANG = "en"
 
 

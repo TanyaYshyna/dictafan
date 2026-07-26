@@ -1352,14 +1352,14 @@ window.DictationKart = window.DictationKart || {
         { action: 'create-assignment', icon: 'clipboard-list', labelKey: 'private_library.dictation_card_actions.create_assignment_new', labelFallback: 'Все упражнения' },
         { action: 'plan-tasks', icon: 'calendar-plus', labelKey: 'private_library.dictation_card_actions.plan', labelFallback: 'Запланировать' },
         { action: 'prefetch-dictation-cache', icon: 'download', labelKey: 'private_library.dictation_card_actions.cache', labelFallback: 'Скачать в кэш' },
-        { action: 'edit-dictation-v2', icon: 'sparkles', labelKey: null, labelFallback: 'Новый редактор' },
+        { action: 'edit-dictation-v2', icon: 'sparkles', labelKey: 'private_library.dictation_card_actions.editor', labelFallback: 'Редактор' },
         { action: 'show-in-book', icon: 'book-marked', labelKey: 'private_library.dictation_card_actions.show_in_book', labelFallback: 'Показать в книге' },
         { action: 'remove-from-desk', icon: 'arrow-big-down-dash', labelKey: 'private_library.dictation_card_actions.remove_from_desk', labelFallback: 'Убрать со стола' },
       ];
     }
 
     return [
-      { action: 'edit-dictation-v2', icon: 'sparkles', labelKey: null, labelFallback: 'Новый редактор' },
+      { action: 'edit-dictation-v2', icon: 'sparkles', labelKey: 'private_library.dictation_card_actions.editor', labelFallback: 'Редактор' },
       { action: 'create-assignment', icon: 'clipboard-list', labelKey: 'private_library.dictation_card_actions.create_assignment', labelFallback: 'Все упражнения' },
       { action: 'plan-tasks', icon: 'calendar-plus', labelKey: 'private_library.dictation_card_actions.plan', labelFallback: 'Запланировать' },
       { action: 'move-dictation', icon: 'folder-symlink', labelKey: 'private_library.dictation_card_actions.move', labelFallback: 'Переместить' },
