@@ -23,6 +23,7 @@
       this.audio_or_order = (audio_or_order !== null && audio_or_order !== undefined) ? String(audio_or_order) : '';
       this.audio_or_shared = (audio_or_shared !== null && audio_or_shared !== undefined) ? String(audio_or_shared) : null;
       this.langBlocks = [];
+      this.lastUsedAtMs = Date.now();
       if (Array.isArray(langBlocks)) {
         this.setLangBlocks(langBlocks);
       }
@@ -497,6 +498,7 @@
     constructor() {
       this._contents = new Map();
       this._sessions = new Map();
+      this._maxContents = 5;
       this._maxSessions = 20;
     }
 
@@ -505,8 +507,11 @@
       const key = dictationId;
       if (!this._contents.has(key)) {
         this._contents.set(key, new DictationContent({ dictationId }));
+        this._evictContentIfNeeded();
       }
-      return this._contents.get(key);
+      const content = this._contents.get(key);
+      content.lastUsedAtMs = Date.now();
+      return content;
     }
 
     setContentSentences({ dictationId, sentences, originalLanguage }) {
@@ -556,6 +561,24 @@
         await window.IdbManager.idbDelete('sessions', key);
       } catch (e) {
         // silent
+      }
+    }
+
+    _evictContentIfNeeded() {
+      if (this._contents.size <= this._maxContents) return;
+      const entries = Array.from(this._contents.entries())
+        .map(([k, v]) => ({ key: k, content: v, lastUsed: v.lastUsedAtMs || 0 }))
+        .sort((a, b) => a.lastUsed - b.lastUsed);
+      const toRemove = this._contents.size - this._maxContents;
+      for (let i = 0; i < toRemove && i < entries.length; i++) {
+        const evictKey = entries[i].key;
+        this._contents.delete(evictKey);
+        // Также удаляем сессии, которые ссылаются на этот контент
+        for (const [sKey, session] of this._sessions) {
+          if (session.dictationId === evictKey) {
+            this._sessions.delete(sKey);
+          }
+        }
       }
     }
 

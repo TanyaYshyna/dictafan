@@ -115,12 +115,11 @@
 
     function getActiveDictationIds() {
       try {
-        if (typeof window.DictationRuntime === 'undefined' ||
-            typeof window.DictationRuntime.DictationSessionsStore === 'undefined' ||
-            typeof window.DictationRuntime.DictationSessionsStore._contents === 'undefined') {
+        if (!window.__dictationRuntimeStore ||
+            typeof window.__dictationRuntimeStore._contents === 'undefined') {
           return [];
         }
-        var contents = window.DictationRuntime.DictationSessionsStore._contents;
+        var contents = window.__dictationRuntimeStore._contents;
         if (typeof contents.keys === 'function') {
           return Array.from(contents.keys());
         }
