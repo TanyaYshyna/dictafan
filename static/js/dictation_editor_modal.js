@@ -2085,15 +2085,24 @@ function _initLanguageFlags() {
         }
       } else {
         // Несколько переводов — правый флаг открывает выпадающий список выбора языка
+        // Определяем начальный отображаемый язык: config.translationLanguage, если он есть в списке
+        var initialDisplayLang = translationLangs[0];
+        if (state.config && state.config.translationLanguage && translationLangs.indexOf(state.config.translationLanguage) !== -1) {
+          initialDisplayLang = state.config.translationLanguage;
+        }
         state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
           mode: 'flag-pair-dropdown-right',
           currentLearning: validOrig,
-          nativeLanguage: translationLangs[0],
+          nativeLanguage: initialDisplayLang,
           nativeLanguages: translationLangs,
           languageData: languageData,
           onLanguageChange: function(values) {
             var newLang = values.nativeLanguage || '';
             if (!newLang) return;
+            // Синхронизируем config.translationLanguage с выбранным флагом
+            if (state.config) {
+              state.config.translationLanguage = newLang;
+            }
             _updateTranslationDisplay(newLang);
             // После ререндера в LanguageSelector сбрасывается inline-left,
             // поэтому перепозиционируем дропдаун под правым флагом
