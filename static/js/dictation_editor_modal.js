@@ -971,8 +971,9 @@ function _readFileAsBase64(file) {
  * в AudioManager.uploadDictationAudioFromCacheToB2().
  */
 async function _uploadDraftAudioToB2(dictationId, token) {
+  var flowNum = window.__SAVE_FLOW || 0;
   if (!state.content || !dictationId || !token) {
-    console.log('[dictationEditorModal] [SAVE-CHAIN] _uploadDraftAudioToB2 пропущено: content=' + !!state.content + ' dictationId=' + dictationId + ' token=' + !!token);
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2 пропущено: content=' + !!state.content + ' dictationId=' + dictationId + ' token=' + !!token);
     return;
   }
 
@@ -983,11 +984,11 @@ async function _uploadDraftAudioToB2(dictationId, token) {
   }
   dictationId = normalizedId;
 
-  console.log('[dictationEditorModal] [SAVE-CHAIN] _uploadDraftAudioToB2: старт, dictationId=' + dictationId);
+  console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: старт, dictationId=' + dictationId + ' time=' + new Date().toISOString());
 
   var am = _ensureAudioManager();
   if (!am || typeof am.uploadDictationAudioFromCacheToB2 !== 'function') {
-    console.warn('[dictationEditorModal] [SAVE-CHAIN] AudioManager.uploadDictationAudioFromCacheToB2 not available');
+    console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] AudioManager.uploadDictationAudioFromCacheToB2 not available');
     return;
   }
 
@@ -995,7 +996,7 @@ async function _uploadDraftAudioToB2(dictationId, token) {
   var langBlocks = state.content.langBlocks || [];
   var urls = [];
 
-  console.log('[dictationEditorModal] [SAVE-CHAIN] _uploadDraftAudioToB2: аналізую ' + langBlocks.length + ' мовних блоків');
+  console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: аналізую ' + langBlocks.length + ' мовних блоків');
 
   for (var b = 0; b < langBlocks.length; b++) {
     var block = langBlocks[b];
@@ -1021,7 +1022,7 @@ async function _uploadDraftAudioToB2(dictationId, token) {
         urls.push(buildUrl);
       }
     }
-    console.log('[dictationEditorModal] [SAVE-CHAIN] _uploadDraftAudioToB2: мова=' + langCode + ' знайдено ' + langUrls.length + ' URL');
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: мова=' + langCode + ' знайдено ' + langUrls.length + ' URL');
   }
 
   // Добавляем shared audio файл, если он есть (всегда для оригинального языка)
@@ -1030,16 +1031,16 @@ async function _uploadDraftAudioToB2(dictationId, token) {
     if (origLang) {
       var sharedUrl = am.buildDictationAudioUrl(dictationId, String(origLang).toLowerCase().trim(), state._sharedAudioFilename);
       urls.push(sharedUrl);
-      console.log('[dictationEditorModal] [SAVE-CHAIN] _uploadDraftAudioToB2: shared audio ' + state._sharedAudioFilename);
+      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: shared audio ' + state._sharedAudioFilename);
     }
   }
 
   if (urls.length === 0) {
-    console.log('[dictationEditorModal] [SAVE-CHAIN] _uploadDraftAudioToB2: немає URL для завантаження (langBlocks=' + langBlocks.length + ')');
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: немає URL для завантаження (langBlocks=' + langBlocks.length + ')');
     return;
   }
 
-  console.log('[dictationEditorModal] [SAVE-CHAIN] _uploadDraftAudioToB2: всього ' + urls.length + ' URL для завантаження на B2');
+  console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: всього ' + urls.length + ' URL для завантаження на B2');
 
   try {
     var result = await am.uploadDictationAudioFromCacheToB2({
@@ -1047,23 +1048,23 @@ async function _uploadDraftAudioToB2(dictationId, token) {
       token: token,
       urls: urls,
       onUploaded: function (uploadedUrl) {
-        console.log('[dictationEditorModal] [SAVE-CHAIN] B2 upload success:', uploadedUrl);
+        console.log('[dictationEditorModal] [FLOW-' + flowNum + '] B2 upload success:', uploadedUrl);
       },
       onProgress: function (progress) {
         // Можно добавить индикатор прогресса при необходимости
       }
     });
 
-    console.log('[dictationEditorModal] [SAVE-CHAIN] _uploadDraftAudioToB2 результат: ok=' + (result ? result.ok : 'N/A') + ' uploaded=' + (result ? result.uploaded : 'N/A') + ' skipped=' + (result ? result.skipped : 'N/A') + ' failed=' + (result ? result.failed?.length || result.failed : 'N/A') + ' cacheMiss=' + (result ? result.cacheMiss : 'N/A'));
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2 результат: ok=' + (result ? result.ok : 'N/A') + ' uploaded=' + (result ? result.uploaded : 'N/A') + ' skipped=' + (result ? result.skipped : 'N/A') + ' failed=' + (result ? result.failed?.length || result.failed : 'N/A') + ' cacheMiss=' + (result ? result.cacheMiss : 'N/A'));
 
     if (result && result.failed && result.failed.length > 0) {
-      console.warn('[dictationEditorModal] [SAVE-CHAIN] Некоторые файлы не загрузились на B2:', JSON.stringify(result.failed));
+      console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Некоторые файлы не загрузились на B2:', JSON.stringify(result.failed));
     }
     if (result && result.cacheMiss && result.cacheMiss > 0) {
-      console.warn('[dictationEditorModal] [SAVE-CHAIN] cacheMiss=' + result.cacheMiss + ' — аудио не найдено в кеші!');
+      console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] cacheMiss=' + result.cacheMiss + ' — аудио не найдено в кеші!');
     }
   } catch (e) {
-    console.warn('[dictationEditorModal] [SAVE-CHAIN] B2 upload error', e);
+    console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] B2 upload error', e);
   }
 }
 
@@ -1423,6 +1424,7 @@ function _handleAddRowCreate() {
 }
 
 async function _generateAudioForSentence(key, lang, text, dictationId) {
+  var flowNum = window.__SAVE_FLOW || 0;
   try {
     var safeEmail = '';
     try {
@@ -1431,7 +1433,7 @@ async function _generateAudioForSentence(key, lang, text, dictationId) {
       }
     } catch (e) {}
 
-    console.log('[dictationEditorModal] [SAVE-CHAIN] _generateAudioForSentence: key=' + key + ' lang=' + lang + ' dictationId=' + dictationId);
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _generateAudioForSentence: key=' + key + ' lang=' + lang + ' dictationId=' + dictationId + ' time=' + new Date().toISOString());
 
     var response = await fetch('/generate_audio', {
       method: 'POST',
@@ -1448,7 +1450,7 @@ async function _generateAudioForSentence(key, lang, text, dictationId) {
 
     var data = await response.json();
     if (!data.success || !data.audio_b64) {
-      console.warn('[dictationEditorModal] [SAVE-CHAIN] _generateAudioForSentence: генерація аудіо не вдалась для key=' + key + ' lang=' + lang, data.error || 'no audio_b64');
+      console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] _generateAudioForSentence: генерація аудіо не вдалась для key=' + key + ' lang=' + lang, data.error || 'no audio_b64');
       return;
     }
 
@@ -1460,24 +1462,24 @@ async function _generateAudioForSentence(key, lang, text, dictationId) {
     var blob = new Blob([bytes], { type: data.mime || 'audio/mpeg' });
     var newFilename = data.filename || ('tts_' + key + '_' + Date.now() + '.mp3');
 
-    console.log('[dictationEditorModal] [SAVE-CHAIN] _generateAudioForSentence: аудіо отримано, filename=' + newFilename + ' blobSize=' + blob.size);
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _generateAudioForSentence: аудіо отримано, filename=' + newFilename + ' blobSize=' + blob.size);
 
     var am = _ensureAudioManager();
     if (am && typeof am.saveDictationAudioBlob === 'function') {
-      console.log('[dictationEditorModal] [SAVE-CHAIN] _generateAudioForSentence: зберігаю blob в CacheStorage... dictationId=' + dictationId + ' lang=' + lang + ' filename=' + newFilename);
+      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _generateAudioForSentence: зберігаю blob в CacheStorage... dictationId=' + dictationId + ' lang=' + lang + ' filename=' + newFilename);
       await am.saveDictationAudioBlob(dictationId, lang, newFilename, blob, data.mime || 'audio/mpeg');
-      console.log('[dictationEditorModal] [SAVE-CHAIN] _generateAudioForSentence: blob збережено в CacheStorage');
+      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _generateAudioForSentence: blob збережено в CacheStorage');
     } else {
-      console.warn('[dictationEditorModal] [SAVE-CHAIN] _generateAudioForSentence: AudioManager.saveDictationAudioBlob недоступний!');
+      console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] _generateAudioForSentence: AudioManager.saveDictationAudioBlob недоступний!');
     }
 
     // Обновляем sentence
     var sentence = state.content.getSentenceForLang(key, lang);
     if (sentence) {
       sentence.audio = newFilename;
-      console.log('[dictationEditorModal] [SAVE-CHAIN] _generateAudioForSentence: sentence.audio=' + newFilename);
+      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _generateAudioForSentence: sentence.audio=' + newFilename);
     } else {
-      console.warn('[dictationEditorModal] [SAVE-CHAIN] _generateAudioForSentence: sentence not found for key=' + key + ' lang=' + lang);
+      console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] _generateAudioForSentence: sentence not found for key=' + key + ' lang=' + lang);
     }
   } catch (e) {
     console.error('[dictationEditorModal] _generateAudioForSentence error', key, lang, e);
@@ -1644,7 +1646,8 @@ async function _handleAddTranslationConfirm() {
   var selectedLang = values.nativeLanguage || '';
   if (!selectedLang) return;
 
-  console.log('[dictationEditorModal] _handleAddTranslationConfirm: починаємо додавання', { selectedLang });
+  window.__SAVE_FLOW = (window.__SAVE_FLOW || 0) + 1;
+  console.log('[dictationEditorModal] [FLOW-' + window.__SAVE_FLOW + '] _handleAddTranslationConfirm: починаємо додавання lang=' + selectedLang + ' time=' + new Date().toISOString(), { selectedLang });
 
   // Проверяем, не добавлен ли уже этот язык
   var langBlocks = state.content ? state.content.langBlocks : [];
@@ -1746,11 +1749,11 @@ async function _handleAddTranslationConfirm() {
     // Автоозвучка для нового языка (если выбран режим "авто")
     var checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
     var voiceMode = checkedRadio ? checkedRadio.value : 'auto';
-    console.log('[dictationEditorModal] [SAVE-CHAIN] _handleAddTranslationConfirm voiceMode=' + voiceMode + ' selectedLang=' + selectedLang);
+    console.log('[dictationEditorModal] [FLOW-' + window.__SAVE_FLOW + '] _handleAddTranslationConfirm TTS: voiceMode=' + voiceMode + ' selectedLang=' + selectedLang + ' time=' + new Date().toISOString());
     if (voiceMode === 'auto' && dictationId) {
       var newBlock = state.content.langBlocks.find(function (b) { return b.lang === selectedLang; });
       if (newBlock && newBlock.sentences) {
-        console.log('[dictationEditorModal] [SAVE-CHAIN] автоозвучка: генеруємо TTS для ' + newBlock.sentences.length + ' речень, мова=' + selectedLang);
+        console.log('[dictationEditorModal] [FLOW-' + window.__SAVE_FLOW + '] автоозвучка: генеруємо TTS для ' + newBlock.sentences.length + ' речень, мова=' + selectedLang);
         for (var i = 0; i < newBlock.sentences.length; i++) {
           var s = newBlock.sentences[i];
           if (s.text) {
@@ -1759,7 +1762,7 @@ async function _handleAddTranslationConfirm() {
         }
       }
     } else {
-      console.log('[dictationEditorModal] [SAVE-CHAIN] TTS не генерується: voiceMode=' + voiceMode + ' dictationId=' + dictationId);
+      console.log('[dictationEditorModal] [FLOW-' + (window.__SAVE_FLOW || 0) + '] TTS не генерується: voiceMode=' + voiceMode + ' dictationId=' + dictationId);
     }
 
     console.log('[dictationEditorModal] оновлюємо інтерфейс для', selectedLang);
@@ -1790,7 +1793,7 @@ async function _handleAddTranslationConfirm() {
     _renderTable();
     _bindAudioPlaybackHandlers();
     var newAudioDirty = voiceMode === 'auto';
-    console.log('[dictationEditorModal] [SAVE-CHAIN] _handleAddTranslationConfirm встановлює dirtyFlags: db=true audio=' + newAudioDirty + ' (voiceMode=' + voiceMode + ')');
+    console.log('[dictationEditorModal] [FLOW-' + window.__SAVE_FLOW + '] _handleAddTranslationConfirm ЗАВЕРШЕНО: dirtyFlags db=true audio=' + newAudioDirty + ' time=' + new Date().toISOString());
     _setDirtyFlags({ db: true, audio: newAudioDirty });
   } finally {
     // Скрываем универсальный лоадер в любом случае (успех или ошибка)
@@ -1953,6 +1956,8 @@ function _maybeCloseWithPrompt() {
           _closeEditorModal();
         },
         onSave: async function () {
+          console.log('[dictationEditorModal] [SAVE-CLOSE] ===== ЗАКРЫТИЕ С СОХРАНЕНИЕМ (модалка "Сохранить и выйти?") =====');
+          console.log('[dictationEditorModal] [SAVE-CLOSE] time=' + new Date().toISOString());
           var ok = false;
           try {
             ok = await _handleSave();
@@ -1969,6 +1974,8 @@ function _maybeCloseWithPrompt() {
     // fallback без универсальной модалки
     var wantSave = window.confirm('Есть несохранённые изменения. Сохранить и выйти?');
     if (wantSave) {
+      console.log('[dictationEditorModal] [SAVE-CLOSE] ===== ЗАКРЫТИЕ С СОХРАНЕНИЕМ (window.confirm fallback) =====');
+      console.log('[dictationEditorModal] [SAVE-CLOSE] time=' + new Date().toISOString());
       _handleSave().then(function () { _closeEditorModal(); }).catch(function () { _closeEditorModal(); });
       return;
     }
@@ -3318,6 +3325,23 @@ async function _handleSave() {
   var saveBtn = document.getElementById('dictationEditorModalSaveBtn');
   if (!saveBtn) return false;
 
+  // Защита от параллельных вызовов _handleSave():
+  // если сохранение уже выполняется — ждём его завершения,
+  // потом запускаемся с актуальными данными (включая новые переводы/TTS).
+  if (window.__DICTATION_EDITOR_SAVE_IN_PROGRESS) {
+    console.warn('[dictationEditorModal] _handleSave уже выполняется — ожидаем завершения...');
+    var waitStarted = Date.now();
+    while (window.__DICTATION_EDITOR_SAVE_IN_PROGRESS && (Date.now() - waitStarted) < 30000) {
+      await new Promise(function (r) { setTimeout(r, 200); });
+    }
+    if (window.__DICTATION_EDITOR_SAVE_IN_PROGRESS) {
+      console.error('[dictationEditorModal] _handleSave таймаут ожидания — выходим');
+      return false;
+    }
+    console.log('[dictationEditorModal] _handleSave предыдущий вызов завершился, запускаем повторно');
+  }
+  window.__DICTATION_EDITOR_SAVE_IN_PROGRESS = true;
+
   // Показываем универсальный лоадер с правильным текстом "Збереження даних"
   try {
     if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.show === 'function') {
@@ -3338,7 +3362,9 @@ async function _handleSave() {
     var flags = _getDirtyFlags();
     var hasChanges = _hasUnsavedChanges();
 
-    console.log('[dictationEditorModal] [SAVE-CHAIN] _handleSave початок: db=' + flags.db + ' audio=' + flags.audio + ' cover=' + flags.cover + ' online=' + navigator.onLine);
+    window.__SAVE_FLOW = (window.__SAVE_FLOW || 0) + 1;
+    var flowNum = window.__SAVE_FLOW;
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _handleSave ПОЧАТОК: db=' + flags.db + ' audio=' + flags.audio + ' cover=' + flags.cover + ' online=' + navigator.onLine + ' langBlocks=' + (state.content ? state.content.langBlocks.length : 0) + ' time=' + new Date().toISOString());
 
     if (!hasChanges) {
       console.log('[dictationEditorModal] Нет изменений для сохранения');
@@ -3479,7 +3505,7 @@ async function _handleSave() {
         // Добавляем флаг dirty audio — чтобы при отправке batcher знал
         saveData._audioDirty = hasDirtyAudio;
 
-        console.log('[dictationEditorModal] [SAVE-CHAIN] SaveQueueBatcher audio=' + hasDirtyAudio + ' online=' + navigator.onLine + ' langBlocks=' + (state.content ? state.content.langBlocks.length : 0));
+        console.log('[dictationEditorModal] [FLOW-' + flowNum + '] SaveQueueBatcher audio=' + hasDirtyAudio + ' online=' + navigator.onLine + ' langBlocks=' + (state.content ? state.content.langBlocks.length : 0));
 
         // Пишем в очередь IndexedDB
         var queueKey = await window.SaveQueueBatcher.enqueueSave(normalizedId, saveData);
@@ -3545,19 +3571,29 @@ async function _handleSave() {
           // Используем hasDirtyAudio (скопирован ДО _setDirtyFlags), а НЕ flags.audio,
           // потому что _setDirtyFlags() мутирует тот же объект state.dirtyFlags.
           if (hasDirtyAudio && navigator.onLine) {
-            console.log('[dictationEditorModal] [SAVE-CHAIN] Загружаем аудио на B2: dictationId=' + normalizedId);
+            console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Загружаем аудио на B2: dictationId=' + normalizedId);
             try {
-              await _uploadDraftAudioToB2(normalizedId, token);
-              _setDirtyFlags({ audio: false });
-              console.log('[dictationEditorModal] [SAVE-CHAIN] Аудио загружено на B2 успешно');
+              var b2Result = await _uploadDraftAudioToB2(normalizedId, token);
+              if (b2Result && b2Result.ok) {
+                _setDirtyFlags({ audio: false });
+                console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио загружено на B2 успешно: uploaded=' + b2Result.uploaded + ' skipped=' + b2Result.skipped + ' failed=' + b2Result.failed + ' cacheMiss=' + b2Result.cacheMiss);
+              } else if (b2Result && b2Result.reason === 'inflight_timeout') {
+                console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось — таймаут ожидания inflight');
+              } else if (b2Result && b2Result.reason === 'inflight') {
+                console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось — inflight (race condition)');
+              } else if (b2Result && b2Result.uploaded > 0 && b2Result.failed > 0) {
+                console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио загружено частково: uploaded=' + b2Result.uploaded + ' failed=' + b2Result.failed);
+              } else {
+                console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось: ' + JSON.stringify(b2Result));
+              }
             } catch (audioErr) {
-              console.warn('[dictationEditorModal] [SAVE-CHAIN] Аудио не загрузилось (останется в кеше):', audioErr);
+              console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось (останется в кеше):', audioErr);
               // Не фатально — аудио осталось в MEDIA_CACHE_PERSIST
             }
           } else if (hasDirtyAudio && !navigator.onLine) {
-            console.log('[dictationEditorModal] [SAVE-CHAIN] Аудио отложено — нет сети: dictationId=' + normalizedId);
+            console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио отложено — нет сети: dictationId=' + normalizedId);
           } else {
-            console.log('[dictationEditorModal] [SAVE-CHAIN] Аудио не требуется: hasDirtyAudio=' + hasDirtyAudio);
+            console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не требуется: hasDirtyAudio=' + hasDirtyAudio);
           }
 
           console.log('[dictationEditorModal] Сохранение через очередь завершено');
@@ -3688,18 +3724,18 @@ async function _handleSave() {
     if (!effectiveDictationId) effectiveDictationId = normalizedId;
 
     // Этап 2: Сохраняем аудио (если dirty audio) — прямой fetch путь
-    console.log('[dictationEditorModal] [SAVE-CHAIN] Прямий fetch: flags.audio=' + flags.audio + ' online=' + navigator.onLine);
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Прямий fetch: flags.audio=' + flags.audio + ' online=' + navigator.onLine);
     if (flags.audio) {
-      console.log('[dictationEditorModal] [SAVE-CHAIN] Сохраняю аудио на B2 (прямий fetch)... dictationId=' + effectiveDictationId);
+      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Сохраняю аудио на B2 (прямий fetch)... dictationId=' + effectiveDictationId);
       try {
         await _uploadDraftAudioToB2(effectiveDictationId, token);
         _setDirtyFlags({ audio: false });
-        console.log('[dictationEditorModal] [SAVE-CHAIN] Аудио сохранено на B2');
+        console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио сохранено на B2');
       } catch (audioErr) {
-        console.error('[dictationEditorModal] [SAVE-CHAIN] Ошибка сохранения аудио:', audioErr);
+        console.error('[dictationEditorModal] [FLOW-' + flowNum + '] Ошибка сохранения аудио:', audioErr);
       }
     } else {
-      console.log('[dictationEditorModal] [SAVE-CHAIN] Аудио не требуется: flags.audio=' + flags.audio);
+      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не требуется: flags.audio=' + flags.audio);
     }
 
     // Обложка передаётся как cover_b64 внутри save_dictation_final (этап 1),
@@ -3713,6 +3749,7 @@ async function _handleSave() {
     console.error('[dictationEditorModal] Ошибка сохранения:', error);
   } finally {
     console.log('[dictationEditorModal] _handleSave finally');
+    window.__DICTATION_EDITOR_SAVE_IN_PROGRESS = false;
     saveBtn.innerHTML = originalHTML;
     if (typeof lucide !== 'undefined' && lucide.createIcons) {
       lucide.createIcons();
@@ -4854,7 +4891,13 @@ function init() {
   // Кнопка сохранения
   var saveBtn = document.getElementById('dictationEditorModalSaveBtn');
   if (saveBtn) {
-    saveBtn.addEventListener('click', _handleSave);
+    saveBtn.addEventListener('click', function (e) {
+      console.log('[dictationEditorModal] [SAVE-BTN] ===== КЛИК ПО КНОПКЕ "СОХРАНИТЬ" (дискета) =====');
+      console.log('[dictationEditorModal] [SAVE-BTN] event.type=' + e.type + ' isTrusted=' + e.isTrusted + ' time=' + new Date().toISOString());
+      console.log('[dictationEditorModal] [SAVE-BTN] Стек вызовов (trace):');
+      console.trace('[dictationEditorModal] [SAVE-BTN]');
+      _handleSave();
+    });
   }
 
   // Обработчики кнопок fill modal
