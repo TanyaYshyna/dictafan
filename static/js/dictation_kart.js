@@ -1008,32 +1008,86 @@ window.DictationKart = window.DictationKart || {
             if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
               console.log('[dictation_kart] calling DictationEditorModal.open');
 
-              // Загружаем предложения с сервера (с таймаутом 10 сек)
+              // Стратегия: КЕШ ПЕРВЫЙ → сервер для обновления
+              // 1. Пробуем загрузить из IndexedDB (мгновенно)
+              // 2. Если есть в кеше — открываем редактор сразу
+              // 3. Параллельно пробуем сервер — если данные новее, обновляем
+              // 4. Если кеша нет — ждём сервер
+              // 5. Если сервер упал — используем кеш (fallback)
               var sentencesPromise = null;
-              if (window.DictationKart && typeof window.DictationKart._fetchSentencesFromServer === 'function') {
-                sentencesPromise = window.DictationKart._fetchSentencesFromServer(dictationId, langOriginal, langTranslation)
-                  .then(function (result) { return result; })
-                  .catch(function (err) {
-                    console.warn('[dictation_kart] Failed to fetch sentences for editor', err);
-                    // Пробуем загрузить из IndexedDB cache
-                    if (window.DictationKart && typeof window.DictationKart._loadSentencesFromCache === 'function') {
-                      return window.DictationKart._loadSentencesFromCache(dictationId, langOriginal, langTranslation)
-                        .then(function (cachedResult) {
-                          if (cachedResult && Array.isArray(cachedResult.sentences) && cachedResult.sentences.length) {
-                            console.log('[dictation_kart] Loaded sentences from cache, count:', cachedResult.sentences.length);
-                            if (typeof window.DictationKart._showToast === 'function') {
-                                window.DictationKart._showToast('Не вдалося завантажити дані з сервера. Використовується кеш.', { type: 'warning' });
-                              }
-                              return { sentences: cachedResult.sentences, audio_user_shared: cachedResult.audio_user_shared };
-                            }
-                            return { sentences: [], audio_user_shared: null };
-                        });
+              var cachePromise = null;
+              
+              // Пробуем загрузить из IndexedDB cache (для всех языковых пар, не только текущей)
+              if (window.DictationKart && typeof window.DictationKart._loadSentencesFromCache === 'function') {
+                cachePromise = window.DictationKart._loadSentencesFromCache(dictationId, langOriginal, langTranslation)
+                  .then(function (cachedResult) {
+                    if (cachedResult && Array.isArray(cachedResult.sentences) && cachedResult.sentences.length) {
+                      console.log('[dictation_kart] Cache HIT for editor, sentences count:', cachedResult.sentences.length);
+                      return { source: 'cache', sentences: cachedResult.sentences, audio_user_shared: cachedResult.audio_user_shared };
                     }
-                    return { sentences: [], audio_user_shared: null };
+                    return null;
+                  })
+                  .catch(function () { return null; });
+              } else {
+                cachePromise = Promise.resolve(null);
+              }
+              
+              // Пробуем загрузить с сервера
+              var serverPromise = null;
+              if (window.DictationKart && typeof window.DictationKart._fetchSentencesFromServer === 'function') {
+                serverPromise = window.DictationKart._fetchSentencesFromServer(dictationId, langOriginal, langTranslation)
+                  .then(function (result) {
+                    console.log('[dictation_kart] Server OK for editor, sentences count:', result.sentences ? result.sentences.length : 0);
+                    return { source: 'server', sentences: result.sentences || [], audio_user_shared: result.audio_user_shared || null };
+                  })
+                  .catch(function (err) {
+                    console.warn('[dictation_kart] Server failed for editor:', err.message || err);
+                    return null;
                   });
               } else {
-                sentencesPromise = Promise.resolve({ sentences: [], audio_user_shared: null });
+                serverPromise = Promise.resolve(null);
               }
+              
+              // Гонка: кеш первый, но если кеша нет — ждём сервер
+              sentencesPromise = cachePromise.then(function (cached) {
+                if (cached && cached.sentences && cached.sentences.length) {
+                  // Кеш есть — открываем редактор сразу, но в фоне проверяем сервер
+                  serverPromise.then(function (serverResult) {
+                    if (serverResult && serverResult.sentences && serverResult.sentences.length) {
+                      // Сервер вернул данные — проверяем, не изменились ли они
+                      if (serverResult.sentences.length !== cached.sentences.length) {
+                        console.log('[dictation_kart] Server has different data, reopening editor with fresh data');
+                        window.DictationEditorModal.open({
+                          dictationId: dictationId,
+                          originalLanguage: langOriginal,
+                          translationLanguage: langTranslation,
+                          title: title,
+                          level: level,
+                          coverUrl: coverUrl,
+                          authorMaterialsUrl: authorMaterialsUrl,
+                          is_dialog: isDialog,
+                          sentences: serverResult.sentences,
+                          audio_user_shared: serverResult.audio_user_shared,
+                          audio_order: audioOrder,
+                        });
+                      }
+                    }
+                  }).catch(function () {});
+                  return { sentences: cached.sentences, audio_user_shared: cached.audio_user_shared };
+                }
+                // Кеша нет — ждём сервер
+                return serverPromise.then(function (serverResult) {
+                  if (serverResult && serverResult.sentences && serverResult.sentences.length) {
+                    return { sentences: serverResult.sentences, audio_user_shared: serverResult.audio_user_shared };
+                  }
+                  // И сервер не дал данных — показываем пустую таблицу
+                  console.warn('[dictation_kart] No data from cache or server, editor will be empty');
+                  if (typeof window.DictationKart._showToast === 'function') {
+                    window.DictationKart._showToast('Не вдалося завантажити дані. Перевірте підключення до інтернету.', { type: 'warning' });
+                  }
+                  return { sentences: [], audio_user_shared: null };
+                });
+              });
 
               sentencesPromise.then(function (result) {
                 var sentences = result && Array.isArray(result.sentences) ? result.sentences : [];
