@@ -962,7 +962,14 @@ class AudioManagerClass {
 
     buildDictationAudioUrl(dictationId, language, filename) {
         try {
-            const id = String(dictationId || '').trim();
+            let id = String(dictationId || '').trim();
+            // Нормализация: добавляем префикс dict_, если его нет.
+            // Это гарантирует, что ключи CacheStorage всегда совпадают,
+            // независимо от того, кто вызывает метод (редактор передаёт "3",
+            // а карточка/модалка — уже "dict_3").
+            if (id && !id.startsWith('dict_') && !id.startsWith('dict_temp_')) {
+                id = 'dict_' + id;
+            }
             const lang = String(language || '').trim();
             const raw = String(filename || '').trim();
             if (!id || !lang || !raw) return '';
