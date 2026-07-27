@@ -1486,14 +1486,21 @@ class AudioManagerClass {
     }
 
     async uploadDictationAudioFromCacheToB2({ dictationId, token, urls, shouldUpload = null, onUploaded = null, onProgress = null }) {
+        console.log('[AudioManager] [SAVE-CHAIN] uploadDictationAudioFromCacheToB2: dictationId=' + dictationId + ' urls=' + (Array.isArray(urls) ? urls.length : 0));
+
         try {
             if (!dictationId || !String(dictationId).startsWith('dict_')) {
+                console.log('[AudioManager] [SAVE-CHAIN] uploadDictationAudioFromCacheToB2: bad_dictation_id');
                 return { ok: false, reason: 'bad_dictation_id' };
             }
             const t = String(token || '').trim();
-            if (!t) return { ok: false, reason: 'missing_token' };
+            if (!t) {
+                console.log('[AudioManager] [SAVE-CHAIN] uploadDictationAudioFromCacheToB2: missing_token');
+                return { ok: false, reason: 'missing_token' };
+            }
 
             const list = Array.from(new Set((Array.isArray(urls) ? urls : []).filter(Boolean)));
+            console.log('[AudioManager] [SAVE-CHAIN] uploadDictationAudioFromCacheToB2: ' + list.length + ' унікальних URL для завантаження');
             if (list.length === 0) {
                 return { ok: true, dictationId, urls: 0, cacheHit: 0, uploaded: 0, skipped: 0, failed: 0, cacheMiss: 0, hashed: 0 };
             }
@@ -1503,14 +1510,20 @@ class AudioManagerClass {
                 window.__B2_AUDIO_UPLOAD_INFLIGHT = window.__B2_AUDIO_UPLOAD_INFLIGHT || {};
                 const k = String(dictationId);
                 if (window.__B2_AUDIO_UPLOAD_INFLIGHT[k]) {
+                    console.log('[AudioManager] [SAVE-CHAIN] uploadDictationAudioFromCacheToB2: inflight — пропускаємо (вже завантажується)');
                     return { ok: false, reason: 'inflight' };
                 }
                 window.__B2_AUDIO_UPLOAD_INFLIGHT[k] = true;
+                console.log('[AudioManager] [SAVE-CHAIN] uploadDictationAudioFromCacheToB2: отримую upload URL...');
             } catch (e) {
             }
 
             const up = await this.getB2UploadUrl(t);
-            if (!up.ok) return { ok: false, reason: up.reason, status: up.status, text: up.text };
+            if (!up.ok) {
+                console.log('[AudioManager] [SAVE-CHAIN] uploadDictationAudioFromCacheToB2: getB2UploadUrl failed, reason=' + up.reason + ' status=' + up.status);
+                return { ok: false, reason: up.reason, status: up.status, text: up.text };
+            }
+            console.log('[AudioManager] [SAVE-CHAIN] uploadDictationAudioFromCacheToB2: upload URL отримано, починаю завантаження ' + list.length + ' файлів');
 
             let cacheHit = 0;
             let uploaded = 0;
@@ -1551,12 +1564,16 @@ class AudioManagerClass {
                     }
                     if (!cached) {
                         cacheMiss += 1;
-                        console.log('[AudioManager] uploadDictationAudioFromCacheToB2: cacheMiss url=' + u.toString() + ' dictationId=' + dictationId + ' lang=' + lang + ' filename=' + filename);
+                        console.log('[AudioManager] [SAVE-CHAIN] cacheMiss: url=' + u.toString() + ' lang=' + lang + ' filename=' + filename + ' (cacheMiss=' + cacheMiss + ')');
                         continue;
                     }
                     cacheHit += 1;
                     const blob = await cached.blob();
-                    if (!blob || !blob.size) continue;
+                    if (!blob || !blob.size) {
+                        console.log('[AudioManager] [SAVE-CHAIN] пустий blob: url=' + u.toString());
+                        continue;
+                    }
+                    console.log('[AudioManager] [SAVE-CHAIN] cacheHit: url=' + u.toString() + ' blobSize=' + blob.size);
 
                     let allow = true;
                     try {
@@ -1596,6 +1613,7 @@ class AudioManagerClass {
                         }
                     }
 
+                    console.log('[AudioManager] [SAVE-CHAIN] завантажую на B2: ' + remotePath + ' blobSize=' + blob.size);
                     const b2Resp = await fetch(up.uploadUrl, {
                         method: 'POST',
                         headers: {
@@ -1608,10 +1626,12 @@ class AudioManagerClass {
                     });
                     if (!b2Resp.ok) {
                         failed += 1;
+                        console.log('[AudioManager] [SAVE-CHAIN] B2 upload failed: ' + remotePath + ' status=' + b2Resp.status);
                         continue;
                     }
 
                     uploaded += 1;
+                    console.log('[AudioManager] [SAVE-CHAIN] B2 upload success: ' + remotePath + ' uploaded=' + uploaded);
                     try {
                         await this._setB2Ledger(remotePath, { sha256: sha256 || null, size: Number(blob.size || 0), uploadedAt: Date.now() });
                     } catch (e) {
@@ -1627,6 +1647,7 @@ class AudioManagerClass {
                 }
             }
 
+            console.log('[AudioManager] [SAVE-CHAIN] upload завершено: dictationId=' + dictationId + ' uploaded=' + uploaded + ' skipped=' + skipped + ' failed=' + failed + ' cacheMiss=' + cacheMiss + ' cacheHit=' + cacheHit + ' hashed=' + hashed);
             return {
                 ok: failed === 0 && cacheMiss === 0,
                 dictationId,
@@ -1639,6 +1660,7 @@ class AudioManagerClass {
                 hashed
             };
         } catch (e) {
+            console.log('[AudioManager] [SAVE-CHAIN] upload fatal error:', e);
             return { ok: false, reason: 'fatal', error: String(e && e.message ? e.message : e) };
         } finally {
             try {
