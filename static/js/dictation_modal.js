@@ -4739,6 +4739,15 @@
     }
 
     store.setContentSentences({ dictationId, sentences, originalLanguage: langOriginal });
+
+    // ПРОВЕРЯЕМ СРАЗУ ПОСЛЕ УСТАНОВКИ
+    try {
+      const verifyContent = store.getContent({ dictationId });
+      console.log('[DM:loadContent] СРАЗУ после setContentSentences: getContent=', !!verifyContent, 'keys=', verifyContent ? verifyContent.getAllKeys().length : 0, 'store._contents.size=', store._contents ? store._contents.size : '?', 'store._contents keys=', store._contents ? JSON.stringify(Array.from(store._contents.keys())) : '?');
+    } catch (eVerify) {
+      console.error('[DM:loadContent] ошибка проверки после setContentSentences:', eVerify);
+    }
+
     return true;
   }
 
@@ -6786,6 +6795,22 @@
       } catch (e) {
       }
 
+      // Восстанавливаем сессию из IndexedDB ПЕРЕД загрузкой контента.
+      // Важно: restoreFromIdb() создаёт контенты для всех диктантов из IDB,
+      // и если их больше _maxContents (5), он удаляет старые, включая
+      // только что загруженный контент текущего диктанта.
+      // Поэтому восстанавливаем ДО, а потом загружаем/перезагружаем контент текущего диктанта.
+      try {
+        const store = getRuntimeStore();
+        if (store && typeof store.restoreFromIdb === 'function') {
+          console.log('[DM:open] вызываю restoreFromIdb ДО загрузки контента');
+          await store.restoreFromIdb().catch(function(e){});
+          console.log('[DM:open] restoreFromIdb завершён, _contents.size=', store._contents ? store._contents.size : '?');
+        }
+      } catch (eReset) {
+        console.error('[DM:open] ошибка restoreFromIdb:', eReset);
+      }
+
       // Загружаем контент диктанта (предложения) в runtime.
       // Если загрузка не удалась — не создаём сессию, показываем ошибку.
       let contentLoaded = false;
@@ -6805,18 +6830,6 @@
           }
         } catch (e1) {
         }
-      }
-
-      // Восстанавливаем сессию из IndexedDB ПОСЛЕ загрузки контента,
-      // чтобы restoreFromIdb() мог сопоставить ключи предложений с контентом.
-      // Если запустить restore до загрузки контента, все сессии будут пропущены
-      // (проверка allKeys.length === 0 в restoreFromIdb).
-      try {
-        const store = getRuntimeStore();
-        if (store && typeof store.restoreFromIdb === 'function') {
-          await store.restoreFromIdb().catch(function(e){});
-        }
-      } catch (eReset) {
       }
 
       // Читаем assignment launch context из localStorage (plan_date, source_group_id и т.д.)
