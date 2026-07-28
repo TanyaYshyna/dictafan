@@ -4744,20 +4744,26 @@
 
   function getOrCreateDefaultSessionFromParsed(parsed, subsetPositions = null, launchCtx = null) {
     const store = getRuntimeStore();
+    console.log('[DM:getOrCreateSession] ВХОД parsed=', !!parsed, 'subsetPositions=', subsetPositions);
     if (!store) {
+      console.warn('[DM:getOrCreateSession] store is null — DictationRuntime не загружен');
       return null;
     }
 
     const dictationId = String(parsed?.dictationIdFormatted || '').trim();
     if (!dictationId) {
+      console.warn('[DM:getOrCreateSession] dictationId пустой');
       return null;
     }
+    console.log('[DM:getOrCreateSession] dictationId=', dictationId);
 
     // Проверяем, что контент загружен и не пустой
     const content = store.getContent({ dictationId });
     const allKeys = content ? content.getAllKeys() : [];
+    console.log('[DM:getOrCreateSession] content there=', !!content, 'allKeys.length=', allKeys.length);
     if (!allKeys.length) {
       // Контент не загружен — не создаём сессию с пустыми данными
+      console.warn('[DM:getOrCreateSession] КОНТЕНТ ПУСТ — возвращаем null');
       return null;
     }
 
@@ -4777,6 +4783,7 @@
       sourceGroupId,
       planDate,
     });
+    console.log('[DM:getOrCreateSession] store.getOrCreateSession вернул сессию, dictationId=', session.dictationId, 'selectedKeys.length=', session.selectedKeys ? session.selectedKeys.length : 0);
 
     try {
       const hasSubset = Array.isArray(subsetPositions) && subsetPositions.length > 0;
@@ -5518,10 +5525,13 @@
   function showStartModal() {
     try {
       const startModal = document.getElementById('start-modal');
+      console.log('[DM:showStartModal] start-modal элемент:', startModal ? 'найден' : 'НЕ НАЙДЕН');
       if (!startModal) {
-       return;
+        console.error('[DM:showStartModal] #start-modal НЕ НАЙДЕН В DOM!');
+        return;
       }
       startModal.style.display = 'flex';
+      console.log('[DM:showStartModal] display установлен в flex');
       renderLucide(startModal);
 
       try {
@@ -5532,8 +5542,10 @@
           applyStartModalColumnsPreset({ progress: true, original: false, translation: false });
         }
       } catch (e1) {
+        console.error('[DM:showStartModal] ошибка в applyStartModalColumnsPreset:', e1);
       }
     } catch (e) {
+      console.error('[DM:showStartModal] исключение:', e);
     }
 
     // Обновляем текст кнопки в зависимости от контекста
@@ -6733,6 +6745,13 @@
       cleanupPreviousDictationState();
       dictationModalState.currentUrl = dictationUrl;
 
+      // Сбрасываем активную сессию перед загрузкой нового диктанта,
+      // чтобы избежать утечки состояния от предыдущего диктанта
+      try {
+        window.__dictationModalActiveSession = null;
+      } catch (e0s) {
+      }
+
       try {
         applyDictationMetaFromCard({ href: dictationUrl, cardEl: opts.cardEl || null });
       } catch (e) {
@@ -6772,11 +6791,14 @@
       let contentLoaded = false;
       try {
         if (parsed) {
+          console.log('[DM:open] вызываю ensureDictationContentLoadedToRuntime для dictationId=', parsed.dictationIdFormatted);
           await ensureDictationContentLoadedToRuntime(parsed);
           contentLoaded = true;
+          console.log('[DM:open] ensureDictationContentLoadedToRuntime — УСПЕШНО');
         }
       } catch (e) {
         contentLoaded = false;
+        console.error('[DM:open] ОШИБКА загрузки контента:', e && e.message ? e.message : e, 'стек:', e && e.stack ? e.stack.substring(0, 200) : '');
         try {
           if (typeof window.showNoSelectionModal === 'function') {
             window.showNoSelectionModal('Не удалось загрузить диктант. Проверь интернет и обнови страницу.');
@@ -6825,55 +6847,86 @@
        try {
         const subsetPositions = opts && Array.isArray(opts.subsetPositions) ? opts.subsetPositions : null;
         const session = (parsed && contentLoaded) ? getOrCreateDefaultSessionFromParsed(parsed, subsetPositions, launchCtx) : null;
+        console.log('[DM:open] getOrCreateDefaultSession result:', session ? 'сессия создана' : 'NULL', 'dictationId=', parsed ? parsed.dictationIdFormatted : '?', 'contentLoaded=', contentLoaded, 'subsetPositions=', subsetPositions);
         if (session) {
           // Если сессия помечена как завершённая (например, страницу закрыли до очистки кеша),
           // сбрасываем прогресс как при нажатии «всё по новой»
           try {
             if (session.completed === true) {
+               console.log('[DM:open] сессия помечена completed, сбрасываем прогресс');
                await resetDictationProgressForSession(session);
             }
           } catch (eReset) {
+            console.error('[DM:open] ошибка resetDictationProgressForSession:', eReset);
           }
 
           try {
             window.__dictationModalActiveSession = session;
+            console.log('[DM:open] window.__dictationModalActiveSession установлен, selectedKeys.length=', session.selectedKeys ? session.selectedKeys.length : 0, 'currentSelectedIndex=', session.currentSelectedIndex);
           } catch (e0) {
+            console.error('[DM:open] ошибка установки activeSession:', e0);
           }
-          renderStartModalSentencesTable(session);
+
+          try {
+            renderStartModalSentencesTable(session);
+            console.log('[DM:open] renderStartModalSentencesTable done');
+          } catch (eRender) {
+            console.error('[DM:open] ошибка в renderStartModalSentencesTable:', eRender);
+          }
+
           dictationModalState.startModalContext = 'open';
-          showStartModal();
-          updateNavigatorFromSession(session);
+          try {
+            showStartModal();
+            console.log('[DM:open] showStartModal done, display=', document.getElementById('start-modal') ? document.getElementById('start-modal').style.display : 'start-modal не найден');
+          } catch (eShow) {
+            console.error('[DM:open] ошибка в showStartModal:', eShow);
+          }
+
+          try {
+            updateNavigatorFromSession(session);
+            console.log('[DM:open] updateNavigatorFromSession done');
+          } catch (eNav) {
+            console.error('[DM:open] ошибка в updateNavigatorFromSession:', eNav);
+          }
 
           try {
             ensureSpeechPanel(session, parsed);
           } catch (e0) {
+            console.error('[DM:open] ошибка в ensureSpeechPanel:', e0);
           }
 
           try {
             bindCoinExchangeModal(session);
           } catch (e0b) {
+            console.error('[DM:open] ошибка в bindCoinExchangeModal:', e0b);
           }
 
           // Показываем номер диктанта и дату старта внизу модалки
           try {
             updateDictationSessionInfo(session);
           } catch (eInfo) {
+            console.error('[DM:open] ошибка в updateDictationSessionInfo:', eInfo);
           }
 
           // Загружаем completionCount из БД и обновляем медальку в шапке
           try {
             await loadCompletionCount(session);
           } catch (eCc) {
+            console.error('[DM:open] ошибка в loadCompletionCount:', eCc);
           }
 
           // Загружаем рекорд диктанта и показываем лейбл под заголовком
           try {
             _updateDictationRecordLabel();
           } catch (eRec) {
+            console.error('[DM:open] ошибка в _updateDictationRecordLabel:', eRec);
           }
 
+        } else {
+          console.warn('[DM:open] СЕССИЯ НЕ СОЗДАНА — parsed=', !!parsed, 'contentLoaded=', contentLoaded);
         }
       } catch (e) {
+        console.error('[DM:open] КРИТИЧЕСКАЯ ОШИБКА в блоке создания сессии:', e);
       }
 
       try {
