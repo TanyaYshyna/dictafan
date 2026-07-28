@@ -641,7 +641,10 @@ window.DictationKart = window.DictationKart || {
           var match = href.match(/\/dictation\/(dict_\d+)\//);
           var dictIdFormatted = match ? match[1] : ('dict_' + dictationId);
 
+          console.log('[DK:thumbClick] dictationIdFormatted=', dictIdFormatted, 'langOriginal=', langOriginal, 'availableTranslations=', availableTranslations, 'DictationLanguageModal=', !!window.DictationLanguageModal);
+
           if (availableTranslations.length >= 1 && window.DictationLanguageModal && typeof window.DictationLanguageModal.open === 'function') {
+            console.log('[DK:thumbClick] открываю DictationLanguageModal');
             window.DictationLanguageModal.open({
               dictationId: dictIdFormatted,
               langOriginal: langOriginal,
@@ -652,6 +655,7 @@ window.DictationKart = window.DictationKart || {
           }
 
           // Fallback: если модалка не загружена — открываем сразу
+          console.log('[DK:thumbClick] fallback: DictationLanguageModal не загружен или нет переводов, вызываю openDictationLaunch');
           if (Number.isFinite(dictationId) && dictationId > 0 && typeof window.openDictationLaunch === 'function') {
             window.openDictationLaunch(dictationId, href, cardEl, dictationTitle);
           } else {
