@@ -7062,6 +7062,8 @@
         const href = thumb.getAttribute('data-href');
         if (!href) return;
 
+        console.log('[DM:patchCardClick] перехвачен клик по карточке desk-card, href=', href);
+
         e.preventDefault();
         e.stopPropagation();
 
@@ -7080,11 +7082,14 @@
         const title = card.querySelector('.short-title');
         const dictationTitle = title ? String(title.textContent || '').trim() : '';
         if (Number.isFinite(dictationId) && dictationId > 0 && typeof window.openDictationLaunch === 'function') {
+          console.log('[DM:patchCardClick] вызываю openDictationLaunch, dictationId=', dictationId, 'title=', dictationTitle);
           window.openDictationLaunch(dictationId, href, card, dictationTitle);
         } else {
+          console.log('[DM:patchCardClick] fallback: DictationModal.open, openDictationLaunch available=', typeof window.openDictationLaunch);
           open(href, { cardEl: card });
         }
       } catch (e2) {
+        console.error('[DM:patchCardClick] error:', e2);
       }
     }, true);
 
@@ -7113,6 +7118,7 @@
           }
         }
       } catch (e2) {
+        console.error('[DM:patchCardClick] ОШИБКА в обработчике:', e2);
       }
     }, true);
   }

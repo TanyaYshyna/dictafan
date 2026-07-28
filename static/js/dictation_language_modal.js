@@ -160,15 +160,21 @@
       btns.forEach(function (btn) {
         btn.addEventListener('click', function () {
           var langTr = btn.getAttribute('data-lang');
+          console.log('[DLM:langSelect] выбран язык перевода=', langTr, 'dictationId=', dictationId, 'langOriginal=', langOriginal, 'openDictationLaunch available=', typeof window.openDictationLaunch);
           closeModal();
           if (onSelect) {
             onSelect(langTr);
           } else if (langOriginal && langTr && dictationId) {
             var url = '/dictation/' + encodeURIComponent(dictationId) + '/' + encodeURIComponent(langOriginal) + '/' + encodeURIComponent(langTr);
+            console.log('[DLM:langSelect] url=', url, 'cardEl=', !!cardEl);
             if (typeof window.openDictationLaunch === 'function') {
+              console.log('[DLM:langSelect] вызываю openDictationLaunch');
               window.openDictationLaunch(Number(dictationId.replace('dict_', '')), url, cardEl, '');
             } else if (window.DictationModal && typeof window.DictationModal.open === 'function') {
+              console.log('[DLM:langSelect] fallback: DictationModal.open');
               window.DictationModal.open(url, { cardEl, subsetPositions: null });
+            } else {
+              console.error('[DLM:langSelect] ни openDictationLaunch, ни DictationModal не доступны!');
             }
           }
         });
