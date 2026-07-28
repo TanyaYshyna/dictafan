@@ -68,7 +68,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 # Цель документа
 
-Зафиксировать **строгую архитектуру** страниц "Редактора диктантов" и "Диктант" , чтобы любые дальнейшие изменения делались без «вольного творчества».
+Зафиксировать **строгую архитектуру** модальных окон "Редактора диктантов" и "Диктант" (открываются на странице `/desktop`), чтобы любые дальнейшие изменения делались без «вольного творчества».
 
 Документ отвечает на вопросы:
 
@@ -115,10 +115,12 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 Отвечает за:
 
-- отдачу страницы редактора и `init-data`
-- сохранение диктанта «финально» (`save_dictation_final`)
+- сохранение диктанта «финально» через `POST /save_dictation_final`
 - нормализацию полей аудио перед записью в БД (**basename-only**)
 - сохранение/обновление текстовых данных и переводов
+- API для перевода (`POST /translate`), генерации TTS (`POST /generate_audio`), нарезки аудио (`POST /cut-audio`, `POST /split-audio`)
+- API для работы с B2: получение upload URL (`POST /api/b2/get_upload_url`), очистка лишних файлов (`POST /api/b2/cleanup_dictation_audio`)
+- резервирование ID для нового диктанта (`GET /api/dictation/reserve_id`)
 
 Важно:
 
@@ -129,8 +131,10 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 Отвечает за:
 
-- страницу выполнения диктанта (HTML) и отдачу текстовых данных
-- генерацию аудио (если генерация реализована на сервере)
+- API для получения данных диктанта: `GET /api/dictation/<id>/<lang_orig>/<lang_tr>/sentences`
+- отдачу аудио из B2 с fallback на локальные файлы: `GET /api/dictations/<dictation_id>/<lang>/<filename>`
+- транскрибацию аудио: `POST /api/speech-recognition/transcribe`
+- рендеринг HTML-страницы диктанта (для прямых ссылок, не для `/desktop`)
 
 Важно:
 
@@ -376,18 +380,30 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 ### `static/js/audio_manager.js`
 
-Роль (целевое состояние):
+Роль (текущее состояние):
 
 - единая точка правды для работы с аудио:
-  - хранение `blob:` (до Save)
-  - построение канонических URL
-  - чтение (blob из cache если нет в если читаем из B2 и формируем из него cache)
-  - сохранение (upload в B2 и формируем из него cache)
-  - удаление удаленных аудиофайлов (удаляем из B2 и cache)
+  - **Хранение**: `saveDictationAudioBlob(dictationId, lang, filename, blob, mime)` — сохраняет blob в CacheStorage под каноническим ключом
+  - **Чтение**: `resolvePlayableUrl(canonicalUrl, playToken)` — возвращает playable URL: сначала проверяет CacheStorage, если нет — канонический URL
+  - **Проигрывание**: `play(button, audioUrl, onEndedCallback)` — управляет воспроизведением с визуальной синхронизацией (playhead)
+  - **Построение канонических URL**: `buildDictationAudioUrl(dictationId, language, filename)` — нормализует ID (приводит `"123"` → `"dict_123"`)
+  - **Загрузка в B2**: `uploadDictationAudioFromCacheToB2({ dictationId, token, urls, ... })`:
+    - Читает blob из CacheStorage
+    - Проверяет SHA256 в `b2_upload_ledger` (IndexedDB) для дедупликации
+    - Загружает недостающие файлы в B2
+    - Возвращает `{ ok, total, uploaded, skipped, failed, cacheMiss, errors }`
+  - **Очистка B2**: `cleanupStaleB2DictationAudio({ dictationId, token, keepRemotePaths })` — удаляет лишние файлы
+  - **Удаление**: `deleteDictationAudioFromCache(dictationId)` — удаляет все аудио диктанта из CacheStorage
 
-Текущее наблюдение:
+Ключевые внутренние хранилища:
+- **CacheStorage** (через `openMediaCache()`): кеш аудио-файлов по каноническим URL
+- **IndexedDB** (`b2_upload_ledger`): ledger SHA256-хешей для дедупликации при загрузке в B2
+- **В памяти**: blob URL mapping (`_objectUrls`), текущее состояние воспроизведения
 
-- Сейчас часть логики upload/commit может жить в page-коде. Это надо централизовать в `AudioManager` (см. TODO).
+Инварианты:
+- Канонический URL всегда содержит `dict_<id>` (не числовой ID)
+- До Save аудио существует в CacheStorage (после `saveDictationAudioBlob()`) и как `blob:` URL
+- После Save аудио загружается в B2 и остаётся в CacheStorage
 
 ### ~~`static/js/private_library.js`~~ **УДАЛЁН**
 
@@ -902,26 +918,318 @@ const state = {
 
 **Важно**: старого page-кода с `workingData`/`currentDictation` больше нет. Все данные живут в `state.config` и `state.content` (экземпляр `DictationContent`).
 
+# Жизненный цикл данных диктанта: как двигаются данные
+
+Этот раздел описывает полный путь данных диктанта от момента загрузки до упражнения ученика — через все слои: IndexedDB, CacheStorage, B2, сервер.
+
+## Уровень 1: Контент диктанта (`DictationContent`)
+
+**Где**: [`static/js/dictation_runtime/dictation_store.js`](static/js/dictation_runtime/dictation_store.js) — класс `DictationContent`.
+
+**Что хранит**: «Паспорт» диктанта — все предложения, переводы, ссылки на аудио. Это **неизменяемые** данные конкретного диктанта (текст не меняется во время упражнения).
+
+**Структура `langBlocks`**:
+```javascript
+[
+  {
+    lang: "en",          // код языка
+    sentences: [         // массив предложений на этом языке
+      {
+        key: "000",      // строковый ключ (3 цифры)
+        position: 1,     // порядковый номер
+        text: "Hello",   // текст предложения
+        audio: "",       // basename аудиофайла (или "")
+        explanation: "", // пояснение
+        speaker: "1",    // номер говорящего (для диалогов)
+      },
+      // ...
+    ]
+  },
+  {
+    lang: "uk",          // язык перевода
+    sentences: [ /* переводы тех же предложений */ ]
+  },
+  // ...
+]
+```
+
+**Нормализация**: `langBlocks[0]` — всегда язык оригинала. `langBlocks[1..n]` — языки перевода в порядке добавления.
+
+**Как создаётся**:
+1. При открытии редактора (`open(config)`) — `config.sentences` конвертируется в `langBlocks`:
+   - Группировка по `langCode` внутри каждого предложения
+   - Для каждого языка создаётся блок `{ lang, sentences: [...] }`
+2. При открытии диктанта для выполнения (`dictation_modal.js`) — данные загружаются из IndexedDB или с сервера, затем `content.setSentences(sentences, originalLanguage)`.
+
+**Как хранится в IndexedDB**:
+- Store: `dictations`
+- Ключ: `sentences:{dictationId}:{langOrig}:{langTr}`
+- Значение: `{ sentences: [...], audio_user_shared, cachedAt }`
+- Запись через [`dictation_kart.js`](static/js/dictation_kart.js) → `prefetchDictationToCache()`
+
+**Как загружается при открытии редактора** (стратегия «кеш первый»):
+1. Параллельно запускаются: чтение из IndexedDB + запрос к серверу
+2. Если кеш есть → данные отдаются мгновенно, редактор открывается без задержки
+3. Серверный ответ приходит в фоне → если данные изменились, редактор переоткрывается с новыми данными
+4. Если кеша нет → ждём сервер
+
+**Как загружается при открытии диктанта для выполнения**:
+1. `dictation_modal.js` → `loadSentencesFromIndexedDb()` — пытается прочитать из IndexedDB
+2. Если нет → `fetchSentencesFromServerAndCache()` — запрос к серверу + запись в IndexedDB
+3. Затем `content.setSentences()` → `DictationContent` готов к использованию
+
+## Уровень 2: Сессия выполнения (`DictationSession`)
+
+**Где**: [`static/js/dictation_runtime/dictation_store.js`](static/js/dictation_runtime/dictation_store.js) — класс `DictationSession`.
+
+**Что хранит**: Прогресс конкретного прохождения диктанта — состояние каждого предложения, выбор предложений, таймер.
+
+**Структура состояния по ключу предложения**:
+```javascript
+{
+  _textAttemptCount: 0,         // счётчик проверок с ошибками в текущем подходе
+  number_of_perfect: 0,         // 1 если есть звезда
+  number_of_corrected: 0,       // 1 если есть полузвезда
+  number_of_audio: 0,           // 1 если выполнено аудио
+  text_activity_count: 0,       // счётчик текстовых активностей
+  audio_activity50_count: 0,    // счётчик аудио-активностей (≥80%)
+  money_count: 0,               // монеты, заработанные на этом предложении
+  checked: false,               // выбрано ли предложение в поднаборе
+  completed: false,             // завершено ли (звезда/полузвезда)
+  // для completed=true: предложение больше не редактируется
+}
+```
+
+**Жизненный цикл сессии**:
+1. **Создание**: `DictationSessionsStore.getOrCreateSession({ dictationId, exerciseId, subsetPositions })`
+   - Если exerciseId задан — загружаются конкретные позиции из упражнения
+   - Если нет — используется весь диктант или переданный subsetPositions
+   - `ensureDefaultSelection()` — выбирает предложения (все, если нет поднабора)
+2. **Выполнение**: пользователь вводит текст, проверяет, записывает аудио
+   - Каждое действие обновляет состояние через `session.getState(key)` → мутация полей
+   - `_textAttemptCount` растёт при ошибках, сбрасывается при повторе/навигации
+3. **Завершение**: `_isDictationFullyCompleted(session)` → `showCompletionModal()`
+   - Данные отправляются через `OutboxBatcher` → `POST /api/statistics/success`
+4. **Сохранение в IndexedDB**: `DictationSessionsStore.persistToIdb()`
+   - Store: `sessions`, ключ: `session:{dictationId}:{langTr}:{exerciseId}:{subsetSignature}`
+   - Сохраняется полный JSON сессии для восстановления после перезагрузки страницы
+5. **Восстановление**: `DictationSessionsStore.restoreFromIdb()` при старте
+
+**Связь с `DictationContent`**:
+- Сессия **ссылается** на контент (хранит `content` внутри)
+- Один контент может использоваться несколькими сессиями (разные упражнения одного диктанта)
+- `DictationSessionsStore` управляет и контентами, и сессиями
+- LRU-эвикция: максимум 5 контентов в памяти, старые вытесняются
+
+## Уровень 3: Хранилище сессий (`DictationSessionsStore`)
+
+**Где**: [`static/js/dictation_runtime/dictation_store.js`](static/js/dictation_runtime/dictation_store.js) — класс `DictationSessionsStore`.
+
+**Роль**: Центральный диспетчер — управляет жизненным циклом контентов и сессий в памяти.
+
+```javascript
+// Внутреннее состояние (в замыкании модуля)
+const _contents = new Map();   // dictationId → DictationContent
+const _sessions = new Map();   // sessionKey → DictationSession
+```
+
+**Ключевые методы**:
+| Метод | Описание |
+|-------|----------|
+| `getOrCreateContent({ dictationId })` | Возвращает существующий или создаёт новый контент. Проверяет LRU-лимит. |
+| `setContentSentences({ dictationId, sentences, originalLanguage })` | Устанавливает предложения в контент (вызывает `content.setSentences()`) |
+| `getOrCreateSession({ dictationId, exerciseId, subsetPositions, ... })` | Создаёт или возвращает существующую сессию по ключу |
+| `getSession({ dictationId, exerciseId, subsetSignature })` | Получить сессию без создания |
+| `removeSession(...)` | Удалить сессию из памяти |
+| `removeSessionFromIdb(...)` | Удалить сессию из памяти и IndexedDB |
+| `persistToIdb()` | Сохранить все сессии в IndexedDB (вызывается при `pagehide`/`beforeunload`) |
+| `restoreFromIdb()` | Восстановить все сессии из IndexedDB (вызывается при старте) |
+| `closeAll()` | Закрыть все сессии и контенты |
+
+**Схема sessionKey**: `session:{dictationId}:{langTr}:{exerciseId}:{subsetSignature}`
+
+Где `subsetSignature` = `normalizeSubsetPositions(subsetPositions).join(',')` — уникальная подпись набора предложений.
+
+## Полная схема движения данных
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                     ОТКРЫТИЕ РЕДАКТОРА                                │
+│                                                                      │
+│  dictation_kart.js                                                   │
+│  ┌─────────────────────────────────────────────┐                    │
+│  │ 1. IndexedDB (dictations store)              │                    │
+│  │    ключ: sentences:{id}:{orig}:{tr}          │                    │
+│  │    └─ ЕСТЬ? → отдаём мгновенно (кеш первый) │                    │
+│  │ 2. Сервер GET /api/dictation/{id}/{o}/{t}/sentences               │
+│  │    └─ фоном обновляем кеш (если изменилось) │                    │
+│  └─────────────────────────────────────────────┘                    │
+│                       ↓                                              │
+│  DictationEditorModal.open(config)                                    │
+│  ┌─────────────────────────────────────────────┐                    │
+│  │ state.config = config                        │                    │
+│  │ state.content = new DictationContent(...)    │                    │
+│  │   └─ config.sentences → langBlocks          │                    │
+│  │ _renderTable() — рендер таблицы             │                    │
+│  │ _initLanguageFlags() — флаги в шапке        │                    │
+│  └─────────────────────────────────────────────┘                    │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                     СОХРАНЕНИЕ (кнопка Save)                          │
+│                                                                      │
+│  _handleSave() в dictation_editor_modal.js                            │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ ЭТАП 1: Сохранение текста и метаданных                         │  │
+│  │   SaveQueueBatcher.enqueueSave(dictationId, saveData)          │  │
+│  │   └─ пишет в IndexedDB (draft_save_queue)                     │  │
+│  │   └─ flushAll() → POST /save_dictation_final                  │  │
+│  │       сервер: сохраняет текст, переводы, audio basename       │  │
+│  │       сервер: сохраняет обложку (cover_b64 → cover.webp)      │  │
+│  │                                                                │  │
+│  │ ЭТАП 2: Загрузка аудио в B2 (только если audio dirty)          │  │
+│  │   _uploadDraftAudioToB2(dictationId, token)                    │  │
+│  │   └─ AudioManager.uploadDictationAudioFromCacheToB2({...)     │  │
+│  │       1. GET /api/b2/get_upload_url → { uploadUrl, token }    │  │
+│  │       2. Для каждого файла в CacheStorage:                    │  │
+│  │          - строим canonical URL                                │  │
+│  │          - проверяем b2_upload_ledger (SHA256 в IndexedDB)    │  │
+│  │          - если нет в ledger → читаем blob из CacheStorage    │  │
+│  │          - PUT blob на B2 uploadUrl                            │  │
+│  │          - сохраняем SHA256 в b2_upload_ledger                │  │
+│  │       3. Cleanup: POST /api/b2/cleanup_dictation_audio        │  │
+│  │          - удаляет из B2 файлы, которых нет в keep_remote_paths│  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                       ↓                                              │
+│  После успеха:                                                       │
+│  - dirtyFlags сбрасываются                                           │
+│  - state.config.dictationId обновляется (если был temp)              │
+│  - window.Desktop.loadDeskItems() — обновление карточек на десктопе  │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                  ОТКРЫТИЕ ДИКТАНТА ДЛЯ ВЫПОЛНЕНИЯ                     │
+│                                                                      │
+│  dictation_modal.js → ensureDictationContentLoadedToRuntime()        │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ 1. IndexedDB (dictations store)                                │  │
+│  │    ключ: sentences:{id}:{orig}:{tr}                            │  │
+│  │    └─ ЕСТЬ? → loadSentencesFromIndexedDb()                    │  │
+│  │ 2. НЕТ? → fetchSentencesFromServerAndCache()                   │  │
+│  │    └─ GET /api/dictation/{id}/{orig}/{tr}/sentences            │  │
+│  │    └─ сохраняем в IndexedDB                                    │  │
+│  │                                                                │  │
+│  │ 3. DictationSessionsStore.setContentSentences(...)             │  │
+│  │    └─ content.setSentences(sentences, originalLanguage)        │  │
+│  │                                                                │  │
+│  │ 4. DictationSessionsStore.getOrCreateSession({...})            │  │
+│  │    └─ new DictationSession({ content, ... })                  │  │
+│  │    └─ session.ensureDefaultSelection()                         │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                       ↓                                              │
+│  Пользователь выполняет упражнение                                    │
+│  ┌───────────────────────────────────────────────────────────────┐  │
+│  │ Каждое действие → handleActivity() → OutboxBatcher            │  │
+│  │   └─ IndexedDB (outbox store)                                 │  │
+│  │   └─ периодически flushAll() → POST /api/statistics/success   │  │
+│  │       → history_by_day (UPSERT)                               │  │
+│  │       → user_money_ledger (INSERT dt)                         │  │
+│  │                                                                │  │
+│  │ При pagehide/beforeunload:                                     │  │
+│  │   └─ DictationSessionsStore.persistToIdb()                    │  │
+│  │      → IndexedDB (sessions store)                             │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
 # Поток данных: аудио
 
 ## A) До Save (черновик)
 
-- Несохранённое аудио существует только как `blob:` URL в памяти вкладки.
-- Оно может проигрываться напрямую через `<audio src="blob:...">`.
-- Оно **не должно** записываться в БД как URL.
+- Несохранённое аудио существует в двух формах:
+  - **`blob:` URL** в памяти вкладки (для только что сгенерированного/записанного аудио)
+  - **CacheStorage** — после вызова `AudioManager.saveDictationAudioBlob()` blob сохраняется в CacheStorage под каноническим ключом
+- Оно может проигрываться через `AudioManager.play()` → `resolvePlayableUrl()` → blob из CacheStorage или `blob:` URL
+- Оно **не должно** записываться в БД как URL
 
 ## B) После Save (финальная сущность)
 
-1) Frontend делает `save_dictation_final`.
-2) Backend сохраняет в БД:
+Полный флоу сохранения аудио при нажатии кнопки Save в редакторе:
 
-- текст/переводы
-- `audio*` поля как **basename-only**
+### Этап 1: Сохранение текста (`_handleSave()` → SaveQueueBatcher)
 
-3) Затем клиентская сторона (сейчас это page-код редактора; целевое состояние — `AudioManager`) обеспечивает медиа в B2:
+1. [`dictation_editor_modal.js:_handleSave()`](static/js/dictation_editor_modal.js:3333) собирает `saveData`:
+   - `id` / `temp_id` — нормализованный ID диктанта
+   - `language_original`, `language_translation`
+   - `title`, `level`, `is_dialog`, `audio_order`, `show_explanation`
+   - `audio_user_shared` — basename общего аудиофайла
+   - `sentences` — объект `{ [langCode]: { title, sentences: [...] } }`, где каждое предложение содержит поля `audio`, `audio_avto`, `audio_mic`, `audio_user` (только basename)
+   - `book_id` — из `sessionStorage['dictationTargetBook']`
+   - `cover_b64` — если cover dirty (base64-строка)
 
-- канонический путь хранения в B2: `dictations/dict_<id>/<lang>/<filename>`
-- загрузка в B2 выполняется **только** по явному действию пользователя (Save)
+2. `SaveQueueBatcher.enqueueSave(dictationId, saveData)` — пишет в IndexedDB (store `draft_save_queue`)
+3. `SaveQueueBatcher.flushAll()` — отправляет `POST /save_dictation_final`
+4. Сервер (`routes/dictation_editor.py`) сохраняет:
+   - текст/переводы в таблицы `dictation_sentences`
+   - метаданные в `dictations`
+   - аудио-поля как **basename-only** (например `000_en_avto.mp3`)
+   - обложку как `cover.webp` в `static/data/dictations/<id>/`
+
+### Этап 2: Загрузка аудио в B2 (`_uploadDraftAudioToB2()`)
+
+**Условие запуска**: `flags.audio === true` (были изменения аудио) И `navigator.onLine === true`.
+
+**Функция**: [`dictation_editor_modal.js:_uploadDraftAudioToB2()`](static/js/dictation_editor_modal.js:973)
+
+1. Получает `uploadUrl` и `authorizationToken` через `GET /api/b2/get_upload_url`
+2. Вызывает `AudioManager.uploadDictationAudioFromCacheToB2({ dictationId, token, urls, ... })`
+
+**Функция**: [`audio_manager.js:uploadDictationAudioFromCacheToB2()`](static/js/audio_manager.js:1495)
+
+1. Собирает список URL аудиофайлов из `state.content` (все `audio*` поля всех предложений)
+2. Для каждого URL строит канонический путь: `dictations/<dictation_id>/<lang>/<filename>`
+3. Для каждого файла проверяет `b2_upload_ledger` в IndexedDB:
+   - Читает blob из CacheStorage
+   - Считает SHA256 от blob
+   - Если SHA256 совпадает с записью в ledger → **пропускает** (уже загружен)
+   - Если нет → загружает blob на B2 через `PUT <uploadUrl>` с заголовками B2
+   - После успешной загрузки сохраняет `{ sha256, size, uploadedAt }` в ledger
+4. Возвращает результат: `{ ok, total, uploaded, skipped, failed, cacheMiss, errors }`
+
+### Этап 3: Очистка лишних файлов из B2
+
+После успешной загрузки аудио вызывается `AudioManager.cleanupStaleB2DictationAudio()`:
+
+1. Собирает `keepRemotePaths` — все канонические пути, которые **должны** существовать
+2. Вызывает `POST /api/b2/cleanup_dictation_audio` с `{ dictation_id, keep_remote_paths }`
+3. Сервер:
+   - Проверяет ownership диктанта
+   - Получает список файлов из B2 по префиксу `dictations/<dictation_id>/`
+   - Удаляет все файлы, которых нет в `keep_remote_paths`
+   - Защита: отказывается удалять, если keep-list пустой
+
+### Как аудио попадает в CacheStorage до Save
+
+Аудио-файлы (TTS, загруженные, записанные с микрофона) сохраняются в CacheStorage через `AudioManager`:
+
+1. **TTS-генерация** (`_handleGenerateTtsForSentence()`):
+   - `POST /generate_audio` → сервер возвращает MP3
+   - `AudioManager.saveDictationAudioBlob(dictationId, lang, filename, blob, 'audio/mpeg')`
+   - Сохраняется в CacheStorage под ключом: канонический URL `/api/dictations/<dictation_id>/<lang>/<filename>`
+
+2. **Загрузка файла** (`_uploadSharedAudioFile()` / `_cacheSharedAudioFile()`):
+   - Файл выбран пользователем через `<input type="file">`
+   - `AudioManager.saveDictationAudioBlob(dictationId, lang, filename, blob, mime)`
+
+3. **Запись с микрофона** (`_applySelfMicFile()`):
+   - `MediaRecorder` → blob
+   - `AudioManager.saveDictationAudioBlob(dictationId, lang, filename, blob, mime)`
+
+### Ключи CacheStorage для аудио
+
+Формат: канонический URL `/api/dictations/<dictation_id>/<lang>/<filename>`
+
+Нормализация dictationId: `buildDictationAudioUrl()` в `AudioManager` принимает как `"123"`, так и `"dict_123"` — всегда приводит к `dict_<id>`.
 
 ### Как клиент загружает аудио в B2 без дублирования
 
@@ -976,7 +1284,7 @@ const state = {
 - формирует `prefix = dictations/<dictation_id>/`
 - получает список файлов из B2 по префиксу (`list_files(prefix)`)
 - удаляет всё, чего **нет** в `keep_remote_paths`
-- guardrail: backend откажется удалять, если keep-list пустой (чтобы не допустить “удалить всё” по ошибке)
+- guardrail: backend откажется удалять, если keep-list пустой (чтобы не допустить "удалить всё" по ошибке)
 
 ### Как файл попадает в B2
 
@@ -1098,11 +1406,10 @@ window.__APP_BUILD = 'YYYY-MM-DD_hhmm';
 - что хранится в IndexedDB (если нужно)
 - минимизировать JSON в CacheStorage
 
-## 5) Исправить рассинхрон шапки языков
+## 5) ~~Исправить рассинхрон шапки языков~~ **ИСПРАВЛЕНО** (Bug #23, 2026-07-28)
 
-- определить единственный source of truth:
-  - `currentDictation.language_translation`
-- любой UI компонент должен подписываться на изменения и перерисовываться
+- `_initLanguageFlags()` в [`dictation_editor_modal.js`](static/js/dictation_editor_modal.js:2086) теперь проверяет `state.config.translationLanguage` перед fallback на `translationLangs[0]`
+- При смене языка через dropdown вызывается `_updateTranslationDisplay()` и синхронизируется `state.config.translationLanguage`
 
 # Учитель – Группа – Ученик (планируемая система)
 

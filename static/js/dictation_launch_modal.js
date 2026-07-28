@@ -393,7 +393,7 @@
         todayTasks = [];
       }
 
-      // 3. Решаем, показывать модалку или сразу открыть
+      // 3. Всегда показываем стартовую модалку (с выбором упражнения или «весь диктант»)
       const visibleExercises = exercises.filter((x) => x && x.id != null);
       const uniqueBySig = new Map();
       for (const ex of visibleExercises) {
@@ -401,24 +401,6 @@
         if (!uniqueBySig.has(sig)) uniqueBySig.set(sig, ex);
       }
       const exerciseList = Array.from(uniqueBySig.values());
-
-      // Есть ли невыполненные задания от учителей
-      const hasIncompleteTasks = todayTasks.some(t => {
-        const done = Number(t.done || 0);
-        const required = Number(t.required_completions || 1);
-        return done < required;
-      });
-
-      // Если только "весь диктант" (или пусто) и нет заданий от учителя — сразу открываем
-      const onlyFull = exerciseList.length === 0 || (exerciseList.length === 1 && !exerciseList[0].positions.length);
-      if (onlyFull && !hasIncompleteTasks) {
-        if (window.DictationModal && typeof window.DictationModal.open === 'function') {
-          window.DictationModal.open(openUrl, { cardEl, subsetPositions: null });
-        } else {
-          console.warn('[dictation_launch_modal] DictationModal не загружен, невозможно открыть диктант');
-        }
-        return;
-      }
 
       // Извлекаем URL обложки из карточки
       let coverUrl = '';
@@ -430,7 +412,7 @@
       } catch (e) {
       }
 
-      // Иначе показываем модалку
+      // Показываем стартовую модалку
       openLaunchModal({
         dictationId: id,
         title: dictationTitle || '',
