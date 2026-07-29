@@ -33,6 +33,12 @@
     // _sentencePreviousAccumulatedTime — st.time_count на момент входа в предложение
     _sentenceTimeAccumulatedAtStart: 0,
     _sentencePreviousAccumulatedTime: 0,
+    // Доступные языки перевода (из карточки data-available-translations)
+    _availableTranslations: [],
+    // Инстанс languageSelector для флагов в шапке
+    _headerLangPairSelector: null,
+    // Начальный язык перевода, вычисленный в renderModalLangPair (применяется к сессии после её создания)
+    _initialTranslationLang: '',
   };
 
   function startNewRewardCycle() {
@@ -3930,12 +3936,180 @@
         return;
       }
       pairContainer.innerHTML = '';
-      window.initLanguageSelector('dictationLangPair', {
-        mode: 'flag-pair-fixed',
-        currentLearning: String(parsed && parsed.langOriginal ? parsed.langOriginal : '').trim().toLowerCase(),
-        nativeLanguage: String(parsed && parsed.langTranslation ? parsed.langTranslation : '').trim().toLowerCase(),
-        languageData,
-      });
+
+      const langOriginal = String(parsed && parsed.langOriginal ? parsed.langOriginal : '').trim().toLowerCase();
+      if (!langOriginal || !languageData[langOriginal]) {
+        pairContainer.textContent = String(parsed && parsed.langOriginal ? parsed.langOriginal : '');
+        return;
+      }
+
+      // Собираем доступные языки перевода: сначала пробуем из langBlocks контента,
+      // затем из сохранённых availableTranslations, затем из parsed.langTranslation
+      var translationLangs = [];
+      var initialDisplayLang = '';
+
+      // Пытаемся получить translationLangs из загруженного контента
+      try {
+        var store = getRuntimeStore();
+        if (store && parsed && parsed.dictationIdFormatted) {
+          var content = store.getContent({ dictationId: parsed.dictationIdFormatted });
+          if (content && content.langBlocks && content.langBlocks.length > 1) {
+            for (var i = 1; i < content.langBlocks.length; i++) {
+              var bl = content.langBlocks[i];
+              if (bl && bl.lang && bl.lang !== langOriginal) {
+                var nl = String(bl.lang).trim().toLowerCase();
+                if (translationLangs.indexOf(nl) === -1) {
+                  translationLangs.push(nl);
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {}
+
+      // Fallback: используем availableTranslations из карточки
+      if (translationLangs.length === 0) {
+        var cardTr = dictationModalState._availableTranslations || [];
+        translationLangs = cardTr.filter(function(l) { return l && l !== langOriginal; });
+      }
+
+      // Fallback: используем langTranslation из parsed
+      if (translationLangs.length === 0) {
+        var pt = String(parsed && parsed.langTranslation ? parsed.langTranslation : '').trim().toLowerCase();
+        if (pt && pt !== langOriginal && languageData[pt]) {
+          translationLangs = [pt];
+        }
+      }
+
+      // ОПРЕДЕЛЯЕМ НАЧАЛЬНЫЙ ЯЗЫК ОТОБРАЖЕНИЯ
+      if (translationLangs.length === 0) {
+        // Нет переводов — показываем только флаг оригинала
+        dictationModalState._headerLangPairSelector = window.initLanguageSelector('dictationLangPair', {
+          mode: 'flag-single',
+          currentLearning: langOriginal,
+          nativeLanguage: langOriginal,
+          languageData: languageData
+        });
+      } else if (translationLangs.length === 1) {
+        // Один перевод — фиксированная пара
+        initialDisplayLang = translationLangs[0];
+        dictationModalState._headerLangPairSelector = window.initLanguageSelector('dictationLangPair', {
+          mode: 'flag-pair-fixed',
+          currentLearning: langOriginal,
+          nativeLanguage: initialDisplayLang,
+          languageData: languageData
+        });
+      } else {
+        // Несколько переводов — dropdown справа
+        // Приоритет: родной язык пользователя, иначе первый из списка
+        var userNativeLang = '';
+        try {
+          if (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage) {
+            userNativeLang = String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase();
+          }
+        } catch (e) {}
+
+        if (userNativeLang && translationLangs.indexOf(userNativeLang) !== -1) {
+          initialDisplayLang = userNativeLang;
+        } else {
+          initialDisplayLang = translationLangs[0];
+        }
+
+        dictationModalState._headerLangPairSelector = window.initLanguageSelector('dictationLangPair', {
+          mode: 'flag-pair-dropdown-right',
+          currentLearning: langOriginal,
+          nativeLanguage: initialDisplayLang,
+          nativeLanguages: translationLangs,
+          languageData: languageData,
+          onLanguageChange: function(values) {
+            var newLang = values.nativeLanguage || '';
+            if (!newLang) return;
+            _onTranslationLanguageChanged(newLang);
+          }
+        });
+      }
+
+      // Сохраняем начальный язык перевода в состоянии — будет применён к сессии после её создания
+      dictationModalState._initialTranslationLang = initialDisplayLang || '';
+
+      // Обновляем translationLanguage в сессии, если она уже создана
+      if (initialDisplayLang) {
+        try {
+          var sess = window.__dictationModalActiveSession;
+          if (sess) {
+            sess.translationLanguage = initialDisplayLang;
+          }
+        } catch (e) {}
+        // Обновляем data-language-translation для аудио
+        try {
+          var dd = document.getElementById('dictation-data');
+          if (dd) dd.setAttribute('data-language-translation', initialDisplayLang);
+        } catch (e) {}
+        // Обновляем лейбл языка перевода у кнопки
+        try {
+          var trLabel = document.getElementById('dictationTranslationLanguage');
+          if (trLabel) trLabel.textContent = initialDisplayLang;
+        } catch (e) {}
+      }
+    } catch (e) {
+    }
+  }
+
+  /**
+   * Обработчик переключения языка перевода.
+   * Обновляет translationLanguage в сессии, перерисовывает таблицу предложений,
+   * обновляет data-language-translation для аудио.
+   */
+  function _onTranslationLanguageChanged(newLang) {
+    try {
+      if (!newLang) return;
+      newLang = String(newLang).trim().toLowerCase();
+
+      // Обновляем data-language-translation
+      try {
+        var dd = document.getElementById('dictation-data');
+        if (dd) dd.setAttribute('data-language-translation', newLang);
+      } catch (e) {}
+
+      // Обновляем лейбл языка перевода у кнопки
+      try {
+        var trLabel = document.getElementById('dictationTranslationLanguage');
+        if (trLabel) trLabel.textContent = newLang;
+      } catch (e) {}
+
+      // Обновляем translationLanguage в активной сессии
+      var session = window.__dictationModalActiveSession;
+      if (session) {
+        session.translationLanguage = newLang;
+
+        // Перерисовываем таблицу предложений с новым языком перевода
+        try {
+          renderStartModalSentencesTable(session);
+        } catch (e) {}
+
+        // Обновляем аудио перевода для текущего предложения (если диктант запущен)
+        try {
+          if (dictationModalState.dictationStarted) {
+            var key = session.getCurrentKey();
+            if (key) {
+              var view = session.getSentenceView(key);
+              if (view) {
+                var dictationData = document.getElementById('dictation-data');
+                var dictId = dictationData ? String(dictationData.getAttribute('data-dictation-id') || '').trim() : '';
+                var langOrig = dictationData ? String(dictationData.getAttribute('data-language-original') || '').trim() : '';
+                var translationUrl = resolveAudioToUrl(view.audio_translation, dictId, newLang);
+                var btn = document.getElementById('translationPlayButton');
+                if (btn) {
+                  btn.dataset.audioUrl = translationUrl || '';
+                }
+              }
+            }
+          }
+        } catch (e) {}
+
+        // Сохраняем сессию в IDB
+        try { _persistSessionToIdb(); } catch (e) {}
+      }
     } catch (e) {
     }
   }
@@ -5409,15 +5583,30 @@
       }
     }
 
+    // Извлекаем available-translations из карточки и сохраняем в dictationModalState
+    // для последующего использования в renderModalLangPair
+    try {
+      let availableTranslations = [];
+      if (cardEl) {
+        const raw = cardEl.getAttribute('data-available-translations');
+        if (raw) {
+          try { availableTranslations = JSON.parse(raw); } catch (e1) { availableTranslations = []; }
+          if (!Array.isArray(availableTranslations)) availableTranslations = [];
+        }
+      }
+      dictationModalState._availableTranslations = availableTranslations;
+    } catch (e) {
+      dictationModalState._availableTranslations = [];
+    }
+
     try {
       const title = dictationData ? String(dictationData.getAttribute('data-title-orig') || '') : '';
       _updateDictationTitle(title);
     } catch (e) {
     }
 
+    // НЕ затираем langPair — он будет перерисован в renderModalLangPair после загрузки контента
     try {
-      const langPair = document.getElementById('dictationLangPair');
-      if (langPair) langPair.textContent = '';
       const tr = document.getElementById('dictationTranslationLanguage');
       if (tr) tr.textContent = parsed.langTranslation;
     } catch (e) {
@@ -6820,6 +7009,12 @@
           await ensureDictationContentLoadedToRuntime(parsed);
           contentLoaded = true;
           console.log('[DM:open] ensureDictationContentLoadedToRuntime — УСПЕШНО');
+
+          // После загрузки контента перерисовываем флаги языков —
+          // теперь доступны langBlocks для определения всех языков перевода
+          try {
+            renderModalLangPair(parsed);
+          } catch (e) {}
         }
       } catch (e) {
         contentLoaded = false;
@@ -6878,6 +7073,17 @@
             console.log('[DM:open] window.__dictationModalActiveSession установлен, selectedKeys.length=', session.selectedKeys ? session.selectedKeys.length : 0, 'currentSelectedIndex=', session.currentSelectedIndex);
           } catch (e0) {
             console.error('[DM:open] ошибка установки activeSession:', e0);
+          }
+
+          // Применяем начальный язык перевода, вычисленный в renderModalLangPair
+          try {
+            var initTrLang = dictationModalState._initialTranslationLang;
+            if (initTrLang && session) {
+              session.translationLanguage = initTrLang;
+              console.log('[DM:open] translationLanguage установлен:', initTrLang);
+            }
+          } catch (eTr) {
+            console.error('[DM:open] ошибка установки translationLanguage:', eTr);
           }
 
           try {
