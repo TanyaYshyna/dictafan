@@ -158,7 +158,7 @@
   }
 
   class DictationSession {
-    constructor({ content, exerciseId = null, subsetPositions = null, sourceGroupId = null, planDate = null }) {
+    constructor({ content, exerciseId = null, subsetPositions = null, sourceGroupId = null, planDate = null, translationLanguage = null }) {
       this.content = content;
       this.dictationId = content ? content.dictationId : null;
 
@@ -189,6 +189,9 @@
 
       // Дата плана (из assignment launch context) — для date_plan в history_by_day
       this.planDate = planDate || null;
+
+      // Текущий выбранный язык перевода (для переключения между доступными переводами)
+      this.translationLanguage = translationLanguage || null;
 
       this.lastUsedAtMs = _nowMs();
     }
@@ -372,10 +375,30 @@
       // Пытаемся найти предложение с таким же ключом в других языках (перевод)
       let translationText = '';
       let translationAudio = '';
+      let translationLang = '';
       const blocks = this.content.langBlocks || [];
       if (blocks.length > 1) {
-        for (let i = 1; i < blocks.length; i++) {
-          const block = blocks[i];
+        // Определяем целевой язык перевода: используем this.translationLanguage если задан,
+        // иначе берём первый доступный переводной блок
+        const targetLang = this.translationLanguage || null;
+        const tryBlocks = [];
+        // Сначала ищем блок с targetLang
+        if (targetLang) {
+          for (let i = 1; i < blocks.length; i++) {
+            if (blocks[i] && blocks[i].lang === targetLang) {
+              tryBlocks.push(blocks[i]);
+              break;
+            }
+          }
+        }
+        // Если не нашли целевой язык — добавляем все остальные блоки
+        if (tryBlocks.length === 0) {
+          for (let i = 1; i < blocks.length; i++) {
+            if (blocks[i]) tryBlocks.push(blocks[i]);
+          }
+        }
+        for (let bi = 0; bi < tryBlocks.length; bi++) {
+          const block = tryBlocks[bi];
           if (!block || !Array.isArray(block.sentences)) continue;
           const trSentence = block.sentences.find(function(s) { return s.key === String(key); });
           if (trSentence) {
@@ -386,6 +409,7 @@
             if (trSentence.audio) {
               translationAudio = String(trSentence.audio);
             }
+            translationLang = block.lang || '';
             break;
           }
         }
@@ -400,6 +424,7 @@
         text_original: String(origSentence.text || ''),
         text_translation: translationText,
         audio_translation: translationAudio,
+        translation_lang: translationLang,
         audio: origSentence.audio,
         audio_file: origSentence.audio_file,
         audio_mic: origSentence.audio_mic,
@@ -454,6 +479,7 @@
         completionCount: Number(this.completionCount) || 0,
         sourceGroupId: this.sourceGroupId,
         planDate: this.planDate,
+        translationLanguage: this.translationLanguage || undefined,
         timer: {
           running: this.timer.running,
           startedAtMs: this.timer.startedAtMs,
@@ -469,6 +495,7 @@
         subsetPositions: data.subsetPositions || null,
         sourceGroupId: data.sourceGroupId || null,
         planDate: data.planDate || null,
+        translationLanguage: data.translationLanguage || null,
       });
       s.activeKeys = data.activeKeys || null;
       s.selectedKeys = data.selectedKeys || [];
