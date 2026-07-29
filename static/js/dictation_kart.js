@@ -17,6 +17,26 @@ function _escapeHtml(s) {
   return _localEscapeHtml(s);
 }
 
+/**
+ * Возвращает родной язык пользователя в нижнем регистре.
+ * Использует window.USER_LANGUAGE_DATA (уст. при открытии профиля)
+ * с fallback на window.UM.userData.native_language (доступен всегда).
+ * Возвращает пустую строку, если язык не определён.
+ */
+function _getUserNativeLang() {
+  try {
+    if (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage) {
+      return String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase();
+    }
+  } catch (e) {}
+  try {
+    if (window.UM && window.UM.userData && window.UM.userData.native_language) {
+      return String(window.UM.userData.native_language).toLowerCase();
+    }
+  } catch (e) {}
+  return '';
+}
+
 window.DictationKart = window.DictationKart || {
   _createElementFromHtml(html) {
     const wrap = document.createElement('div');
@@ -1501,9 +1521,7 @@ window.DictationKart = window.DictationKart || {
     const dictationIdFormatted = `dict_${dictationId}`;
 
     const langOriginal = item.language_original || item.language_code || 'en';
-    const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
-      ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
-      : '';
+    const nativeLang = _getUserNativeLang();
 
     const availableTranslations = Array.isArray(item.translation_languages)
       ? item.translation_languages.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean)
@@ -1583,9 +1601,7 @@ window.DictationKart = window.DictationKart || {
     const coverUrl = d.cover_url || '/static/data/covers/cover_en.webp';
 
     const langOriginal = d.language_original || d.language_code || 'en';
-    const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
-      ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
-      : '';
+    const nativeLang = _getUserNativeLang();
 
     const availableTranslations = Array.isArray(d.translation_languages)
       ? d.translation_languages.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean)
@@ -1672,9 +1688,7 @@ window.DictationKart = window.DictationKart || {
     const dictationIdFormatted = `dict_${dictationId}`;
 
     const langOriginal = item.language_original || item.language_code || 'en';
-    const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
-      ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
-      : '';
+    const nativeLang = _getUserNativeLang();
 
     const availableTranslations = Array.isArray(item.translation_languages)
       ? item.translation_languages.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean)
@@ -1780,9 +1794,7 @@ window.DictationKart = window.DictationKart || {
     const coverSrc = coverUrl || '/static/data/covers/cover_en.webp';
 
     const langOriginal = d.language_original || d.language_code || 'en';
-    const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
-      ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
-      : '';
+    const nativeLang = _getUserNativeLang();
 
     const availableTranslations = Array.isArray(d.translation_languages)
       ? d.translation_languages.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean)

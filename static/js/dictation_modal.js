@@ -2277,15 +2277,17 @@
             break;
           }
           case 'Digit1': {
-            if (!dictationModalState.dictationStarted) return;
+            if (!dictationModalState.dictationStarted) { console.log('[DM:hotkey] Digit1 — dictation NOT started'); return; }
             const visual = window.__dictationModalOriginalAudioVisual;
+            console.log('[DM:hotkey] Digit1 — visual=', !!visual, 'playButton=', !!(visual && visual.playButton), 'audioPath=', visual ? visual.getCurrentAudioPath() : 'N/A');
             if (visual && visual.playButton) visual.playButton.click();
             event.preventDefault();
             break;
           }
           case 'Digit2': {
-            if (!dictationModalState.dictationStarted) return;
+            if (!dictationModalState.dictationStarted) { console.log('[DM:hotkey] Digit2 — dictation NOT started'); return; }
             const btn = document.getElementById('translationPlayButton');
+            console.log('[DM:hotkey] Digit2 — btn=', !!btn, 'audioUrl=', btn ? String(btn.dataset.audioUrl || '') : 'N/A');
             if (btn) btn.click();
             event.preventDefault();
             break;
@@ -2790,6 +2792,7 @@
       }
       if (!st) st = getCurrentSentenceStateFromSession(session);
       if (!st) {
+        console.log('[DM:updateNextBtn] st is null, disabling button');
         btn.disabled = true;
         btn.classList.remove('button-color-yellow');
         btn.classList.add('button-color-gray');
@@ -2803,6 +2806,7 @@
       // Кнопка "Далее" всегда видна, но доступна только когда textOk && audioOk
       const canNext = !!(textOk && audioOk);
 
+      console.log('[DM:updateNextBtn] key=', usedKey, 'perfect=', perfect, 'corrected=', corrected, 'audioDone=', audioDone, 'textOk=', textOk, 'audioOk=', audioOk, 'requiresAudio=', requiresAudio, 'canNext=', canNext, 'selection_state=', st.selection_state);
 
       btn.disabled = !canNext;
       btn.classList.remove('button-color-yellow', 'button-color-gray');
@@ -2812,6 +2816,7 @@
         btn.classList.add('button-color-gray');
       }
     } catch (e) {
+      console.error('[DM:updateNextBtn] error:', e);
     }
   }
 
@@ -3539,9 +3544,11 @@
 
   function updateAudioPlayersFromSession(session) {
     const started = !!dictationModalState.dictationStarted;
+    console.log('[DM:updateAudioPlayersFromSession] dictationStarted=', started);
     try {
       const startModal = document.getElementById('start-modal');
       if (startModal && (startModal.style.display === 'flex' || startModal.style.display === 'block')) {
+        console.log('[DM:updateAudioPlayersFromSession] start-modal ещё открыт, пропускаем');
         return;
       }
     } catch (e0) {
@@ -3584,6 +3591,7 @@
 
     const originalUrl = resolveAudioToUrl((view.audio_original != null ? view.audio_original : view.audio), dictId, langOrig);
     const translationUrl = resolveAudioToUrl((view.audio_translation != null ? view.audio_translation : view.audio_tr), dictId, langTr);
+    console.log('[DM:updateAudioPlayersFromSession] dictId=', dictId, 'langOrig=', langOrig, 'langTr=', langTr, 'originalUrl=', originalUrl, 'translationUrl=', translationUrl, 'view.audio=', view.audio, 'view.audio_translation=', view.audio_translation);
 
     try {
       const visual = window.__dictationModalOriginalAudioVisual;
@@ -4002,12 +4010,22 @@
       } else {
         // Несколько переводов — dropdown справа
         // Приоритет: родной язык пользователя, иначе первый из списка
+        // USER_LANGUAGE_DATA может быть не установлен (если профиль не открывался),
+        // поэтому fallback на window.UM.userData.native_language
         var userNativeLang = '';
         try {
           if (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage) {
             userNativeLang = String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase();
           }
         } catch (e) {}
+        if (!userNativeLang) {
+          try {
+            if (window.UM && window.UM.userData && window.UM.userData.native_language) {
+              userNativeLang = String(window.UM.userData.native_language).toLowerCase();
+            }
+          } catch (e) {}
+        }
+        console.log('[DM:renderModalLangPair] userNativeLang=', userNativeLang, 'translationLangs=', translationLangs, 'USER_LANGUAGE_DATA=', typeof window.USER_LANGUAGE_DATA !== 'undefined' ? 'present' : 'undefined');
 
         if (userNativeLang && translationLangs.indexOf(userNativeLang) !== -1) {
           initialDisplayLang = userNativeLang;
@@ -4064,6 +4082,7 @@
     try {
       if (!newLang) return;
       newLang = String(newLang).trim().toLowerCase();
+      console.log('[DM:_onTranslationLanguageChanged] newLang=', newLang, 'session=', !!window.__dictationModalActiveSession, 'dictationStarted=', dictationModalState.dictationStarted);
 
       // Обновляем data-language-translation
       try {
@@ -4081,36 +4100,45 @@
       var session = window.__dictationModalActiveSession;
       if (session) {
         session.translationLanguage = newLang;
+        console.log('[DM:_onTranslationLanguageChanged] session.translationLanguage обновлён');
 
         // Перерисовываем таблицу предложений с новым языком перевода
         try {
           renderStartModalSentencesTable(session);
         } catch (e) {}
 
-        // Обновляем аудио перевода для текущего предложения (если диктант запущен)
+        // Обновляем аудио перевода для текущего предложения
+        // Делаем это ВСЕГДА (не только когда dictationStarted),
+        // чтобы кнопка была готова к моменту старта диктанта
         try {
-          if (dictationModalState.dictationStarted) {
-            var key = session.getCurrentKey();
-            if (key) {
-              var view = session.getSentenceView(key);
-              if (view) {
-                var dictationData = document.getElementById('dictation-data');
-                var dictId = dictationData ? String(dictationData.getAttribute('data-dictation-id') || '').trim() : '';
-                var langOrig = dictationData ? String(dictationData.getAttribute('data-language-original') || '').trim() : '';
-                var translationUrl = resolveAudioToUrl(view.audio_translation, dictId, newLang);
-                var btn = document.getElementById('translationPlayButton');
-                if (btn) {
-                  btn.dataset.audioUrl = translationUrl || '';
-                }
+          var key = session.getCurrentKey();
+          if (key) {
+            var view = session.getSentenceView(key);
+            console.log('[DM:_onTranslationLanguageChanged] key=', key, 'view=', !!view, 'audio_translation=', view ? view.audio_translation : 'N/A', 'translation_lang=', view ? view.translation_lang : 'N/A');
+            if (view) {
+              var dictationData = document.getElementById('dictation-data');
+              var dictId = dictationData ? String(dictationData.getAttribute('data-dictation-id') || '').trim() : '';
+              var translationUrl = resolveAudioToUrl(view.audio_translation, dictId, newLang);
+              var btn = document.getElementById('translationPlayButton');
+              console.log('[DM:_onTranslationLanguageChanged] translationUrl=', translationUrl, 'btn=', !!btn, 'dictId=', dictId);
+              if (btn) {
+                btn.dataset.audioUrl = translationUrl || '';
               }
             }
           }
         } catch (e) {}
+        // Если диктант уже запущен — также обновляем аудиоплееры
+        if (dictationModalState.dictationStarted) {
+          try { updateAudioPlayersFromSession(session); } catch (eu) {}
+        }
 
         // Сохраняем сессию в IDB
         try { _persistSessionToIdb(); } catch (e) {}
+      } else {
+        console.log('[DM:_onTranslationLanguageChanged] СЕССИЯ НЕ НАЙДЕНА — window.__dictationModalActiveSession is null');
       }
     } catch (e) {
+      console.error('[DM:_onTranslationLanguageChanged] ошибка:', e);
     }
   }
 
