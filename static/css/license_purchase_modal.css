@@ -1,0 +1,172 @@
+/* license_purchase_modal.css */
+.license-purchase-modal-content {
+  max-width: 820px;
+  width: 95%;
+}
+
+.license-purchase-body {
+  padding: 0 4px;
+}
+
+.license-purchase-subtitle {
+  font-size: 14px;
+  color: var(--color-text-secondary, #666);
+  margin: 0 0 20px;
+  text-align: center;
+}
+
+/* --- Сетка карточек --- */
+.license-plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 12px;
+}
+
+/* --- Карточка тарифа --- */
+.license-plan-card {
+  position: relative;
+  background: var(--color-bg-card, #fff);
+  border: 2px solid var(--color-border, #e5e5e5);
+  border-radius: 12px;
+  padding: 16px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.license-plan-card:hover {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.license-plan-card--highlighted {
+  border-color: #f6b100;
+}
+
+.license-plan-card--premium {
+  border-color: #8b5cf6;
+}
+
+/* Бейдж */
+.license-plan-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f6b100;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.license-plan-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.license-plan-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text, #222);
+}
+
+.license-plan-price {
+  font-size: 12px;
+  color: var(--color-text-secondary, #888);
+}
+
+/* --- Список фич --- */
+.license-plan-features {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.license-plan-feature {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #555);
+}
+
+.license-plan-feature svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--color-accent, #4caf50);
+}
+
+/* --- Кнопки --- */
+.license-plan-btn {
+  margin-top: auto;
+  width: 100%;
+  padding: 9px 0;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.license-plan-btn:hover {
+  opacity: 0.9;
+}
+
+.license-plan-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.license-plan-btn--free {
+  background: var(--color-bg-secondary, #f0f0f0);
+  color: var(--color-text, #333);
+}
+
+.license-plan-btn--primary {
+  background: var(--color-accent, #4caf50);
+  color: #fff;
+}
+
+.license-plan-btn--highlighted {
+  background: #f6b100;
+  color: #fff;
+}
+
+.license-plan-btn--premium {
+  background: #8b5cf6;
+  color: #fff;
+}
+
+/* --- Сообщение об успехе/ошибке --- */
+.license-purchase-message {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.license-purchase-message.success {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.license-purchase-message.error {
+  background: #ffebee;
+  color: #c62828;
+}
+
+/* --- Адаптация --- */
+@media (max-width: 500px) {
+  .license-plans-grid {
+    grid-template-columns: 1fr;
+  }
+}

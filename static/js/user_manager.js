@@ -432,6 +432,15 @@ class UserManager {
     if (authButtons) authButtons.style.display = 'none';
     if (userInfo) userInfo.style.display = 'flex';
 
+    // Показываем/скрываем админские элементы на основе role_code
+    try {
+      const isAdmin = String(userData.role_code || '').toLowerCase() === 'admin';
+      const adminMenuItem = document.getElementById('desktopAdminLicenseMenuItem');
+      if (adminMenuItem) {
+        adminMenuItem.style.display = isAdmin ? '' : 'none';
+      }
+    } catch (e) {}
+
     // console.log('✅ Интерфейс настроен для авторизованного пользователя');
   }
 
