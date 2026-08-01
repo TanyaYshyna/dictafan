@@ -1,0 +1,84 @@
+<!-- admin-license-modal: админ-панель управления лицензиями -->
+<div id="adminLicenseModal" class="modal" style="display: none;">
+    <div class="modal-content admin-license-modal-content">
+        <div class="modal-header">
+            <h2>Управление лицензиями</h2>
+            <button class="modal-close" id="adminLicenseModalClose" title="Закрыть">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+
+        <div class="admin-license-body">
+            <!-- Поиск пользователя -->
+            <div class="admin-license-section">
+                <label class="admin-license-label">Поиск пользователя по email</label>
+                <div class="admin-license-search-row">
+                    <input
+                        type="email"
+                        id="adminLicenseSearchEmail"
+                        class="text-input"
+                        placeholder="user@example.com"
+                    >
+                    <button id="adminLicenseSearchBtn" class="button-color-yellow">
+                        <i data-lucide="search"></i>
+                        <span>Найти</span>
+                    </button>
+                </div>
+                <div id="adminLicenseSearchResult" class="admin-license-search-result" style="display: none;"></div>
+            </div>
+
+            <!-- Форма выдачи лицензии -->
+            <div id="adminLicenseGrantForm" class="admin-license-section" style="display: none;">
+                <label class="admin-license-label">Выдать лицензию</label>
+
+                <div class="admin-license-form-row">
+                    <select id="adminLicenseTypeSelect" class="text-input">
+                        <option value="Free">Free (Guest)</option>
+                        <option value="Student30">Student (30 дней)</option>
+                        <option value="Teacher30">Teacher (30 дней)</option>
+                        <option value="StudentTeacher30">Student + Teacher (30 дней)</option>
+                    </select>
+                </div>
+
+                <div class="admin-license-form-row">
+                    <input
+                        type="number"
+                        id="adminLicenseDaysInput"
+                        class="text-input"
+                        placeholder="Количество дней (0 = навсегда)"
+                        value="30"
+                        min="0"
+                    >
+                </div>
+
+                <div class="admin-license-form-row">
+                    <input
+                        type="text"
+                        id="adminLicenseCommentInput"
+                        class="text-input"
+                        placeholder="Комментарий"
+                    >
+                </div>
+
+                <button id="adminLicenseGrantBtn" class="button-color-yellow">
+                    <i data-lucide="gift"></i>
+                    <span>Выдать</span>
+                </button>
+
+                <div id="adminLicenseGrantMessage" class="admin-license-message" style="display: none;"></div>
+            </div>
+
+            <!-- История лицензий -->
+            <div id="adminLicenseHistorySection" class="admin-license-section" style="display: none;">
+                <label class="admin-license-label">История операций</label>
+                <div id="adminLicenseHistoryTable" class="admin-license-table-wrap"></div>
+            </div>
+
+            <!-- Календарь доступа -->
+            <div id="adminLicenseCalendarSection" class="admin-license-section" style="display: none;">
+                <label class="admin-license-label">Календарь доступа (следующие дни)</label>
+                <div id="adminLicenseCalendarTable" class="admin-license-table-wrap"></div>
+            </div>
+        </div>
+    </div>
+</div>

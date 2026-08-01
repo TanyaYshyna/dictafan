@@ -1,0 +1,124 @@
+/* admin_license_modal.css */
+.admin-license-modal-content {
+  max-width: 700px;
+  width: 95%;
+}
+
+.admin-license-body {
+  padding: 0 4px;
+}
+
+.admin-license-section {
+  margin-bottom: 20px;
+}
+
+.admin-license-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text, #222);
+  margin-bottom: 8px;
+}
+
+/* --- Поиск --- */
+.admin-license-search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-license-search-row .text-input {
+  flex: 1;
+}
+
+.admin-license-search-result {
+  margin-top: 10px;
+}
+
+.admin-license-search-result .user-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--color-bg-secondary, #f5f5f5);
+  border-radius: 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.admin-license-search-result .user-item:hover {
+  background: var(--color-border, #e5e5e5);
+}
+
+.admin-license-search-result .user-item .user-email {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.admin-license-search-result .user-item .user-name {
+  font-size: 12px;
+  color: var(--color-text-secondary, #888);
+}
+
+/* --- Форма --- */
+.admin-license-form-row {
+  margin-bottom: 10px;
+}
+
+.admin-license-form-row .text-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* --- Сообщение --- */
+.admin-license-message {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.admin-license-message.success {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.admin-license-message.error {
+  background: #ffebee;
+  color: #c62828;
+}
+
+/* --- Таблицы --- */
+.admin-license-table-wrap {
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.admin-license-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-license-table-wrap th,
+.admin-license-table-wrap td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border, #e5e5e5);
+}
+
+.admin-license-table-wrap th {
+  font-weight: 600;
+  background: var(--color-bg-secondary, #f5f5f5);
+  position: sticky;
+  top: 0;
+}
+
+/* --- Кнопки --- */
+#adminLicenseGrantBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+}

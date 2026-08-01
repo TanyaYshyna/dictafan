@@ -22,6 +22,8 @@
     <link rel="stylesheet" href="/static/css/dictation_language_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/model_selector.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/language_selector.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/license_purchase_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/admin_license_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
 {% endblock %}
 
@@ -48,8 +50,12 @@
                             <button type="button" class="dropdown-menu-item" data-action="desktop-menu-profile" role="menuitem">
                                 <i data-lucide="user"></i>
                                 <span>Профиль пользователя</span>
-                            </button>
-                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-tracker" role="menuitem">
+                                </button>
+                                <button type="button" class="dropdown-menu-item" data-action="desktop-menu-license" role="menuitem">
+                                    <i data-lucide="key"></i>
+                                    <span>Купить доступ</span>
+                                </button>
+                                <button type="button" class="dropdown-menu-item" data-action="desktop-menu-tracker" role="menuitem">
                                 <i data-lucide="calendar"></i>
                                 <span>Трекер</span>
                             </button>
@@ -64,8 +70,12 @@
                             <button type="button" class="dropdown-menu-item" data-action="desktop-menu-coffee" role="menuitem">
                                 <i data-lucide="coffee"></i>
                                 <span>На кофе</span>
-                            </button>
-                        </div>
+                                </button>
+                                <button type="button" class="dropdown-menu-item" data-action="desktop-menu-admin-licenses" role="menuitem" style="display: none;" id="desktopAdminLicenseMenuItem">
+                                    <i data-lucide="shield-check"></i>
+                                    <span>Управление лицензиями</span>
+                                </button>
+                            </div>
                     </div>
                     <button id="logoutBtn" class="logout-btn" title="">
                         <i data-lucide="log-out"></i>
@@ -123,6 +133,10 @@
                             <i data-lucide="music"></i>
                             <span>Аудио в кэше</span>
                         </button>
+                        <button type="button" class="dropdown-menu-item" data-action="desktop-admin-licenses" role="menuitem">
+                            <i data-lucide="shield-check"></i>
+                            <span>Лицензии</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -153,6 +167,9 @@
 
     {% include 'partials/active_dictations_modal.html' %}
     {% include 'partials/audio_cache_modal.html' %}
+
+    {% include 'partials/license_purchase_modal.html' %}
+    {% include 'partials/admin_license_modal.html' %}
 {% endblock %}
 
 {% block scripts %}
@@ -200,5 +217,7 @@
     <script defer src="/static/js/audio_cache_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop_stats_panel.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/statistics_report.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/license_purchase_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/admin_license_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop.js?v={{ app_cache_revision }}"></script>
 {% endblock %}

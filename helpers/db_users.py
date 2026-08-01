@@ -374,7 +374,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
         select_fields = [
             "u.id", "u.username", "u.email", "u.password_hash",
             "u.native_language", "u.current_learning", "u.streak_days",
-            "u.role", "u.created_at", "u.updated_at"
+            "u.role", "u.role_id", "u.created_at", "u.updated_at"
         ]
         if has_settings_json:
             select_fields.append("u.settings_json")
@@ -432,6 +432,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
             "learning_languages": learning_languages,
             "streak_days": row["streak_days"],
             "role": row["role"],
+            "role_id": row.get("role_id"),
             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
             "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
         }

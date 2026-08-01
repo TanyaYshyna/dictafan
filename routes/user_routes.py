@@ -148,6 +148,13 @@ def api_register():
     except Exception:
         pass
 
+    # Выдаём бесплатную лицензию при регистрации
+    try:
+        from helpers.license_manager import license_manager
+        license_manager.assign_free_license(int(user_response.get('id')))
+    except Exception:
+        pass
+
     # Создаем токен (identity = email, как и раньше)
     access_token = create_access_token(identity=email)
     
@@ -279,6 +286,13 @@ def google_oauth_callback():
             current_learning=learning_language,
             learning_languages=learning_languages,
         )
+
+    # Выдаём бесплатную лицензию при регистрации через Google
+    try:
+        from helpers.license_manager import license_manager
+        license_manager.assign_free_license(int(user_response.get('id')))
+    except Exception:
+        pass
 
     app_token = create_access_token(identity=email)
 
@@ -500,6 +514,22 @@ def api_get_current_user():
         pass
     
     user_copy['telegram_bot_name'] = (os.getenv('TELEGRAM_BOT_NAME') or 'dictafan_user_bot').strip()
+
+    # Добавляем role_code из таблицы roles для фронтенда
+    try:
+        if user_data.get('role_id'):
+            from helpers.db import get_db_connection, get_db_cursor
+            conn2, cur2 = get_db_cursor()
+            try:
+                cur2.execute("SELECT code FROM roles WHERE id = %s", (user_data['role_id'],))
+                row2 = cur2.fetchone()
+                if row2:
+                    user_copy['role_code'] = row2['code']
+            finally:
+                cur2.close()
+                conn2.close()
+    except Exception:
+        pass
     
     return jsonify(user_copy)
 

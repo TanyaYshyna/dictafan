@@ -215,6 +215,17 @@ app.register_blueprint(assignments_bp)
 app.register_blueprint(plan_tasks_bp)
 app.register_blueprint(telegram_bp)
 
+# Регистрируем blueprint лицензий
+from routes.license import license_bp
+app.register_blueprint(license_bp)
+
+# Предзаполняем справочники ролей и разрешений при старте
+try:
+    from helpers.db_license import seed_roles_and_permissions
+    seed_roles_and_permissions()
+except Exception as e:
+    print(f"[app] Ошибка при seed ролей/разрешений: {e}", file=sys.stderr)
+
 
 @app.route('/favicon.ico')
 def favicon():

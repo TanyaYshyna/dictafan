@@ -1,0 +1,126 @@
+<!-- license-purchase-modal: окно покупки лицензии (заглушка) -->
+<div id="licensePurchaseModal" class="modal" style="display: none;">
+    <div class="modal-content license-purchase-modal-content">
+        <div class="modal-header">
+            <h2 id="licensePurchaseModalTitle">Приобрести доступ</h2>
+            <button class="modal-close" id="licensePurchaseModalClose" title="Закрыть">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+
+        <div class="license-purchase-body">
+            <p class="license-purchase-subtitle">
+                Выберите подходящий тарифный план
+            </p>
+
+            <div class="license-plans-grid" id="licensePlansGrid">
+                <!-- Free -->
+                <div class="license-plan-card" data-license="Free">
+                    <div class="license-plan-header">
+                        <span class="license-plan-name">Guest</span>
+                        <span class="license-plan-price">Бесплатно</span>
+                    </div>
+                    <div class="license-plan-features">
+                        <div class="license-plan-feature">
+                            <i data-lucide="type"></i>
+                            <span>1 000 символов в день</span>
+                        </div>
+                        <div class="license-plan-feature">
+                            <i data-lucide="mic"></i>
+                            <span>20 аудиозаписей в день</span>
+                        </div>
+                    </div>
+                    <button class="license-plan-btn license-plan-btn--free" data-action="purchase-license">
+                        Активировать
+                    </button>
+                </div>
+
+                <!-- Student -->
+                <div class="license-plan-card" data-license="Student30">
+                    <div class="license-plan-header">
+                        <span class="license-plan-name">Student</span>
+                        <span class="license-plan-price">30 дней</span>
+                    </div>
+                    <div class="license-plan-features">
+                        <div class="license-plan-feature">
+                            <i data-lucide="type"></i>
+                            <span>Безлимит символов</span>
+                        </div>
+                        <div class="license-plan-feature">
+                            <i data-lucide="mic"></i>
+                            <span>Безлимит аудиозаписей</span>
+                        </div>
+                        <div class="license-plan-feature">
+                            <i data-lucide="edit"></i>
+                            <span>Создание диктантов</span>
+                        </div>
+                    </div>
+                    <button class="license-plan-btn license-plan-btn--primary" data-action="purchase-license">
+                        Купить
+                    </button>
+                </div>
+
+                <!-- Teacher -->
+                <div class="license-plan-card license-plan-card--highlighted" data-license="Teacher30">
+                    <div class="license-plan-badge">Популярный</div>
+                    <div class="license-plan-header">
+                        <span class="license-plan-name">Teacher</span>
+                        <span class="license-plan-price">30 дней</span>
+                    </div>
+                    <div class="license-plan-features">
+                        <div class="license-plan-feature">
+                            <i data-lucide="type"></i>
+                            <span>Безлимит символов</span>
+                        </div>
+                        <div class="license-plan-feature">
+                            <i data-lucide="mic"></i>
+                            <span>Безлимит аудиозаписей</span>
+                        </div>
+                        <div class="license-plan-feature">
+                            <i data-lucide="plus-circle"></i>
+                            <span>50 новых предложений в день</span>
+                        </div>
+                        <div class="license-plan-feature">
+                            <i data-lucide="users"></i>
+                            <span>Управление студентами</span>
+                        </div>
+                        <div class="license-plan-feature">
+                            <i data-lucide="bar-chart"></i>
+                            <span>Статистика</span>
+                        </div>
+                    </div>
+                    <button class="license-plan-btn license-plan-btn--highlighted" data-action="purchase-license">
+                        Купить
+                    </button>
+                </div>
+
+                <!-- StudentTeacher -->
+                <div class="license-plan-card license-plan-card--premium" data-license="StudentTeacher30">
+                    <div class="license-plan-header">
+                        <span class="license-plan-name">Student + Teacher</span>
+                        <span class="license-plan-price">30 дней</span>
+                    </div>
+                    <div class="license-plan-features">
+                        <div class="license-plan-feature">
+                            <i data-lucide="check-check"></i>
+                            <span>Все возможности Student</span>
+                        </div>
+                        <div class="license-plan-feature">
+                            <i data-lucide="check-check"></i>
+                            <span>Все возможности Teacher</span>
+                        </div>
+                        <div class="license-plan-feature">
+                            <i data-lucide="star"></i>
+                            <span>Максимальный приоритет</span>
+                        </div>
+                    </div>
+                    <button class="license-plan-btn license-plan-btn--premium" data-action="purchase-license">
+                        Купить
+                    </button>
+                </div>
+            </div>
+
+            <div id="licensePurchaseMessage" class="license-purchase-message" style="display: none;"></div>
+        </div>
+    </div>
+</div>

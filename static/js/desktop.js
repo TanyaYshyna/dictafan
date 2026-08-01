@@ -541,6 +541,26 @@ window.Desktop = window.Desktop || {
         })();
         return;
       }
+      if (name === 'desktop-menu-license') {
+        try {
+          if (window.LicensePurchaseModal && typeof window.LicensePurchaseModal.open === 'function') {
+            window.LicensePurchaseModal.open();
+          }
+        } catch (e) {
+          console.error('[desktop] license purchase modal error', e);
+        }
+        return;
+      }
+      if (name === 'desktop-menu-admin-licenses' || name === 'desktop-admin-licenses') {
+        try {
+          if (window.AdminLicenseModal && typeof window.AdminLicenseModal.open === 'function') {
+            window.AdminLicenseModal.open();
+          }
+        } catch (e) {
+          console.error('[desktop] admin license modal error', e);
+        }
+        return;
+      }
       if (name === 'desktop-new') {
         (async () => {
           try {
@@ -618,9 +638,7 @@ window.Desktop = window.Desktop || {
     try {
       const adminSection = document.getElementById('desktopToolPaletteAdmin');
       if (!adminSection) return;
-      // TODO: когда появится роль администратора — заменить условие ниже на проверку роли
-      // const isVisible = window.UM && window.UM.userData && String(window.UM.userData.role || '').toLowerCase() === 'admin';
-      const isVisible = true; // пока видно всем
+      const isVisible = window.UM && window.UM.userData && String(window.UM.userData.role_code || '').toLowerCase() === 'admin';
       adminSection.style.display = isVisible ? '' : 'none';
     } catch (e) {
     }
@@ -932,7 +950,7 @@ window.Desktop = window.Desktop || {
         const action = btn.getAttribute('data-action');
 
         // Исключаем действия, которые уже обрабатываются в initUserMenu/initAdminMenu
-        if (action === 'desktop-menu-profile' || action === 'desktop-admin-active-dictations' || action === 'desktop-admin-audio-cache') {
+        if (action === 'desktop-menu-profile' || action === 'desktop-admin-active-dictations' || action === 'desktop-admin-audio-cache' || action === 'desktop-menu-license' || action === 'desktop-menu-admin-licenses' || action === 'desktop-admin-licenses') {
           return;
         }
 
