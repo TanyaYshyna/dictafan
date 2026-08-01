@@ -3990,15 +3990,12 @@ function open(config) {
   if (store) {
     // Используем DictationSessionsStore — он сам кеширует content через _contents Map
     state.content = store.getOrCreateContent({ dictationId: dictationId });
-    // Если content уже существовал и в нём есть langBlocks — используем их,
-    // иначе устанавливаем sentences из config
+    // ВСЕГДА устанавливаем sentences из config — редактор всегда получает
+    // полные данные с сервера (оригинал + все переводы).
+    // Нельзя полагаться на кешированный content, потому что он мог быть создан
+    // при запуске диктанта (где только оригинальный язык), и тогда переводы потеряются.
     if (rawSentences && rawSentences.length > 0) {
-      var existingBlocks = state.content.langBlocks;
-      var hasSentences = existingBlocks && existingBlocks.length > 0 &&
-        existingBlocks[0].sentences && existingBlocks[0].sentences.length > 0;
-      if (!hasSentences) {
-        state.content.setSentences(rawSentences, langOrig);
-      }
+      state.content.setSentences(rawSentences, langOrig);
     }
     // Если content уже существовал и в нём есть audio_or_order — используем его
     // как источник истины (приоритет над config)
@@ -4303,10 +4300,16 @@ async function _restoreSharedAudioFromSentences() {
     console.warn('[dictationEditorModal] Не удалось восстановить shared audio через кэш', e);
   }
 
-  // Если не нашли в кэше — пробуем загрузить напрямую с сервера
+  // Если не нашли в кэше — пробуем загрузить напрямую с сервера.
+  // Проверяем доступность URL через HEAD перед инициализацией waveform,
+  // чтобы избежать EncodingError при 404 ответе.
   try {
     var directUrl = am.buildDictationAudioUrl(dictationId, lang, sharedFilename);
-    // Пробуем просто использовать canonical URL как playable (сервер отдаст файл)
+    var headResp = await fetch(directUrl, { method: 'HEAD' });
+    if (!headResp.ok) {
+      console.warn('[dictationEditorModal] Shared audio file not found (HTTP ' + headResp.status + '):', directUrl);
+      return;
+    }
     _initWaveform(directUrl);
     state._sharedAudioUrl = directUrl;
     state._sharedAudioFilename = sharedFilename;
