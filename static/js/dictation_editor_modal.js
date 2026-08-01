@@ -368,8 +368,12 @@ function _applyTableViewForTab(tabName) {
   } else if (tabName === 'voice-translations') {
     // №, Оригинал, a/f/m (только аудио-кнопка по радио), Перевод, t
     showCols('.panel-original');
-    showCols('.panel-translation');
     showAudioBtnByVoiceMode();
+    var langBlocksVT = state.content ? state.content.langBlocks : [];
+    var hasTranslationVT = langBlocksVT.length > 1;
+    if (hasTranslationVT) {
+      showCols('.panel-translation');
+    }
   } else if (tabName === 'create-audio') {
     showCols('.panel-original');
     showCols('.panel-translation');
@@ -1868,14 +1872,12 @@ async function _handleAddTranslationConfirm() {
       }
     }
 
-    // Автоозвучка для нового языка (если выбран режим "авто")
-    var checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
-    var voiceMode = checkedRadio ? checkedRadio.value : 'auto';
-    console.log('[dictationEditorModal] [FLOW-' + window.__SAVE_FLOW + '] _handleAddTranslationConfirm TTS: voiceMode=' + voiceMode + ' selectedLang=' + selectedLang + ' time=' + new Date().toISOString());
-    if (voiceMode === 'auto' && dictationId) {
+    // Автоозвучка для нового языка перевода — всегда генерируем TTS,
+    // независимо от выбранного радио voiceMode (которое относится к оригиналу).
+    if (dictationId) {
       var newBlock = state.content.langBlocks.find(function (b) { return b.lang === selectedLang; });
       if (newBlock && newBlock.sentences) {
-        console.log('[dictationEditorModal] [FLOW-' + window.__SAVE_FLOW + '] автоозвучка: генеруємо TTS для ' + newBlock.sentences.length + ' речень, мова=' + selectedLang);
+        console.log('[dictationEditorModal] [FLOW-' + window.__SAVE_FLOW + '] автоозвучка перекладу: генеруємо TTS для ' + newBlock.sentences.length + ' речень, мова=' + selectedLang);
         for (var i = 0; i < newBlock.sentences.length; i++) {
           var s = newBlock.sentences[i];
           if (s.text) {
@@ -1884,7 +1886,7 @@ async function _handleAddTranslationConfirm() {
         }
       }
     } else {
-      console.log('[dictationEditorModal] [FLOW-' + (window.__SAVE_FLOW || 0) + '] TTS не генерується: voiceMode=' + voiceMode + ' dictationId=' + dictationId);
+      console.log('[dictationEditorModal] [FLOW-' + (window.__SAVE_FLOW || 0) + '] TTS перекладу не генерується: dictationId відсутній');
     }
 
     console.log('[dictationEditorModal] оновлюємо інтерфейс для', selectedLang);
@@ -1914,9 +1916,8 @@ async function _handleAddTranslationConfirm() {
     _updateTranslationDisplay(selectedLang);
     _renderTable();
     _bindAudioPlaybackHandlers();
-    var newAudioDirty = voiceMode === 'auto';
-    console.log('[dictationEditorModal] [FLOW-' + window.__SAVE_FLOW + '] _handleAddTranslationConfirm ЗАВЕРШЕНО: dirtyFlags db=true audio=' + newAudioDirty + ' time=' + new Date().toISOString());
-    _setDirtyFlags({ db: true, audio: newAudioDirty });
+    console.log('[dictationEditorModal] [FLOW-' + window.__SAVE_FLOW + '] _handleAddTranslationConfirm ЗАВЕРШЕНО: dirtyFlags db=true audio=true time=' + new Date().toISOString());
+    _setDirtyFlags({ db: true, audio: true });
   } finally {
     // Скрываем универсальный лоадер в любом случае (успех или ошибка)
     try {
