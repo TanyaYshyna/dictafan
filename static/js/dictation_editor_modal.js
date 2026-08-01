@@ -561,7 +561,14 @@ function _renderTable() {
         var sentence = state.content.getSentenceForLang(key, langOrig);
         if (sentence) {
           sentence.text = this.value;
-          _setDirtyFlags({ db: true });
+          // Clear TTS audio and set button to hammer
+          sentence.audio = '';
+          _setDirtyFlags({ db: true, audio: true });
+          // Update the TTS button icon to hammer
+          var ttsBtn = document.querySelector('#' + EDITOR_TABLE_ID + ' .col-generate-tts button[data-key="' + key + '"]');
+          if (ttsBtn) {
+            _setButtonState(ttsBtn, 'creating');
+          }
         }
       }
     });
@@ -661,7 +668,14 @@ function _renderTable() {
         var sentence = state.content.getSentenceForLang(key, currentLang);
         if (sentence) {
           sentence.text = this.value;
-          _setDirtyFlags({ db: true });
+          // Clear TTS audio and set translation play button to hammer
+          sentence.audio = '';
+          _setDirtyFlags({ db: true, audio: true });
+          // Update the translation play button icon to hammer
+          var playTransBtn = document.querySelector('#' + EDITOR_TABLE_ID + ' .col-play-translation button[data-key="' + key + '"][data-lang="' + currentLang + '"]');
+          if (playTransBtn) {
+            _setButtonState(playTransBtn, 'creating');
+          }
         }
       }
     });
@@ -784,15 +798,23 @@ function _handleAudioPlayback(event) {
     return;
   }
 
-  // Если файла нет — переключаем в режим создания (молоток)
-  if (!audioFilename) {
-    _setButtonState(button, 'creating');
+  // Если кнопка в состоянии 'creating' (молоток):
+  //   - Для поля 'audio' (TTS) — генерируем TTS аудио автоматически
+  //   - Для полей 'audio_file'/'audio_mic' — обрезаем shared audio по start/end
+  if (currentState === 'creating') {
+    if (field === 'audio') {
+      // TTS auto-generation
+      _handleHammerGenerateTts(button, key, lang, sentence);
+    } else {
+      // Cut audio for audio_file / audio_mic
+      _handleCutAudioForSentence(button, sentence, lang, field);
+    }
     return;
   }
 
-  // Если кнопка в состоянии 'creating' (молоток) — обрезаем аудио
-  if (currentState === 'creating') {
-    _handleCutAudioForSentence(button, sentence, lang, field);
+  // Если файла нет — переключаем в режим создания (молоток)
+  if (!audioFilename) {
+    _setButtonState(button, 'creating');
     return;
   }
 
@@ -845,6 +867,103 @@ function _handleAudioPlayback(event) {
     } catch (e) {
       console.warn('[dictationEditorModal] Audio creation error', e);
     }
+  }
+}
+
+/**
+ * Генерирует TTS аудио при клике на молоточек (кнопка в состоянии 'creating').
+ * Используется для кнопок TTS оригинала (поле 'audio') и перевода (поле 'audio').
+ * После генерации автоматически проигрывает аудио и меняет иконку на play.
+ */
+async function _handleHammerGenerateTts(button, key, lang, sentence) {
+  if (!sentence || !sentence.text) {
+    console.warn('[dictationEditorModal] Пустой текст в предложении, нечего генерировать');
+    return;
+  }
+
+  var dictationId = state.config ? state.config.dictationId : '';
+  if (!dictationId) return;
+
+  // Показываем состояние загрузки (две полоски = pause icon как loading indicator)
+  _setButtonState(button, 'playing');
+  button.disabled = true;
+
+  var safeEmail = '';
+  try {
+    if (window.UM && typeof window.UM.getSafeEmail === 'function') {
+      safeEmail = window.UM.getSafeEmail();
+    }
+  } catch (e) {}
+
+  try {
+    var response = await fetch('/generate_audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dictation_id: dictationId,
+        text: sentence.text,
+        language: lang,
+        filename_audio: 'tts_' + key + '_' + Date.now() + '.mp3',
+        tipe_audio: 'avto',
+        safe_email: safeEmail,
+      })
+    });
+
+    var data = await response.json();
+    if (!data.success || !data.audio_b64) {
+      console.error('[dictationEditorModal] Ошибка генерации TTS:', data.error);
+      button.disabled = false;
+      _setButtonState(button, 'creating');
+      return;
+    }
+
+    // Создаём blob из audio_b64
+    var binaryStr = atob(data.audio_b64);
+    var bytes = new Uint8Array(binaryStr.length);
+    for (var j = 0; j < binaryStr.length; j++) {
+      bytes[j] = binaryStr.charCodeAt(j);
+    }
+    var blob = new Blob([bytes], { type: data.mime || 'audio/mpeg' });
+    var newFilename = data.filename || ('tts_' + key + '_' + Date.now() + '.mp3');
+
+    // Сохраняем в CacheStorage через AudioManager
+    var am = _ensureAudioManager();
+    if (am && typeof am.saveDictationAudioBlob === 'function') {
+      await am.saveDictationAudioBlob(dictationId, lang, newFilename, blob, data.mime || 'audio/mpeg');
+    }
+
+    // Обновляем sentence
+    sentence.audio = newFilename;
+
+    // Устанавливаем dirty flags (зелёная + фиолетовая звезда)
+    _setDirtyFlags({ db: true, audio: true });
+
+    // Проигрываем сгенерированное аудио
+    button.disabled = false;
+    if (am && typeof am.play === 'function') {
+      var canonicalUrl = am.buildDictationAudioUrl(dictationId, lang, newFilename);
+      am.play(button, canonicalUrl, function () {
+        _setButtonState(button, 'ready');
+      });
+      _setButtonState(button, 'playing');
+    } else {
+      // Fallback
+      var blobUrl = URL.createObjectURL(blob);
+      var audio = new Audio(blobUrl);
+      audio.play().catch(function (err) {
+        console.warn('[dictationEditorModal] Audio play error', err);
+      });
+      _setButtonState(button, 'playing');
+      audio.addEventListener('ended', function () {
+        _setButtonState(button, 'ready');
+      });
+    }
+
+    console.log('[dictationEditorModal] TTS сгенерирован и проигран для строки', key, newFilename);
+  } catch (e) {
+    console.error('[dictationEditorModal] Ошибка при генерации TTS:', e);
+    button.disabled = false;
+    _setButtonState(button, 'creating');
   }
 }
 
@@ -3024,6 +3143,15 @@ function _syncStartEndToSentence(field, value) {
     var playBtn = selectedRow.querySelector('.col-play-audio.panel-editing-user .audio-btn');
     if (playBtn) {
       _setButtonState(playBtn, 'creating');
+    }
+  }
+
+  // Если у предложения есть audio (TTS) — сбрасываем его и меняем кнопку o на молоточек
+  if (sentence.audio) {
+    sentence.audio = '';
+    var ttsBtn = selectedRow.querySelector('.col-generate-tts.panel-editing-avto .audio-btn');
+    if (ttsBtn) {
+      _setButtonState(ttsBtn, 'creating');
     }
   }
 
