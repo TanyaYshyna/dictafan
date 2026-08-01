@@ -3034,7 +3034,7 @@ async function _cacheSharedAudioFile(file) {
 
 function _initWaveform(audioUrl) {
   var container = document.getElementById('editorModalAudioWaveform');
-  if (!container) return;
+  if (!container) return Promise.resolve();
 
   // Проверяем, что контейнер имеет размеры
   if (container.offsetWidth === 0 || container.offsetHeight === 0) {
@@ -3046,14 +3046,14 @@ function _initWaveform(audioUrl) {
     // Если размеры все еще 0, откладываем инициализацию
     if (container.offsetWidth === 0 || container.offsetHeight === 0) {
       console.warn('[dictationEditorModal] Не удалось установить размеры контейнера, откладываем инициализацию');
-      return;
+      return Promise.resolve();
     }
   }
 
   // Проверяем, что WaveformCanvas загружен
   if (typeof WaveformCanvas === 'undefined') {
     console.warn('[dictationEditorModal] WaveformCanvas не загружен');
-    return;
+    return Promise.resolve();
   }
 
   // Уничтожаем старый экземпляр
@@ -3080,13 +3080,6 @@ function _initWaveform(audioUrl) {
       }
     });
 
-    wf.loadAudio(audioUrl).then(function () {
-      var duration = wf.getDuration();
-      wf.setRegion(0, duration);
-    }).catch(function (err) {
-      console.warn('[dictationEditorModal] Waveform load error', err);
-    });
-
     // Callback при изменении региона
     wf.onRegionUpdate(function (region) {
       var startInput = document.getElementById('editorModalAudioStartTime');
@@ -3095,8 +3088,19 @@ function _initWaveform(audioUrl) {
       if (endInput) endInput.value = region.end.toFixed(2);
     });
 
+    // Возвращаем промис, который резолвится после полной загрузки аудио.
+    // Регион по умолчанию (0, duration) устанавливается внутри loadAudio,
+    // но вызывающий код может переопределить его в своём .then().
+    return wf.loadAudio(audioUrl).then(function () {
+      var duration = wf.getDuration();
+      wf.setRegion(0, duration);
+    }).catch(function (err) {
+      console.warn('[dictationEditorModal] Waveform load error', err);
+    });
+
   } catch (e) {
     console.warn('[dictationEditorModal] Waveform init error', e);
+    return Promise.resolve();
   }
 }
 
@@ -4279,7 +4283,7 @@ async function _restoreSharedAudioFromSentences() {
     var canonicalUrl = am.buildDictationAudioUrl(dictationId, lang, sharedFilename);
     var playableUrl = await am.resolvePlayableUrl(canonicalUrl);
     if (playableUrl) {
-      _initWaveform(playableUrl);
+      await _initWaveform(playableUrl);
       state._sharedAudioUrl = playableUrl;
       state._sharedAudioFilename = sharedFilename;
       return;
@@ -4298,7 +4302,7 @@ async function _restoreSharedAudioFromSentences() {
       console.warn('[dictationEditorModal] Shared audio file not found (HTTP ' + headResp.status + '):', directUrl);
       return;
     }
-    _initWaveform(directUrl);
+    await _initWaveform(directUrl);
     state._sharedAudioUrl = directUrl;
     state._sharedAudioFilename = sharedFilename;
     console.log('[dictationEditorModal] Shared audio восстановлен через прямой URL:', directUrl);
