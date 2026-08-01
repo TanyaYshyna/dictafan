@@ -46,6 +46,9 @@ const state = {
 
   /** EditorMicPanel для запису з мікрофона */
   _micPanel: null,
+
+  /** Флаг: волна на закладке "have" уже инициализирована */
+  _waveformInitialized: false,
 };
 
 /* ===== Хранилище контента через DictationSessionsStore ===== */
@@ -3449,6 +3452,45 @@ function _setupTabs() {
 
       _applyTableViewForTab(tabName);
 
+      // Ленивая инициализация волны — только при первом открытии закладки
+      if (tabName === 'voice-original-have' && !state._waveformInitialized) {
+        state._waveformInitialized = true;
+        _restoreSharedAudioFromSentences().then(function () {
+          // После восстановления волны — синхронизируем регионы для первой строки
+          var wf = window.editorModalWaveform;
+          if (wf) {
+            var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
+            if (selectedRow) {
+              var key = selectedRow.dataset.key;
+              if (key && state.content) {
+                var cores = state.content.getAllSentenceCores();
+                var found = null;
+                for (var i = 0; i < cores.length; i++) {
+                  if (cores[i].key === key) {
+                    found = cores[i];
+                    break;
+                  }
+                }
+                if (found && found.start !== undefined && found.start !== '' && found.end !== undefined && found.end !== '') {
+                  var startVal = parseFloat(found.start);
+                  var endVal = parseFloat(found.end);
+                  if (!isNaN(startVal) && !isNaN(endVal)) {
+                    wf.setRegion(startVal, endVal);
+                    var startInput = document.getElementById('editorModalAudioStartTime');
+                    var endInput = document.getElementById('editorModalAudioEndTime');
+                    if (startInput) startInput.value = startVal.toFixed(2);
+                    if (endInput) endInput.value = endVal.toFixed(2);
+                  }
+                }
+              }
+            }
+          }
+        });
+      } else if (tabName === 'voice-original-self' && !state._waveformInitialized) {
+        state._waveformInitialized = true;
+        _restoreSelfAudioFromSentences();
+      }
+
       if (typeof lucide !== 'undefined') {
         lucide.createIcons();
       }
@@ -4170,70 +4212,15 @@ function open(config) {
   // Инициализируем AudioManager
   _ensureAudioManager();
 
-  // Пытаемся восстановить shared audio из данных предложений (после reopen)
-  _restoreSharedAudioFromSentences();
+  // Сбрасываем флаг инициализации волны — она будет нарисована только при
+  // первом открытии соответствующей закладки (ленивая инициализация).
+  state._waveformInitialized = false;
 
-  // После восстановления shared audio обновляем текст в панели над волной
-  // из первой (активной) строки таблицы, чтобы там не осталось имени файла
-  var firstRowAfterRestore = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr');
-  if (firstRowAfterRestore) {
-    _selectSentenceRow(firstRowAfterRestore);
-  }
-
-  // Переключаемся на правильную закладку в зависимости от режима audio_order.
-  // Если audio_order === 'f' (режим "э файл") — открываем закладку с волной,
-  // чтобы waveform могла корректно инициализироваться (wavesurfer не работает в скрытом контейнере).
-  // Если audio_order === 'm' (режим "сам") — открываем закладку с микрофоном.
-  // В остальных случаях — открываем первую закладку (Общие данные).
-  var audioOrder = state.config ? state.config.audio_order : null;
-  if (audioOrder === 'f') {
-    var haveTabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="voice-original-have"]');
-    if (haveTabBtn) {
-      haveTabBtn.click();
-    }
-    // После переключения на закладку с волной — синхронизируем регионы
-    // для текущей (первой) строки, если у неё есть start/end
-    var wf = window.editorModalWaveform;
-    if (wf) {
-      var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
-      if (selectedRow) {
-        var key = selectedRow.dataset.key;
-        if (key && state.content) {
-          var cores = state.content.getAllSentenceCores();
-          var found = null;
-          for (var i = 0; i < cores.length; i++) {
-            if (cores[i].key === key) {
-              found = cores[i];
-              break;
-            }
-          }
-          if (found && found.start !== undefined && found.start !== '' && found.end !== undefined && found.end !== '') {
-            var startVal = parseFloat(found.start);
-            var endVal = parseFloat(found.end);
-            if (!isNaN(startVal) && !isNaN(endVal)) {
-              wf.setRegion(startVal, endVal);
-              var startInput = document.getElementById('editorModalAudioStartTime');
-              var endInput = document.getElementById('editorModalAudioEndTime');
-              if (startInput) startInput.value = startVal.toFixed(2);
-              if (endInput) endInput.value = endVal.toFixed(2);
-            }
-          }
-        }
-      }
-    }
-  } else if (audioOrder === 'm') {
-    // Режим "сам" — переключаемся на закладку voice-original-self
-    var selfTabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="voice-original-self"]');
-    if (selfTabBtn) {
-      selfTabBtn.click();
-    }
-    // Пытаемся восстановить self audio из данных первого предложения
-    _restoreSelfAudioFromSentences();
-  } else {
-    var defaultTabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="general"]');
-    if (defaultTabBtn) {
-      defaultTabBtn.click();
-    }
+  // Всегда открываем первую закладку (Общие данные), независимо от audio_order.
+  // Волна рисуется лениво при первом переключении на закладку "have"/"self".
+  var defaultTabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="general"]');
+  if (defaultTabBtn) {
+    defaultTabBtn.click();
   }
 
   if (typeof lucide !== 'undefined') {
