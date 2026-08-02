@@ -474,6 +474,7 @@
   <div class="modal-content add-row-modal__content">
     <div class="add-row-modal__header">
       <span>Добавить строку</span>
+      <span id="addRowModalCodeDisplay" class="add-row-modal__code-badge"></span>
       <button type="button" id="addRowModalCloseBtn" class="btn-close">
         <i data-lucide="x"></i>
       </button>
@@ -484,11 +485,13 @@
         <input type="text" id="addRowModalOrigInput" class="text-input" placeholder="Текст оригинала" />
       </div>
       <div class="add-row-modal__translations-section">
+        <label>Переводы:</label>
         <table id="addRowModalTranslationsTable">
           <thead>
             <tr>
-              <th>Язык</th>
-              <th>Перевод</th>
+              <th class="add-row-modal__col-flag"></th>
+              <th class="add-row-modal__col-lang">Язык</th>
+              <th class="add-row-modal__col-text">Перевод</th>
             </tr>
           </thead>
           <tbody>
@@ -498,7 +501,18 @@
       </div>
     </div>
     <div class="add-row-modal__footer">
-      <button type="button" id="addRowModalCreateBtn" class="btn btn-primary">Создать</button>
+      <div class="add-row-modal__position-toggle">
+        <span>Вставить:</span>
+        <label class="add-row-modal__position-radio">
+          <input type="radio" name="addRowPosition" value="above" />
+          <span>Выше</span>
+        </label>
+        <label class="add-row-modal__position-radio">
+          <input type="radio" name="addRowPosition" value="below" checked />
+          <span>Ниже</span>
+        </label>
+      </div>
+      <button type="button" id="addRowModalCreateBtn" class="btn btn-primary add-row-modal__create-btn">Создать</button>
     </div>
   </div>
 </div>
