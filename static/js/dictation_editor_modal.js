@@ -3664,7 +3664,25 @@ async function _handleSave() {
       title: state.config ? state.config.title : 'Без названия',
       level: state.config ? (state.config.level || 'A1') : 'A1',
       is_dialog: state.currentDictation ? !!state.currentDictation.is_dialog : false,
-      audio_user_shared: state._sharedAudioFilename || null,
+      audio_user_shared: (function () {
+        // Защита: не сохраняем повреждённые/плейсхолдерные имена файлов
+        // (например, "audio ___.mp3" с пробелами или не содержащие реального расширения)
+        var name = state._sharedAudioFilename;
+        if (!name || typeof name !== 'string') return null;
+        name = name.trim();
+        if (!name) return null;
+        // Имя файла не должно содержать пробелов (урлы с пробелами ломаются)
+        if (/\s/.test(name)) {
+          console.warn('[dictationEditorModal] Пропускаем сохранение audio_user_shared — имя содержит пробелы:', name);
+          return null;
+        }
+        // Имя файла должно иметь расширение (хотя бы .mp3, .wav, .ogg и т.п.)
+        if (!/\.[a-z0-9]{2,5}$/i.test(name)) {
+          console.warn('[dictationEditorModal] Пропускаем сохранение audio_user_shared — нет расширения:', name);
+          return null;
+        }
+        return name;
+      })(),
       audio_order: audioOrderValue,
       sentences: sentencesPayload,
       book_id: targetBookId,
@@ -3818,10 +3836,10 @@ async function _handleSave() {
             state.content.audio_order = audioOrderValue;
           }
 
-          // Обновляем audio_user_shared в DictationContent после сохранения,
+          // Обновляем audio_or_shared в DictationContent после сохранения,
           // чтобы при повторном открытии (без перезагрузки страницы) shared audio восстановился
           if (state.content) {
-            state.content.audio_user_shared = state._sharedAudioFilename || null;
+            state.content.audio_or_shared = state._sharedAudioFilename || null;
           }
 
           // Обновляем ID диктанта из ответа сервера (на случай, если это был новый диктант)
@@ -4295,19 +4313,36 @@ async function _restoreSharedAudioFromSentences() {
   // Если не нашли в кэше — пробуем загрузить напрямую с сервера.
   // Проверяем доступность URL через HEAD перед инициализацией waveform,
   // чтобы избежать EncodingError при 404 ответе.
+  var restored = false;
   try {
     var directUrl = am.buildDictationAudioUrl(dictationId, lang, sharedFilename);
     var headResp = await fetch(directUrl, { method: 'HEAD' });
     if (!headResp.ok) {
       console.warn('[dictationEditorModal] Shared audio file not found (HTTP ' + headResp.status + '):', directUrl);
-      return;
+    } else {
+      await _initWaveform(directUrl);
+      state._sharedAudioUrl = directUrl;
+      state._sharedAudioFilename = sharedFilename;
+      restored = true;
+      console.log('[dictationEditorModal] Shared audio восстановлен через прямой URL:', directUrl);
     }
-    await _initWaveform(directUrl);
-    state._sharedAudioUrl = directUrl;
-    state._sharedAudioFilename = sharedFilename;
-    console.log('[dictationEditorModal] Shared audio восстановлен через прямой URL:', directUrl);
   } catch (e2) {
     console.warn('[dictationEditorModal] Не удалось восстановить shared audio даже через прямой URL', e2);
+  }
+
+  if (!restored) {
+    // Если не удалось восстановить shared audio файл — очищаем повреждённое значение,
+    // чтобы оно не циркулировало через кэш при повторных открытиях/сохранениях.
+    console.warn('[dictationEditorModal] Shared audio file not accessible, clearing stale reference:', sharedFilename);
+    if (state.config) {
+      state.config.audio_user_shared = null;
+    }
+    if (state.content) {
+      state.content.audio_or_shared = null;
+    }
+    state._sharedAudioFilename = null;
+    var fnEl = document.getElementById('editorModalWaveformFilename');
+    if (fnEl) fnEl.textContent = '';
   }
 }
 
