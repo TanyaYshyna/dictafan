@@ -1352,19 +1352,7 @@ function _setupTableControls() {
   if (addBtn && !addBtn.getAttribute('data-table-control-handler')) {
     addBtn.setAttribute('data-table-control-handler', '1');
     addBtn.addEventListener('click', function () {
-      if (typeof window.DesktopConfirmModal !== 'undefined' && window.DesktopConfirmModal.open) {
-        window.DesktopConfirmModal.open({
-          title: 'Добавить строку',
-          message: 'Куда добавить новую строку?',
-          buttons: [
-            { text: 'Выше', class: 'modal-btn modal-btn-secondary', callback: function () { _addNewRow('above'); } },
-            { text: 'Ниже', class: 'modal-btn modal-btn-secondary', callback: function () { _addNewRow('below'); } },
-            { text: 'Отмена', class: 'modal-btn modal-btn-secondary transparent' },
-          ]
-        });
-      } else {
-        _addNewRow('below');
-      }
+      _openAddRowModal('below');
     });
   }
 
@@ -1374,18 +1362,7 @@ function _setupTableControls() {
     deleteBtn.addEventListener('click', function () {
       var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
       if (!selectedRow) return;
-      if (typeof window.DesktopConfirmModal !== 'undefined' && window.DesktopConfirmModal.open) {
-        window.DesktopConfirmModal.open({
-          title: 'Удалить строку',
-          message: 'Вы уверены, что хотите удалить эту строку?',
-          buttons: [
-            { text: 'Удалить', class: 'modal-btn modal-btn-danger', callback: function () { _deleteRow(selectedRow); } },
-            { text: 'Отмена', class: 'modal-btn modal-btn-secondary transparent' },
-          ]
-        });
-      } else {
-        _deleteRow(selectedRow);
-      }
+      _deleteRow(selectedRow);
     });
   }
 
@@ -1448,29 +1425,90 @@ function _findFreeKey() {
   return 's_' + freeNum;
 }
 
-function _addNewRow(position) {
-  var table = document.getElementById(EDITOR_TABLE_ID);
-  if (!table) return;
-  var tbody = table.querySelector('tbody');
-  if (!tbody) return;
-
-  var selectedRow = tbody.querySelector('tr.selected');
-  if (!state.content) return;
-
-  // Получаем langBlocks
-  var langBlocks = state.content.langBlocks;
-  if (!langBlocks || langBlocks.length === 0) return;
-
-  // Открываем модальное окно добавления строки
-  _openAddRowModal(position, selectedRow);
+/** Получить URL флага для языка */
+function _getFlagUrlForLang(lang) {
+  try {
+    if (window.LanguageManager && typeof window.LanguageManager.getCountryCode === 'function') {
+      var cc = window.LanguageManager.getCountryCode(lang);
+      if (cc) return '/static/flags/' + cc + '.svg';
+    }
+  } catch (e) {}
+  return '';
 }
 
-function _openAddRowModal(position, selectedRow) {
+/** Получить отображаемое имя языка */
+function _getLangDisplayName(lang) {
+  try {
+    if (window.LanguageManager && typeof window.LanguageManager.getLanguageDisplayName === 'function') {
+      return window.LanguageManager.getLanguageDisplayName(lang);
+    }
+  } catch (e) {}
+  return lang;
+}
+
+/** Автоперевод всех пустых полей перевода по тексту оригинала */
+function _autoFillTranslations(origText) {
+  if (!origText) return;
+  var origLang = state.config ? state.config.originalLanguage : '';
+  if (!origLang) return;
+  var rows = document.querySelectorAll('#addRowModalTranslationsTable tbody tr');
+  rows.forEach(function (row) {
+    var input = row.querySelector('input[type="text"]');
+    if (!input) return;
+    var lang = input.dataset.lang;
+    if (!lang) return;
+    var currentText = input.value.trim();
+    // Заполняем только если поле ещё пустое
+    if (currentText) return;
+    input.placeholder = 'Переклад...';
+    input.disabled = true;
+    fetch('/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: origText,
+        source_lang: origLang,
+        target_lang: lang,
+      }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.translation) {
+          input.value = data.translation;
+        }
+        input.disabled = false;
+        input.placeholder = 'Перевод...';
+      })
+      .catch(function () {
+        input.disabled = false;
+        input.placeholder = 'Перевод...';
+      });
+  });
+}
+
+function _openAddRowModal(position) {
   var modal = document.getElementById('addRowModal');
   if (!modal) return;
 
-  // Получаем языки перевода (все блоки кроме первого — оригинал)
   var langBlocks = state.content ? state.content.langBlocks : [];
+  var origBlock = langBlocks.length > 0 ? langBlocks[0] : null;
+  if (!origBlock) return;
+
+  // Проверка лимита 1000 строк
+  if (origBlock.sentences.length >= 1000) {
+    alert('Достигнут лимит в 1000 строк. Добавление невозможно.');
+    return;
+  }
+
+  // Вычисляем свободный ключ и отображаем его
+  var freeKey = _findFreeKey();
+  var freeNum = parseInt(String(freeKey).replace('s_', '') || '0', 10);
+  var displayCode = String(freeNum).padStart(3, '0');
+
+  var codeBadge = document.getElementById('addRowModalCodeDisplay');
+  if (codeBadge) codeBadge.textContent = 'Код: ' + displayCode;
+
+  // Получаем языки перевода (все блоки кроме первого — оригинал)
   var translationLangs = [];
   if (langBlocks.length > 1) {
     for (var i = 1; i < langBlocks.length; i++) {
@@ -1478,22 +1516,42 @@ function _openAddRowModal(position, selectedRow) {
     }
   }
 
-  // Заполняем таблицу переводов
+  // Заполняем таблицу переводов с флагами
   var tbody = document.querySelector('#addRowModalTranslationsTable tbody');
   if (tbody) {
     tbody.innerHTML = '';
     if (translationLangs.length > 0) {
       translationLangs.forEach(function (lang) {
         var tr = document.createElement('tr');
+
+        // Флаг
+        var flagTd = document.createElement('td');
+        flagTd.className = 'add-row-modal__col-flag';
+        var flagUrl = _getFlagUrlForLang(lang);
+        if (flagUrl) {
+          var flagImg = document.createElement('img');
+          flagImg.src = flagUrl;
+          flagImg.className = 'add-row-modal__flag-img';
+          flagImg.alt = lang;
+          flagTd.appendChild(flagImg);
+        }
+
+        // Код языка
         var langTd = document.createElement('td');
+        langTd.className = 'add-row-modal__col-lang';
         langTd.textContent = lang;
+
+        // Поле ввода перевода
         var inputTd = document.createElement('td');
+        inputTd.className = 'add-row-modal__col-text';
         var input = document.createElement('input');
         input.type = 'text';
         input.className = 'text-input';
         input.placeholder = 'Перевод...';
         input.dataset.lang = lang;
         inputTd.appendChild(input);
+
+        tr.appendChild(flagTd);
         tr.appendChild(langTd);
         tr.appendChild(inputTd);
         tbody.appendChild(tr);
@@ -1501,7 +1559,7 @@ function _openAddRowModal(position, selectedRow) {
     } else {
       var tr = document.createElement('tr');
       var td = document.createElement('td');
-      td.setAttribute('colspan', '2');
+      td.setAttribute('colspan', '3');
       td.textContent = 'Нет языков перевода';
       td.style.textAlign = 'center';
       td.style.color = '#888';
@@ -1514,13 +1572,9 @@ function _openAddRowModal(position, selectedRow) {
   var origInput = document.getElementById('addRowModalOrigInput');
   if (origInput) origInput.value = '';
 
-  // Сохраняем позицию для создания
+  // Сохраняем позицию и свободный ключ в dataset модалки
   modal.dataset.position = position || 'below';
-  if (selectedRow) {
-    modal.dataset.selectedRowKey = selectedRow.dataset.key;
-  } else {
-    modal.dataset.selectedRowKey = '';
-  }
+  modal.dataset.freeKey = freeKey;
 
   modal.style.display = 'flex';
 }
@@ -1530,12 +1584,24 @@ function _closeAddRowModal() {
   if (modal) modal.style.display = 'none';
 }
 
+/** Пересчитывает position у всех предложений во всех langBlocks по порядковому индексу */
+function _recalcPositions() {
+  if (!state.content) return;
+  var langBlocks = state.content.langBlocks;
+  if (!langBlocks) return;
+  langBlocks.forEach(function (block) {
+    block.sentences.forEach(function (s, idx) {
+      s.position = idx;
+    });
+  });
+}
+
 function _handleAddRowCreate() {
   var modal = document.getElementById('addRowModal');
   if (!modal) return;
 
-  var position = modal.dataset.position || 'below';
-  var selectedRowKey = modal.dataset.selectedRowKey || '';
+  var freeKey = modal.dataset.freeKey;
+  if (!freeKey) return;
 
   var origInput = document.getElementById('addRowModalOrigInput');
   var origText = origInput ? origInput.value.trim() : '';
@@ -1546,42 +1612,37 @@ function _handleAddRowCreate() {
   translationInputs.forEach(function (input) {
     var lang = input.dataset.lang;
     var text = input.value.trim();
-    if (lang && text) {
+    if (lang) {
       translations[lang] = text;
     }
   });
 
-  // Находим свободный ключ
-  var newKey = _findFreeKey();
-
-  var table = document.getElementById(EDITOR_TABLE_ID);
-  if (!table) return;
-  var tbody = table.querySelector('tbody');
-  if (!tbody) return;
-
   var langBlocks = state.content.langBlocks;
   if (!langBlocks || langBlocks.length === 0) return;
 
-  // Определяем индекс вставки
-  var insertIndex = -1;
-  if (selectedRowKey) {
-    var origBlock = langBlocks[0];
+  // Определяем индекс вставки относительно выделенной строки
+  var origBlock = langBlocks[0];
+  var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
+  var selectedKey = selectedRow ? selectedRow.dataset.key : '';
+  var positionRadio = document.querySelector('input[name="addRowPosition"]:checked');
+  var position = positionRadio ? positionRadio.value : 'below';
+
+  var insertIndex = origBlock.sentences.length; // по умолчанию в конец
+
+  if (selectedKey) {
     for (var i = 0; i < origBlock.sentences.length; i++) {
-      if (origBlock.sentences[i].key === selectedRowKey) {
-        insertIndex = i;
+      if (origBlock.sentences[i].key === selectedKey) {
+        insertIndex = (position === 'above') ? i : (i + 1);
         break;
       }
     }
-    if (position === 'below' && insertIndex >= 0) {
-      insertIndex = insertIndex + 1;
-    }
   }
 
-  // Создаём новое предложение для каждого языка
+  // Создаём новое предложение для каждого языкового блока
   langBlocks.forEach(function (block) {
     var isOrig = (block === langBlocks[0]);
     var sentence = {
-      key: newKey,
+      key: freeKey,
       position: null,
       text: isOrig ? origText : (translations[block.lang] || ''),
       audio: '',
@@ -1593,28 +1654,27 @@ function _handleAddRowCreate() {
       explanation: '',
     };
 
-    if (insertIndex >= 0 && insertIndex <= block.sentences.length) {
-      block.sentences.splice(insertIndex, 0, sentence);
-    } else {
-      block.sentences.push(sentence);
-    }
+    block.sentences.splice(insertIndex, 0, sentence);
   });
 
-  // Если включено авто — генерируем аудио для оригинала
+  // Пересчитываем position для всех строк
+  _recalcPositions();
+
+  // Генерируем аудио: оригинал — если voiceMode auto, переводы — всегда если есть текст
   var checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
   var voiceMode = checkedRadio ? checkedRadio.value : 'auto';
   var dictationId = state.config ? state.config.dictationId : '';
 
   if (voiceMode === 'auto' && origText && dictationId) {
-    _generateAudioForSentence(newKey, langBlocks[0].lang, origText, dictationId);
+    _generateAudioForSentence(freeKey, langBlocks[0].lang, origText, dictationId);
   }
 
-  // Если включено авто — генерируем аудио для переводов
-  if (voiceMode === 'auto' && dictationId) {
+  // Для переводов генерируем аудио всегда (как при начальном заполнении)
+  if (dictationId) {
     Object.keys(translations).forEach(function (lang) {
       var trText = translations[lang];
       if (trText) {
-        _generateAudioForSentence(newKey, lang, trText, dictationId);
+        _generateAudioForSentence(freeKey, lang, trText, dictationId);
       }
     });
   }
@@ -1711,6 +1771,9 @@ function _deleteRow(row) {
       }
     });
   }
+
+  // Пересчитываем position для всех строк
+  _recalcPositions();
 
   _setDirtyFlags({ db: true });
   _renderTable();
@@ -5297,57 +5360,13 @@ function init() {
     addRowCloseBtn.addEventListener('click', _closeAddRowModal);
   }
 
-  // Enter в поле оригинала → автоперевод
+  // При изменении текста оригинала — автозаполнение пустых переводов
   var addRowOrigInput = document.getElementById('addRowModalOrigInput');
   if (addRowOrigInput) {
-    addRowOrigInput.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        // Заполняем таблицу переводов (автоперевод)
-        var text = addRowOrigInput.value.trim();
-        if (!text) return;
-        var origLang = state.config ? state.config.originalLanguage : '';
-        if (!origLang) return;
-        var langBlocks = state.content ? state.content.langBlocks : [];
-        if (!langBlocks || langBlocks.length < 2) return;
-        var translationLangs = [];
-        for (var i = 1; i < langBlocks.length; i++) {
-          translationLangs.push(langBlocks[i].lang);
-        }
-        if (translationLangs.length === 0) return;
-        var tbody = document.querySelector('#addRowModalTranslationsTable tbody');
-        if (!tbody) return;
-        var rows = tbody.querySelectorAll('tr');
-        rows.forEach(function (row) {
-          var langCode = row.dataset.lang;
-          if (!langCode) return;
-          var input = row.querySelector('input');
-          if (!input) return;
-          // Показываем индикатор загрузки
-          input.placeholder = 'Переклад...';
-          input.disabled = true;
-          fetch('/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              text: text,
-              source_lang: origLang,
-              target_lang: langCode,
-            }),
-          })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-              if (data.translated_text) {
-                input.value = data.translated_text;
-              }
-              input.disabled = false;
-              input.placeholder = '';
-            })
-            .catch(function () {
-              input.disabled = false;
-              input.placeholder = '';
-            });
-        });
+    addRowOrigInput.addEventListener('input', function () {
+      var text = addRowOrigInput.value.trim();
+      if (text) {
+        _autoFillTranslations(text);
       }
     });
   }
