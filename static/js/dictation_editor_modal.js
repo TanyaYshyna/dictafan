@@ -5650,7 +5650,7 @@ window.NewDictationFillModal = {
           // Генерируем аудио для перевода (если есть текст перевода)
           if (trText) {
             try {
-              console.log('[NewDictationFillModal] generating audio for translation:', key, { langTr, trText: trText.slice(0, 50) });
+              console.log('[NewDictationFillModal] [TR-TTS] generating audio for translation:', key, { langTr: langTr, trText: trText.slice(0, 50), dictationId: dictationId, safeEmail: safeEmail ? safeEmail.substring(0, 3) + '...' : '(empty)' });
               var genTrResp = await fetch('/generate_audio', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -5663,7 +5663,9 @@ window.NewDictationFillModal = {
                   safe_email: safeEmail,
                 })
               });
+              console.log('[NewDictationFillModal] [TR-TTS] HTTP status:', genTrResp.status, 'ok:', genTrResp.ok);
               var genTrData = await genTrResp.json();
+              console.log('[NewDictationFillModal] [TR-TTS] response:', { success: genTrData.success, hasB64: !!genTrData.audio_b64, b64Len: genTrData.audio_b64 ? genTrData.audio_b64.length : 0, error: genTrData.error, filename: genTrData.filename });
               if (genTrData.success && genTrData.audio_b64) {
                 var binaryStrTr = atob(genTrData.audio_b64);
                 var bytesTr = new Uint8Array(binaryStrTr.length);
@@ -5673,19 +5675,25 @@ window.NewDictationFillModal = {
                 var blobTr = new Blob([bytesTr], { type: genTrData.mime || 'audio/mpeg' });
                 var newFilenameTr = genTrData.filename || ('tts_' + key + '_' + Date.now() + '.mp3');
                 var am2 = _ensureAudioManager();
+                console.log('[NewDictationFillModal] [TR-TTS] AudioManager available:', !!am2, 'has saveDictationAudioBlob:', !!(am2 && typeof am2.saveDictationAudioBlob === 'function'));
                 if (am2 && typeof am2.saveDictationAudioBlob === 'function') {
                   var savedKeyTr = await am2.saveDictationAudioBlob(dictationId, langTr, newFilenameTr, blobTr, genTrData.mime || 'audio/mpeg');
+                  console.log('[NewDictationFillModal] [TR-TTS] saved to CacheStorage:', { langTr: langTr, newFilenameTr: newFilenameTr, blobSize: blobTr.size, savedKeyTr: savedKeyTr });
                   // saveDictationAudioBlob() сама создаёт blob URL в _objectUrlByCanonicalUrl,
                   // так что _handleAudioPlayback() сможет найти аудио без поиска в CacheStorage.
+                } else {
+                  console.warn('[NewDictationFillModal] [TR-TTS] AudioManager не может сохранить blob! am2=' + !!am2 + ' hasMethod=' + !!(am2 && typeof am2.saveDictationAudioBlob === 'function'));
                 }
                 audioTr = newFilenameTr;
-                console.log('[NewDictationFillModal] generated audio for translation:', key, audioTr);
+                console.log('[NewDictationFillModal] [TR-TTS] SUCCESS: audioTr=' + audioTr + ' for key=' + key + ' langTr=' + langTr);
               } else {
-                console.warn('[NewDictationFillModal] generate_audio API error for translation:', genTrData.error);
+                console.warn('[NewDictationFillModal] [TR-TTS] API error:', genTrData.error);
               }
             } catch (e) {
-              console.warn('[NewDictationFillModal] generateAudioForSentence translation error:', e);
+              console.warn('[NewDictationFillModal] [TR-TTS] EXCEPTION:', e.message || e, e.stack);
             }
+          } else {
+            console.log('[NewDictationFillModal] [TR-TTS] skipped: no trText for key=' + key);
           }
         }
 
@@ -5706,6 +5714,7 @@ window.NewDictationFillModal = {
 
         // Добавляем предложение перевода с language_code (если есть текст перевода)
         if (trText) {
+          console.log('[NewDictationFillModal] [TR-SENT] pushing translation sentence: key=' + key + ' langTr=' + langTr + ' audioTr=' + (audioTr || '(empty)'));
           flatSentences.push({
             language_code: langTr,
             key: key,

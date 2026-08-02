@@ -163,22 +163,24 @@ def translate_text():
 @editor_bp.route('/generate_audio', methods=['POST'])
 def generate_audio():
     data = request.json
-    logging.info("Начало генерации аудио")
+    lang = data.get('language', '')
+    text_preview = (data.get('text') or '')[:50]
+    logging.info(f"[TTS] Запрос: lang={lang} text_preview={text_preview} dictation_id={data.get('dictation_id')} safe_email={'yes' if data.get('safe_email') else 'no'}")
 
     try:
         dictation_id = data.get('dictation_id')
         user_id = data.get('user_id')  # ID пользователя для пути temp/<user_id>/
         safe_email = data.get('safe_email')  # получаем из запроса
         if not safe_email:
-            logging.error("Отсутствует safe_email")
+            logging.error("[TTS] Отсутствует safe_email")
             return jsonify({"success": False, "error": "Отсутствует safe_email"}), 400
         if not dictation_id:
+            logging.error("[TTS] Отсутствует ID диктанта")
             return jsonify({"success": False, "error": "Отсутствует ID диктанта"}), 400
 
         text = data.get('text')
         tipe_audio  = data.get('tipe_audio') or 'avto'
         filename_audio  = data.get('filename_audio') or data.get('filename')
-        lang = data.get('language')
 
         try:
             from werkzeug.utils import secure_filename
@@ -202,9 +204,11 @@ def generate_audio():
         
         # Генерируем аудио с обработкой ошибок
         try:
+            logging.info(f"[TTS] gTTS(text_len={len(text) if text else 0}, lang={lang}) начало...")
             tts = gTTS(text=text, lang=lang)
             tts.save(filepath)
-            logging.info(f"Аудиофайл успешно сгенерирован: {filepath}")
+            file_size = os.path.getsize(filepath)
+            logging.info(f"[TTS] Аудиофайл успешно сгенерирован: {filepath} (size={file_size} bytes)")
 
             with open(filepath, 'rb') as f:
                 audio_b64 = base64.b64encode(f.read()).decode('ascii')
@@ -221,7 +225,7 @@ def generate_audio():
                 "audio_b64": audio_b64,
             })
         except Exception as e:
-            logging.error(f"Ошибка генерации аудио: {e}")
+            logging.error(f"[TTS] Ошибка генерации аудио: lang={lang} text_len={len(text) if text else 0} error={e}")
             return jsonify({
                 "success": False,
                 "error": f"Ошибка генерации аудио: {e}"
