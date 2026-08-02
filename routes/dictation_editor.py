@@ -1115,7 +1115,35 @@ def save_dictation_final():
                 logger.info(f"✅ Очищена временная папка: {temp_path}")
             except Exception as e:
                 logger.warning(f"⚠️ Не удалось удалить временную папку {temp_path}: {e}")
-        
+
+        # === B2 orphan cleanup ===
+        # После сохранения и загрузки новых файлов в B2,
+        # удаляем orphan'ы: файлы в B2, которых нет в новом keep-списке.
+        # keep_audio_relpaths уже содержит все имена из sentences_data (+ shared audio).
+        if b2_storage.enabled and keep_audio_relpaths:
+            try:
+                b2_prefix = f"dictations/{dictation_id}/"
+                keep_set = set()
+                for rel in keep_audio_relpaths:
+                    keep_set.add(f"{b2_prefix}{rel}")
+
+                existing = b2_storage.list_files(b2_prefix)
+                deleted = 0
+                for name in existing:
+                    if name in keep_set:
+                        continue
+                    try:
+                        if b2_storage.delete_file(name):
+                            deleted += 1
+                    except Exception:
+                        continue
+                logger.info(
+                    "B2 cleanup: dictation_id=%s existing=%s keep=%s deleted=%s",
+                    dictation_id, len(existing), len(keep_set), deleted,
+                )
+            except Exception as e:
+                logger.warning(f"B2 orphan cleanup failed (non-critical): {e}")
+
         # Если диктант был создан из приватной библиотеки и передан book_id,
         # привязываем его к книге/разделу через таблицу book_dictations
         if target_book_id and db_id:
@@ -1528,7 +1556,9 @@ def split_audio_file():
                 if not key or start_time >= end_time:
                     continue
 
-                segment_filename = f"{key}_{language}_user.mp3"
+                # Клиент может передать segment_filename с timestamp.
+                # Если нет — fallback на старый формат.
+                segment_filename = sentence.get('segment_filename') or f"{key}_{language}_user.mp3"
                 with tempfile.NamedTemporaryFile(prefix='dictafan_split_out_', suffix='.mp3', delete=False) as tmp_out:
                     tmp_out_path = tmp_out.name
                 cleanup_paths.append(tmp_out_path)
