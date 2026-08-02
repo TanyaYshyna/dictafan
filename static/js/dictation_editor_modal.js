@@ -958,7 +958,7 @@ async function _handleHammerGenerateTts(button, key, lang, sentence) {
         dictation_id: dictationId,
         text: sentence.text,
         language: lang,
-        filename_audio: 'tts_' + key + '_' + Date.now() + '.mp3',
+        filename_audio: _makeAudioFilename('tts', String(dictationId).replace(/^dict_/, ''), key, '.mp3'),
         tipe_audio: 'avto',
         safe_email: safeEmail,
       })
@@ -979,7 +979,7 @@ async function _handleHammerGenerateTts(button, key, lang, sentence) {
       bytes[j] = binaryStr.charCodeAt(j);
     }
     var blob = new Blob([bytes], { type: data.mime || 'audio/mpeg' });
-    var newFilename = data.filename || ('tts_' + key + '_' + Date.now() + '.mp3');
+    var newFilename = data.filename || _makeAudioFilename('tts', String(dictationId).replace(/^dict_/, ''), key, '.mp3');
 
     // Сохраняем в CacheStorage через AudioManager
     var am = _ensureAudioManager();
@@ -1081,8 +1081,9 @@ async function _handleCutAudioForSentence(button, sentence, lang, field) {
     }
     var blob = new Blob([bytes], { type: data.mime || file.type || 'audio/mpeg' });
 
-    // Генерируем имя файла
-    var newFilename = 'cut_' + sentence.key + '_' + Date.now() + '.mp3';
+    // Генерируем имя файла через единый генератор
+    var numId = (state.config && state.config.dictationId) ? String(state.config.dictationId).replace(/^dict_/, '') : '';
+    var newFilename = _makeAudioFilename('cut', numId, sentence.key, '.mp3');
 
     // Сохраняем в CacheStorage через AudioManager (вместо draft cache)
     var am = _ensureAudioManager();
@@ -1144,11 +1145,11 @@ function _readFileAsBase64(file) {
  * Собирает canonical URLs для всех audio_file в предложениях и передаёт
  * в AudioManager.uploadDictationAudioFromCacheToB2().
  */
-async function _uploadDraftAudioToB2(dictationId, token) {
+async function _uploadDraftAudioToB2(dictationId, token, dirtySetParam) {
   var flowNum = window.__SAVE_FLOW || 0;
   if (!state.content || !dictationId || !token) {
     console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2 пропущено: content=' + !!state.content + ' dictationId=' + dictationId + ' token=' + !!token);
-    return;
+    return { ok: false, reason: 'missing_data' };
   }
 
   // Нормализуем dictationId: добавляем префикс dict_ если его нет
@@ -1163,14 +1164,26 @@ async function _uploadDraftAudioToB2(dictationId, token) {
   var am = _ensureAudioManager();
   if (!am || typeof am.uploadDictationAudioFromCacheToB2 !== 'function') {
     console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] AudioManager.uploadDictationAudioFromCacheToB2 not available');
-    return;
+    return { ok: false, reason: 'no_audio_manager' };
   }
 
-  // Определяем, какие файлы грязные (per-file dirty tracking)
-  var flags = _getDirtyFlags();
-  var dirtySet = (flags.audio && flags.audio.dirty) ? flags.audio.dirty : new Set();
-  var uploadAll = dirtySet.has('*') || dirtySet.size === 0;
-  console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: uploadAll=' + uploadAll + ' dirtySet.size=' + dirtySet.size);
+  // Используем переданный dirtySet (снапшот ДО очистки в _handleSave),
+  // либо читаем текущее состояние (для обратной совместимости).
+  var dirtySet;
+  if (dirtySetParam instanceof Set) {
+    dirtySet = dirtySetParam;
+  } else {
+    var flags = _getDirtyFlags();
+    dirtySet = (flags.audio && flags.audio.dirty) ? flags.audio.dirty : new Set();
+  }
+  var uploadAll = dirtySet.has('*');
+  console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: uploadAll=' + uploadAll + ' dirtySet.size=' + dirtySet.size + ' (from param=' + (dirtySetParam instanceof Set) + ')');
+
+  // Если dirtySet пуст и нет сентинела '*' — нечего загружать
+  if (dirtySet.size === 0) {
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: dirtySet пуст, нечего загружать');
+    return { ok: true, uploaded: 0, skipped: 0, failed: [] };
+  }
 
   // Проходим по всем языковым блокам (оригинал + переводы)
   var langBlocks = state.content.langBlocks || [];
@@ -1199,7 +1212,7 @@ async function _uploadDraftAudioToB2(dictationId, token) {
         var fn = filenames[f];
         if (!fn) continue;
         allFilenames.push(fn);
-        // Dirty-only: пропускаем чистые файлы
+        // Dirty-only: пропускаем чистые файлы (если не uploadAll)
         if (!uploadAll && !dirtySet.has(fn)) continue;
         var buildUrl = am.buildDictationAudioUrl(dictationId, langCode, fn);
         langUrls.push(buildUrl);
@@ -1223,7 +1236,7 @@ async function _uploadDraftAudioToB2(dictationId, token) {
   if (urls.length === 0) {
     console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: немає dirty URL для завантаження (dirtySet.size=' + dirtySet.size + ')');
     // Орфанов не чистим, так как БД ещё не обновлена — cleanup сделает сервер после save_dictation_final
-    return;
+    return { ok: true, uploaded: 0, skipped: 0, failed: [] };
   }
 
   console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: всього ' + urls.length + ' dirty URL для завантаження на B2 (из ' + (new Set(allFilenames)).size + ' всего)');
@@ -1249,8 +1262,11 @@ async function _uploadDraftAudioToB2(dictationId, token) {
     if (result && result.cacheMiss && result.cacheMiss > 0) {
       console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] cacheMiss=' + result.cacheMiss + ' — аудио не найдено в кеші!');
     }
+
+    return result || { ok: true, uploaded: 0, skipped: 0, failed: [] };
   } catch (e) {
     console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] B2 upload error', e);
+    return { ok: false, reason: 'exception', error: e };
   }
 }
 
@@ -3455,10 +3471,12 @@ async function _smartSplitOnServer(filename, audio_b64, mime) {
       smart: true,
       language: state.config ? state.config.originalLanguage : '',
       sentences: state.content ? state.content.getAllSentenceCores().map(function (s) {
+        var numId = (state.config && state.config.dictationId) ? String(state.config.dictationId).replace(/^dict_/, '') : '';
         return {
           key: s.key,
           text: s.text || '',
-          language: state.config ? state.config.originalLanguage : ''
+          language: state.config ? state.config.originalLanguage : '',
+          segment_filename: _makeAudioFilename('seg', numId, s.key, '.mp3')
         };
       }) : []
     };
@@ -3638,7 +3656,7 @@ async function _handleSave() {
 
     window.__SAVE_FLOW = (window.__SAVE_FLOW || 0) + 1;
     var flowNum = window.__SAVE_FLOW;
-    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _handleSave ПОЧАТОК: db=' + flags.db + ' audio=' + flags.audio + ' cover=' + flags.cover + ' online=' + navigator.onLine + ' langBlocks=' + (state.content ? state.content.langBlocks.length : 0) + ' time=' + new Date().toISOString());
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _handleSave ПОЧАТОК: db=' + flags.db + ' audio.size=' + (flags.audio && flags.audio.dirty ? flags.audio.dirty.size : 0) + ' cover=' + flags.cover + ' online=' + navigator.onLine + ' langBlocks=' + (state.content ? state.content.langBlocks.length : 0) + ' time=' + new Date().toISOString());
 
     if (!hasChanges) {
       console.log('[dictationEditorModal] Нет изменений для сохранения');
@@ -3795,14 +3813,19 @@ async function _handleSave() {
       try {
         console.log('[dictationEditorModal] Сохраняю через SaveQueueBatcher...');
 
-        // КОПИРУЕМ флаг audio ДО вызова _setDirtyFlags(), т.к. flags — ссылка на
+        // СНАПШОТИМ dirty audio ДО вызова _setDirtyFlags(), т.к. flags — ссылка на
         // state.dirtyFlags и _setDirtyFlags() ниже мутирует тот же объект!
         var hasDirtyAudio = !!(flags.audio && flags.audio.dirty && flags.audio.dirty.size > 0);
+        // Клонируем dirty set для передачи в _uploadDraftAudioToB2 (он будет вызван ПОСЛЕ очистки)
+        var dirtySetSnapshot = null;
+        if (hasDirtyAudio && flags.audio.dirty instanceof Set) {
+          dirtySetSnapshot = new Set(flags.audio.dirty);
+        }
 
         // Добавляем флаг dirty audio — чтобы при отправке batcher знал
         saveData._audioDirty = hasDirtyAudio;
 
-        console.log('[dictationEditorModal] [FLOW-' + flowNum + '] SaveQueueBatcher audio=' + hasDirtyAudio + ' online=' + navigator.onLine + ' langBlocks=' + (state.content ? state.content.langBlocks.length : 0));
+        console.log('[dictationEditorModal] [FLOW-' + flowNum + '] SaveQueueBatcher audio=' + hasDirtyAudio + ' dirtySetSnapshot.size=' + (dirtySetSnapshot ? dirtySetSnapshot.size : 0) + ' online=' + navigator.onLine + ' langBlocks=' + (state.content ? state.content.langBlocks.length : 0));
 
         // Пишем в очередь IndexedDB
         var queueKey = await window.SaveQueueBatcher.enqueueSave(normalizedId, saveData);
@@ -3870,16 +3893,16 @@ async function _handleSave() {
           if (hasDirtyAudio && navigator.onLine) {
             console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Загружаем аудио на B2: dictationId=' + normalizedId);
             try {
-              var b2Result = await _uploadDraftAudioToB2(normalizedId, token);
+              var b2Result = await _uploadDraftAudioToB2(normalizedId, token, dirtySetSnapshot);
               if (b2Result && b2Result.ok) {
                 _setDirtyFlags({ audio: false });
-                console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио загружено на B2 успешно: uploaded=' + b2Result.uploaded + ' skipped=' + b2Result.skipped + ' failed=' + b2Result.failed + ' cacheMiss=' + b2Result.cacheMiss);
+                console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио загружено на B2 успешно: uploaded=' + b2Result.uploaded + ' skipped=' + b2Result.skipped + ' failed=' + (b2Result.failed ? b2Result.failed.length : 0) + ' cacheMiss=' + b2Result.cacheMiss);
               } else if (b2Result && b2Result.reason === 'inflight_timeout') {
                 console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось — таймаут ожидания inflight');
               } else if (b2Result && b2Result.reason === 'inflight') {
                 console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось — inflight (race condition)');
-              } else if (b2Result && b2Result.uploaded > 0 && b2Result.failed > 0) {
-                console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио загружено частково: uploaded=' + b2Result.uploaded + ' failed=' + b2Result.failed);
+              } else if (b2Result && b2Result.uploaded > 0 && b2Result.failed && b2Result.failed.length > 0) {
+                console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио загружено частково: uploaded=' + b2Result.uploaded + ' failed=' + b2Result.failed.length);
               } else {
                 console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось: ' + JSON.stringify(b2Result));
               }
@@ -4022,13 +4045,21 @@ async function _handleSave() {
 
     // Этап 2: Сохраняем аудио (если dirty audio) — прямой fetch путь
     var hasDirtyAudioLegacy = !!(flags.audio && flags.audio.dirty && flags.audio.dirty.size > 0);
+    var dirtySetSnapshotLegacy = null;
+    if (hasDirtyAudioLegacy && flags.audio.dirty instanceof Set) {
+      dirtySetSnapshotLegacy = new Set(flags.audio.dirty);
+    }
     console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Прямий fetch: hasDirtyAudio=' + hasDirtyAudioLegacy + ' online=' + navigator.onLine);
     if (hasDirtyAudioLegacy) {
       console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Сохраняю аудио на B2 (прямий fetch)... dictationId=' + effectiveDictationId);
       try {
-        await _uploadDraftAudioToB2(effectiveDictationId, token);
-        _setDirtyFlags({ audio: false });
-        console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио сохранено на B2');
+        var legacyB2Result = await _uploadDraftAudioToB2(effectiveDictationId, token, dirtySetSnapshotLegacy);
+        if (legacyB2Result && legacyB2Result.ok) {
+          _setDirtyFlags({ audio: false });
+          console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио сохранено на B2: uploaded=' + legacyB2Result.uploaded);
+        } else {
+          console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось: ' + JSON.stringify(legacyB2Result));
+        }
       } catch (audioErr) {
         console.error('[dictationEditorModal] [FLOW-' + flowNum + '] Ошибка сохранения аудио:', audioErr);
       }
@@ -4086,7 +4117,7 @@ function open(config) {
   console.log('[dictationEditorModal] open() config:', JSON.stringify(state.config));
   console.log('[dictationEditorModal] [TRACE] open(): config.audio_user_shared=' + (config && config.audio_user_shared));
   state.isOpen = true;
-  state.dirtyFlags = { db: false, audio: false, cover: false };
+  state.dirtyFlags = { db: false, cover: false, audio: { dirty: new Set() } };
 
   // Определяем режим редактора:
   // - isNewDictation === true → "Начальное заполнение" (fill)
@@ -4665,10 +4696,18 @@ function _closeEditorModal(wasSaved) {
   state.headerLangPairSelector = null;
   state.content = null;
   state.currentDictation = null;
-  state.dirtyFlags = { db: false, audio: false, cover: false };
+  state.dirtyFlags = { db: false, cover: false, audio: { dirty: new Set() } };
   state._sharedAudioFilename = null;
   state._sharedAudioDuration = null;
   state._sharedAudioFile = null;
+
+  // Освобождаем blob URL'ы диктанта через AudioManager (включая мапу _objectUrlByCanonicalUrl)
+  if (closingDictationId) {
+    var am = _ensureAudioManager();
+    if (am && typeof am.revokeDictationBlobUrls === 'function') {
+      am.revokeDictationBlobUrls(closingDictationId);
+    }
+  }
 
   // Освобождаем blob URL для shared audio
   if (state._sharedAudioUrl) {
@@ -4850,11 +4889,15 @@ function _uploadSelfAudioFile(file) {
   var sentence = state.content.getSentence(key);
   if (!sentence) return;
 
+  // Генерируем имя файла через единый генератор (с timestamp)
+  var numId = (state.config && state.config.dictationId) ? String(state.config.dictationId).replace(/^dict_/, '') : '';
+  var generatedFilename = _makeAudioFilename('mic', numId, key, '.mp3');
+
   // Записуємо ім'я файлу в audio_mic поточної строки
-  sentence.audio_mic = file.name;
+  sentence.audio_mic = generatedFilename;
 
   // Зберігаємо файл у CacheStorage
-  _cacheSelfAudioFile(file, file.name);
+  _cacheSelfAudioFile(file, generatedFilename);
 
   // Помічаємо dirty
   _setDirtyFlags({ db: true, audio: true });
