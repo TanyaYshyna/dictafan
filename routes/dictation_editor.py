@@ -705,7 +705,7 @@ def save_dictation_final():
                 speakers=data.get("speakers", {}),
                 title_translations=data.get("title_translations", {}),
                 author_materials_url=data.get("author_materials_url"),
-                audio_user_shared=data.get("audio_user_shared"),
+                audio_user_shared=_normalize_audio_filename(data.get("audio_user_shared")),
                 audio_order=data.get("audio_order")
             )
         elif db_id:
@@ -718,7 +718,7 @@ def save_dictation_final():
                 speakers=data.get("speakers", {}),
                 title_translations=data.get("title_translations", {}),
                 author_materials_url=data.get("author_materials_url"),
-                audio_user_shared=data.get("audio_user_shared"),
+                audio_user_shared=_normalize_audio_filename(data.get("audio_user_shared")),
                 audio_order=data.get("audio_order")
             )
         else:
