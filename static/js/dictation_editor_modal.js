@@ -2977,9 +2977,15 @@ function _uploadSharedAudioFile(file) {
   state._sharedAudioFile = file;
 
   // НЕМЕДЛЕННО сохраняем имя файла, не дожидаясь loadedmetadata!
-  // Иначе если loadedmetadata задержится, сохранение уйдёт со старым именем.
-  state._sharedAudioFilename = file.name;
-  console.log('[dictationEditorModal] [TRACE] _uploadSharedAudioFile: _sharedAudioFilename сразу=' + state._sharedAudioFilename);
+  // Генерируем предсказуемое имя: shared_audio_{id}.{ext}
+  // Это исключает проблемы с пробелами, спецсимволами и %20 в URL.
+  var ext = '.mp3';
+  var extMatch = file.name.match(/\.([a-z0-9]{2,5})$/i);
+  if (extMatch) ext = '.' + extMatch[1].toLowerCase();
+  var dictId = (state.config && state.config.dictationId) ? String(state.config.dictationId).replace(/^dict_/, '') : '';
+  if (!dictId) dictId = Date.now();
+  state._sharedAudioFilename = 'shared_audio_' + dictId + ext;
+  console.log('[dictationEditorModal] [TRACE] _uploadSharedAudioFile: _sharedAudioFilename сгенерировано=' + state._sharedAudioFilename + ' (оригинал=' + file.name + ')');
 
   // Обновляем название файла в панели над волной
   var filenameEl = document.getElementById('editorModalWaveformFilename');
@@ -3680,10 +3686,13 @@ async function _handleSave() {
         if (!name || typeof name !== 'string') return null;
         name = name.trim();
         if (!name) return null;
-        // Имя файла не должно содержать пробелов (урлы с пробелами ломаются)
+        // Нормализуем пробелы → подчёркивания (на случай старых кэшированных имён)
         if (/\s/.test(name)) {
-          console.warn('[dictationEditorModal] Пропускаем сохранение audio_user_shared — имя содержит пробелы:', name);
-          return null;
+          console.warn('[dictationEditorModal] Нормализуем пробелы в audio_user_shared:', name);
+          name = name.replace(/\s+/g, '_');
+          // Синхронизируем нормализованное имя обратно в state, чтобы CacheStorage/B2
+          // тоже использовали чистое имя
+          state._sharedAudioFilename = name;
         }
         // Имя файла должно иметь расширение (хотя бы .mp3, .wav, .ogg и т.п.)
         if (!/\.[a-z0-9]{2,5}$/i.test(name)) {
@@ -4088,14 +4097,17 @@ function open(config) {
     // Кэшированный content.audio_or_shared НИКОГДА не перезаписывает config,
     // потому что может содержать устаревшее/повреждённое значение из предыдущих сессий.
     if (audioUserSharedFromConfig) {
-      state.config.audio_user_shared = audioUserSharedFromConfig;
-      state._sharedAudioFilename = audioUserSharedFromConfig;
-      state.content.audio_or_shared = audioUserSharedFromConfig;
-      console.log('[dictationEditorModal] [TRACE] open(): _sharedAudioFilename из config: ' + audioUserSharedFromConfig);
+      // Нормализуем на случай старых данных с пробелами в имени
+      var normalized = audioUserSharedFromConfig.replace(/\s+/g, '_');
+      state.config.audio_user_shared = normalized;
+      state._sharedAudioFilename = normalized;
+      state.content.audio_or_shared = normalized;
+      console.log('[dictationEditorModal] [TRACE] open(): _sharedAudioFilename из config: ' + normalized + (normalized !== audioUserSharedFromConfig ? ' (было: ' + audioUserSharedFromConfig + ')' : ''));
     } else if (state.content.audio_or_shared) {
-      state.config.audio_user_shared = state.content.audio_or_shared;
-      state._sharedAudioFilename = state.content.audio_or_shared;
-      console.log('[dictationEditorModal] [TRACE] open(): _sharedAudioFilename из кэша: ' + state.content.audio_or_shared);
+      var normalized2 = state.content.audio_or_shared.replace(/\s+/g, '_');
+      state.config.audio_user_shared = normalized2;
+      state._sharedAudioFilename = normalized2;
+      console.log('[dictationEditorModal] [TRACE] open(): _sharedAudioFilename из кэша: ' + normalized2 + (normalized2 !== state.content.audio_or_shared ? ' (было: ' + state.content.audio_or_shared + ')' : ''));
     } else {
       state.content.audio_or_shared = null;
       console.log('[dictationEditorModal] [TRACE] open(): _sharedAudioFilename сброшен (нет ни в config, ни в кэше)');
