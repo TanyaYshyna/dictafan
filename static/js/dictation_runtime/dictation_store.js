@@ -614,6 +614,22 @@
       this._contents.clear();
     }
 
+    /** Удаляет мутированный контент при выходе без сохранения (discard). */
+    discardContent(dictationId) {
+      if (!dictationId) return;
+      this._contents.delete(dictationId);
+      // Удаляем связанные сессии
+      const keysToRemove = [];
+      for (const [key, session] of this._sessions) {
+        if (session.dictationId === dictationId) {
+          keysToRemove.push(key);
+        }
+      }
+      for (const k of keysToRemove) {
+        this._sessions.delete(k);
+      }
+    }
+
     _evictIfNeeded(incomingCount) {
       if (this._sessions.size + incomingCount <= this._maxSessions) return;
       const entries = Array.from(this._sessions.entries())
