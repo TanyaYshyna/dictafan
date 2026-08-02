@@ -5646,46 +5646,44 @@ window.NewDictationFillModal = {
           } catch (e) {
             console.warn('[NewDictationFillModal] generateAudioForSentence error:', e);
           }
+        }
 
-          // Генерируем аудио для перевода (если есть текст перевода)
-          if (trText) {
-            try {
-              console.log('[NewDictationFillModal] generating audio for translation:', key, { langTr, trText: trText.slice(0, 50) });
-              var genTrResp = await fetch('/generate_audio', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  dictation_id: dictationId,
-                  text: trText,
-                  language: langTr,
-                  filename_audio: 'tts_' + key + '_' + Date.now() + '.mp3',
-                  tipe_audio: 'avto',
-                  safe_email: safeEmail,
-                })
-              });
-              var genTrData = await genTrResp.json();
-              if (genTrData.success && genTrData.audio_b64) {
-                var binaryStrTr = atob(genTrData.audio_b64);
-                var bytesTr = new Uint8Array(binaryStrTr.length);
-                for (var j2 = 0; j2 < binaryStrTr.length; j2++) {
-                  bytesTr[j2] = binaryStrTr.charCodeAt(j2);
-                }
-                var blobTr = new Blob([bytesTr], { type: genTrData.mime || 'audio/mpeg' });
-                var newFilenameTr = genTrData.filename || ('tts_' + key + '_' + Date.now() + '.mp3');
-                var am2 = _ensureAudioManager();
-                if (am2 && typeof am2.saveDictationAudioBlob === 'function') {
-                  var savedKeyTr = await am2.saveDictationAudioBlob(dictationId, langTr, newFilenameTr, blobTr, genTrData.mime || 'audio/mpeg');
-                  // saveDictationAudioBlob() сама создаёт blob URL в _objectUrlByCanonicalUrl,
-                  // так что _handleAudioPlayback() сможет найти аудио без поиска в CacheStorage.
-                }
-                audioTr = newFilenameTr;
-                console.log('[NewDictationFillModal] generated audio for translation:', key, audioTr);
-              } else {
-                console.warn('[NewDictationFillModal] generate_audio API error for translation:', genTrData.error);
+        // Генерируем аудио для перевода (всегда, независимо от voiceMode)
+        if (trText && dictationId) {
+          try {
+            console.log('[NewDictationFillModal] generating audio for translation:', key, { langTr, trText: trText.slice(0, 50) });
+            var genTrResp = await fetch('/generate_audio', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                dictation_id: dictationId,
+                text: trText,
+                language: langTr,
+                filename_audio: 'tts_' + key + '_' + Date.now() + '.mp3',
+                tipe_audio: 'avto',
+                safe_email: safeEmail,
+              })
+            });
+            var genTrData = await genTrResp.json();
+            if (genTrData.success && genTrData.audio_b64) {
+              var binaryStrTr = atob(genTrData.audio_b64);
+              var bytesTr = new Uint8Array(binaryStrTr.length);
+              for (var j2 = 0; j2 < binaryStrTr.length; j2++) {
+                bytesTr[j2] = binaryStrTr.charCodeAt(j2);
               }
-            } catch (e) {
-              console.warn('[NewDictationFillModal] generateAudioForSentence translation error:', e);
+              var blobTr = new Blob([bytesTr], { type: genTrData.mime || 'audio/mpeg' });
+              var newFilenameTr = genTrData.filename || ('tts_' + key + '_' + Date.now() + '.mp3');
+              var am2 = _ensureAudioManager();
+              if (am2 && typeof am2.saveDictationAudioBlob === 'function') {
+                var savedKeyTr = await am2.saveDictationAudioBlob(dictationId, langTr, newFilenameTr, blobTr, genTrData.mime || 'audio/mpeg');
+              }
+              audioTr = newFilenameTr;
+              console.log('[NewDictationFillModal] generated audio for translation:', key, audioTr);
+            } else {
+              console.warn('[NewDictationFillModal] generate_audio API error for translation:', genTrData.error);
             }
+          } catch (e) {
+            console.warn('[NewDictationFillModal] generateAudioForSentence translation error:', e);
           }
         }
 
