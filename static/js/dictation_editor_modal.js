@@ -2955,6 +2955,8 @@ function _initAutoAudioTab() {
 }
 
 function _uploadSharedAudioFile(file) {
+  console.log('[dictationEditorModal] [TRACE] _uploadSharedAudioFile: file.name=' + file.name + ' _sharedAudioFilename_до=' + state._sharedAudioFilename);
+
   // Освобождаем старый blob URL, если был
   if (state._sharedAudioUrl && state._sharedAudioUrl.startsWith('blob:')) {
     URL.revokeObjectURL(state._sharedAudioUrl);
@@ -2974,6 +2976,11 @@ function _uploadSharedAudioFile(file) {
   // Сохраняем File объект для отправки на сервер при split
   state._sharedAudioFile = file;
 
+  // НЕМЕДЛЕННО сохраняем имя файла, не дожидаясь loadedmetadata!
+  // Иначе если loadedmetadata задержится, сохранение уйдёт со старым именем.
+  state._sharedAudioFilename = file.name;
+  console.log('[dictationEditorModal] [TRACE] _uploadSharedAudioFile: _sharedAudioFilename сразу=' + state._sharedAudioFilename);
+
   // Обновляем название файла в панели над волной
   var filenameEl = document.getElementById('editorModalWaveformFilename');
   if (filenameEl) {
@@ -2982,8 +2989,8 @@ function _uploadSharedAudioFile(file) {
 
   audio.addEventListener('loadedmetadata', function () {
     var duration = audio.duration;
-    state._sharedAudioFilename = file.name;
     state._sharedAudioDuration = duration;
+    console.log('[dictationEditorModal] [TRACE] _uploadSharedAudioFile loadedmetadata: duration=' + duration + ' _sharedAudioFilename=' + state._sharedAudioFilename);
 
     // Инициализируем волну
     _initWaveform(audioUrl);
@@ -2997,6 +3004,7 @@ function _uploadSharedAudioFile(file) {
     // Помечаем, что есть несохранённые изменения:
     // db: true — имя файла нужно сохранить в БД (колонка audio_user_shared)
     // audio: true — сам аудиофайл нужно загрузить в B2
+    console.log('[dictationEditorModal] [TRACE] _uploadSharedAudioFile: выставляю dirty db+audio');
     _setDirtyFlags({ db: true, audio: true });
 
     // Сохраняем файл в CacheStorage, чтобы _uploadDraftAudioToB2() мог его найти
@@ -3460,6 +3468,7 @@ function _setupTabs() {
       // Ленивая инициализация волны — только при первом открытии закладки
       if (tabName === 'voice-original-have' && !state._waveformInitialized) {
         state._waveformInitialized = true;
+        console.log('[dictationEditorModal] [TRACE] _setupTabs: lazy wave init, _sharedAudioFilename=' + state._sharedAudioFilename + ' config.audio_user_shared=' + (state.config && state.config.audio_user_shared));
         _restoreSharedAudioFromSentences().then(function () {
           // После восстановления волны — синхронизируем регионы для первой строки
           var wf = window.editorModalWaveform;
@@ -3688,6 +3697,8 @@ async function _handleSave() {
       book_id: targetBookId,
       cover_b64: cover_b64,
     };
+
+    console.log('[dictationEditorModal] [TRACE] _handleSave: audio_user_shared=' + saveData.audio_user_shared + ' _sharedAudioFilename=' + state._sharedAudioFilename + ' dirty.db=' + flags.db + ' dirty.audio=' + flags.audio);
 
     // Если есть shared audio filename, но db флаг не стоит — всё равно помечаем db dirty,
     // чтобы audio_user_shared гарантированно сохранился в БД
@@ -3988,6 +3999,7 @@ function open(config) {
   }
 
   console.log('[dictationEditorModal] open() config:', JSON.stringify(state.config));
+  console.log('[dictationEditorModal] [TRACE] open(): config.audio_user_shared=' + (config && config.audio_user_shared));
   state.isOpen = true;
   state.dirtyFlags = { db: false, audio: false, cover: false };
 
@@ -3997,6 +4009,7 @@ function open(config) {
   state.editorMode = (config && config.isNewDictation) ? 'fill' : 'append';
 
   // Сбрасываем shared audio состояние
+  console.log('[dictationEditorModal] [TRACE] open(): сбрасываю _sharedAudioFilename (было=' + state._sharedAudioFilename + ')');
   state._sharedAudioFilename = null;
   state._sharedAudioUrl = null;
   state._sharedAudioDuration = null;
@@ -4052,6 +4065,7 @@ function open(config) {
   var audioUserSharedFromConfig = config.audio_user_shared || null;
 
   var store = _getEditorRuntimeStore();
+  console.log('[dictationEditorModal] [TRACE] open(): кэш content.audio_or_shared=' + (store ? store.getOrCreateContent({dictationId: dictationId}).audio_or_shared : 'N/A') + ' config.audio_user_shared=' + audioUserSharedFromConfig);
   if (store) {
     // Используем DictationSessionsStore — он сам кеширует content через _contents Map
     state.content = store.getOrCreateContent({ dictationId: dictationId });
@@ -4070,12 +4084,21 @@ function open(config) {
       // Если в content нет audio_or_order, но есть в config — сохраняем в content
       state.content.audio_or_order = audioOrderFromConfig;
     }
-    // Аналогично для audio_or_shared
-    if (state.content.audio_or_shared) {
+    // ВАЖНО: config.audio_user_shared — источник истины (с сервера/свежего кэша dictation_kart).
+    // Кэшированный content.audio_or_shared НИКОГДА не перезаписывает config,
+    // потому что может содержать устаревшее/повреждённое значение из предыдущих сессий.
+    if (audioUserSharedFromConfig) {
+      state.config.audio_user_shared = audioUserSharedFromConfig;
+      state._sharedAudioFilename = audioUserSharedFromConfig;
+      state.content.audio_or_shared = audioUserSharedFromConfig;
+      console.log('[dictationEditorModal] [TRACE] open(): _sharedAudioFilename из config: ' + audioUserSharedFromConfig);
+    } else if (state.content.audio_or_shared) {
       state.config.audio_user_shared = state.content.audio_or_shared;
       state._sharedAudioFilename = state.content.audio_or_shared;
-    } else if (audioUserSharedFromConfig) {
-      state.content.audio_or_shared = audioUserSharedFromConfig;
+      console.log('[dictationEditorModal] [TRACE] open(): _sharedAudioFilename из кэша: ' + state.content.audio_or_shared);
+    } else {
+      state.content.audio_or_shared = null;
+      console.log('[dictationEditorModal] [TRACE] open(): _sharedAudioFilename сброшен (нет ни в config, ни в кэше)');
     }
   } else if (typeof DictationContent !== 'undefined') {
     // Создаём DictationContent напрямую (без хранилища)
@@ -4270,10 +4293,13 @@ function open(config) {
  * Если audio_user_shared пустой — ничего не показывает.
  */
 async function _restoreSharedAudioFromSentences() {
+  console.log('[dictationEditorModal] [TRACE] _restoreSharedAudioFromSentences: начало, content=' + !!state.content + ' config.audio_user_shared=' + (state.config && state.config.audio_user_shared) + ' _sharedAudioFilename=' + state._sharedAudioFilename);
+
   if (!state.content) return;
 
   // Берём имя shared audio файла из config (сохранён в БД как audio_user_shared)
   var sharedFilename = state.config?.audio_user_shared || state._sharedAudioFilename;
+  console.log('[dictationEditorModal] [TRACE] _restoreSharedAudioFromSentences: sharedFilename=' + sharedFilename);
   if (!sharedFilename) {
     // Нет shared audio — ничего не показываем, не лезем в строки
     return;
