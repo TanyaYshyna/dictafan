@@ -473,7 +473,7 @@
 <div id="addRowModal" class="modal-overlay" style="display:none;">
   <div class="modal-content add-row-modal__content">
     <div class="add-row-modal__header">
-      <span>Добавить строку</span>
+      <span class="add-row-modal__title">Добавить строку</span>
       <span id="addRowModalCodeDisplay" class="add-row-modal__code-badge"></span>
       <button type="button" id="addRowModalCloseBtn" class="btn-close">
         <i data-lucide="x"></i>
@@ -502,17 +502,19 @@
     </div>
     <div class="add-row-modal__footer">
       <div class="add-row-modal__position-toggle">
-        <span>Вставить:</span>
-        <label class="add-row-modal__position-radio">
-          <input type="radio" name="addRowPosition" value="above" />
-          <span>Выше</span>
-        </label>
-        <label class="add-row-modal__position-radio">
-          <input type="radio" name="addRowPosition" value="below" checked />
-          <span>Ниже</span>
-        </label>
+        <span class="add-row-modal__position-label">Вставить:</span>
+        <div class="add-row-modal__position-options">
+          <label class="add-row-modal__position-radio">
+            <input type="radio" name="addRowPosition" value="above" />
+            <span>Выше</span>
+          </label>
+          <label class="add-row-modal__position-radio">
+            <input type="radio" name="addRowPosition" value="below" checked />
+            <span>Ниже</span>
+          </label>
+        </div>
       </div>
-      <button type="button" id="addRowModalCreateBtn" class="btn btn-primary add-row-modal__create-btn">Создать</button>
+      <button type="button" id="addRowModalCreateBtn" class="add-row-modal__create-btn">Создать</button>
     </div>
   </div>
 </div>
