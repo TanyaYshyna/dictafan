@@ -1446,23 +1446,28 @@ function _getLangDisplayName(lang) {
   return lang;
 }
 
-/** Автоперевод всех пустых полей перевода по тексту оригинала */
+/** Автоперевод всех пустых полей перевода по тексту оригинала (фоновый, не ждёт) */
 function _autoFillTranslations(origText) {
+  _autoFillTranslationsAsync(origText);
+}
+
+/** Автоперевод всех пустых полей перевода — возвращает Promise, ждёт все fetch */
+async function _autoFillTranslationsAsync(origText, origLangOverride) {
   if (!origText) return;
-  var origLang = state.config ? state.config.originalLanguage : '';
+  var origLang = origLangOverride || (state.config ? state.config.originalLanguage : '');
   if (!origLang) return;
   var rows = document.querySelectorAll('#addRowModalTranslationsTable tbody tr');
+  var promises = [];
   rows.forEach(function (row) {
     var input = row.querySelector('input[type="text"]');
     if (!input) return;
     var lang = input.dataset.lang;
     if (!lang) return;
     var currentText = input.value.trim();
-    // Заполняем только если поле ещё пустое
     if (currentText) return;
     input.placeholder = 'Переклад...';
     input.disabled = true;
-    fetch('/translate', {
+    var p = fetch('/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1483,7 +1488,9 @@ function _autoFillTranslations(origText) {
         input.disabled = false;
         input.placeholder = 'Перевод...';
       });
+    promises.push(p);
   });
+  await Promise.all(promises);
 }
 
 function _openAddRowModal(position) {
@@ -1596,7 +1603,7 @@ function _recalcPositions() {
   });
 }
 
-function _handleAddRowCreate() {
+async function _handleAddRowCreate() {
   var modal = document.getElementById('addRowModal');
   if (!modal) return;
 
@@ -1606,7 +1613,16 @@ function _handleAddRowCreate() {
   var origInput = document.getElementById('addRowModalOrigInput');
   var origText = origInput ? origInput.value.trim() : '';
 
-  // Собираем переводы
+  var langBlocks = state.content.langBlocks;
+  if (!langBlocks || langBlocks.length === 0) return;
+
+  var origBlock = langBlocks[0];
+  var origLang = origBlock.lang;
+
+  // Дожидаемся автоперевода всех пустых полей
+  await _autoFillTranslationsAsync(origText, origLang);
+
+  // Собираем переводы (уже заполненные)
   var translations = {};
   var translationInputs = document.querySelectorAll('#addRowModalTranslationsTable tbody input[type="text"]');
   translationInputs.forEach(function (input) {
@@ -1617,11 +1633,7 @@ function _handleAddRowCreate() {
     }
   });
 
-  var langBlocks = state.content.langBlocks;
-  if (!langBlocks || langBlocks.length === 0) return;
-
   // Определяем индекс вставки относительно выделенной строки
-  var origBlock = langBlocks[0];
   var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
   var selectedKey = selectedRow ? selectedRow.dataset.key : '';
   var positionRadio = document.querySelector('input[name="addRowPosition"]:checked');
@@ -1648,8 +1660,8 @@ function _handleAddRowCreate() {
       audio: '',
       audio_file: null,
       audio_mic: null,
-      start: '',
-      end: '',
+      start: '0',
+      end: '0',
       checked: false,
       explanation: '',
     };
@@ -1666,17 +1678,19 @@ function _handleAddRowCreate() {
   var dictationId = state.config ? state.config.dictationId : '';
 
   if (voiceMode === 'auto' && origText && dictationId) {
-    _generateAudioForSentence(freeKey, langBlocks[0].lang, origText, dictationId);
+    await _generateAudioForSentence(freeKey, langBlocks[0].lang, origText, dictationId);
   }
 
-  // Для переводов генерируем аудио всегда (как при начальном заполнении)
+  // Для переводов — последовательный await
   if (dictationId) {
-    Object.keys(translations).forEach(function (lang) {
-      var trText = translations[lang];
+    var langKeys = Object.keys(translations);
+    for (var k = 0; k < langKeys.length; k++) {
+      var langKey = langKeys[k];
+      var trText = translations[langKey];
       if (trText) {
-        _generateAudioForSentence(freeKey, lang, trText, dictationId);
+        await _generateAudioForSentence(freeKey, langKey, trText, dictationId);
       }
-    });
+    }
   }
 
   _closeAddRowModal();
