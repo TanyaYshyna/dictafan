@@ -3263,6 +3263,9 @@ function _initWaveform(audioUrl) {
       var endInput = document.getElementById('editorModalAudioEndTime');
       if (startInput) startInput.value = region.start.toFixed(2);
       if (endInput) endInput.value = region.end.toFixed(2);
+      // Синхронизируем с моделью предложения (start/end), чтобы _handleCutAudioForSentence видел актуальные значения
+      _syncStartEndToSentence('start', region.start.toFixed(2));
+      _syncStartEndToSentence('end', region.end.toFixed(2));
     });
 
     // Возвращаем промис, который резолвится после полной загрузки аудио.
@@ -4526,6 +4529,16 @@ async function _restoreSharedAudioFromSentences() {
       await _initWaveform(playableUrl);
       state._sharedAudioUrl = playableUrl;
       state._sharedAudioFilename = sharedFilename;
+      // Восстанавливаем File-объект из кэша для _handleCutAudioForSentence
+      try {
+        var resp = await fetch(playableUrl);
+        if (resp.ok) {
+          var blob = await resp.blob();
+          state._sharedAudioFile = new File([blob], sharedFilename, { type: blob.type || 'audio/mpeg' });
+        }
+      } catch (e) {
+        console.warn('[dictationEditorModal] Could not restore File object from cached audio', e);
+      }
       return;
     }
   } catch (e) {
@@ -4545,6 +4558,16 @@ async function _restoreSharedAudioFromSentences() {
       await _initWaveform(directUrl);
       state._sharedAudioUrl = directUrl;
       state._sharedAudioFilename = sharedFilename;
+      // Восстанавливаем File-объект для _handleCutAudioForSentence
+      try {
+        var resp = await fetch(directUrl);
+        if (resp.ok) {
+          var blob = await resp.blob();
+          state._sharedAudioFile = new File([blob], sharedFilename, { type: blob.type || 'audio/mpeg' });
+        }
+      } catch (e) {
+        console.warn('[dictationEditorModal] Could not restore File object from direct URL', e);
+      }
       restored = true;
       console.log('[dictationEditorModal] Shared audio восстановлен через прямой URL:', directUrl);
     }
