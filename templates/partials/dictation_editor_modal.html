@@ -505,12 +505,20 @@
         <span class="add-row-modal__position-label">Вставить:</span>
         <div class="add-row-modal__position-options">
           <label class="add-row-modal__position-radio">
+            <input type="radio" name="addRowPosition" value="start" />
+            <span>Начало строки</span>
+          </label>
+          <label class="add-row-modal__position-radio">
             <input type="radio" name="addRowPosition" value="above" />
-            <span>Выше</span>
+            <span>Выше текущей строки</span>
           </label>
           <label class="add-row-modal__position-radio">
             <input type="radio" name="addRowPosition" value="below" checked />
-            <span>Ниже</span>
+            <span>Ниже текущей строки</span>
+          </label>
+          <label class="add-row-modal__position-radio">
+            <input type="radio" name="addRowPosition" value="end" />
+            <span>Конец строки</span>
           </label>
         </div>
       </div>

@@ -1580,10 +1580,20 @@ function _openAddRowModal(position) {
   if (origInput) origInput.value = '';
 
   // Сохраняем позицию и свободный ключ в dataset модалки
-  modal.dataset.position = position || 'below';
+  var effectivePosition = position || 'below';
+  modal.dataset.position = effectivePosition;
   modal.dataset.freeKey = freeKey;
 
+  // Предвыбираем соответствующую радио-кнопку
+  var positionRadio = document.querySelector('input[name="addRowPosition"][value="' + effectivePosition + '"]');
+  if (positionRadio) positionRadio.checked = true;
+
   modal.style.display = 'flex';
+
+  // Устанавливаем фокус на поле ввода оригинала
+  setTimeout(function () {
+    if (origInput) origInput.focus();
+  }, 50);
 }
 
 function _closeAddRowModal() {
@@ -1639,13 +1649,21 @@ async function _handleAddRowCreate() {
   var positionRadio = document.querySelector('input[name="addRowPosition"]:checked');
   var position = positionRadio ? positionRadio.value : 'below';
 
-  var insertIndex = origBlock.sentences.length; // по умолчанию в конец
+  var insertIndex;
 
-  if (selectedKey) {
-    for (var i = 0; i < origBlock.sentences.length; i++) {
-      if (origBlock.sentences[i].key === selectedKey) {
-        insertIndex = (position === 'above') ? i : (i + 1);
-        break;
+  if (position === 'start') {
+    insertIndex = 0;
+  } else if (position === 'end') {
+    insertIndex = origBlock.sentences.length;
+  } else {
+    // above / below — всегда есть выделенная строка
+    insertIndex = origBlock.sentences.length; // fallback
+    if (selectedKey) {
+      for (var i = 0; i < origBlock.sentences.length; i++) {
+        if (origBlock.sentences[i].key === selectedKey) {
+          insertIndex = (position === 'above') ? i : (i + 1);
+          break;
+        }
       }
     }
   }
