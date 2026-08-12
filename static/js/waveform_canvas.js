@@ -794,14 +794,14 @@ class WaveformCanvas {
             this.ctx.fill();
         }
 
-        // Символ < или > на маркере (белым цветом, по центру)
-        this.ctx.fillStyle = '#ffffff';
+        // Символ < или > в нижней части маркера (тем же цветом, что и три точки)
+        this.ctx.fillStyle = this.getCSSVariable('--color-waveform-marker-dots');
         this.ctx.font = 'bold 11px monospace';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
         var symbol = (type === 'start') ? '<' : '>';
-        // Рисуем символ чуть ниже трёх точек (на 8px ниже центра)
-        this.ctx.fillText(symbol, x, centerY + dotSpacing * 2);
+        // Рисуем символ в нижней части ручки (на 6px выше нижнего края)
+        this.ctx.fillText(symbol, x, rectY + rectH - 10);
     }
 
     /**
