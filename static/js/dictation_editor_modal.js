@@ -1650,6 +1650,26 @@ async function _handleAddRowCreate() {
     }
   }
 
+  // Вычисляем start = конец предыдущей строки, end = длительность общего аудиофайла
+  var newStart = '0';
+  var newEnd = '0';
+  if (insertIndex > 0 && origBlock.sentences[insertIndex - 1]) {
+    var prevEnd = parseFloat(origBlock.sentences[insertIndex - 1].end);
+    if (!isNaN(prevEnd)) {
+      newStart = prevEnd.toFixed(2);
+    }
+  }
+  // Длительность аудиофайла
+  if (state._sharedAudioDuration && state._sharedAudioDuration > 0) {
+    newEnd = state._sharedAudioDuration.toFixed(2);
+  } else {
+    var wf = window.editorModalWaveform;
+    if (wf && typeof wf.getDuration === 'function') {
+      var dur = wf.getDuration();
+      if (dur > 0) newEnd = dur.toFixed(2);
+    }
+  }
+
   // Создаём новое предложение для каждого языкового блока
   langBlocks.forEach(function (block) {
     var isOrig = (block === langBlocks[0]);
@@ -1660,8 +1680,8 @@ async function _handleAddRowCreate() {
       audio: '',
       audio_file: null,
       audio_mic: null,
-      start: '0',
-      end: '0',
+      start: newStart,
+      end: newEnd,
       checked: false,
       explanation: '',
     };
@@ -3161,8 +3181,13 @@ function _uploadSharedAudioFile(file) {
     state._sharedAudioDuration = duration;
     console.log('[dictationEditorModal] [TRACE] _uploadSharedAudioFile loadedmetadata: duration=' + duration + ' _sharedAudioFilename=' + state._sharedAudioFilename);
 
-    // Инициализируем волну
-    _initWaveform(audioUrl);
+    // Инициализируем волну и устанавливаем регион на весь файл
+    _initWaveform(audioUrl).then(function () {
+      var wf = window.editorModalWaveform;
+      if (wf) {
+        wf.setRegion(0, duration);
+      }
+    });
 
     // Устанавливаем start/end на весь файл
     var startInput = document.getElementById('editorModalAudioStartTime');
@@ -3269,11 +3294,10 @@ function _initWaveform(audioUrl) {
     });
 
     // Возвращаем промис, который резолвится после полной загрузки аудио.
-    // Регион по умолчанию (0, duration) устанавливается внутри loadAudio,
-    // но вызывающий код может переопределить его в своём .then().
+    // НЕ устанавливаем регион по умолчанию — это делается только в _uploadSharedAudioFile
+    // (при загрузке нового файла) и в _selectSentenceRow (при выборе строки).
     return wf.loadAudio(audioUrl).then(function () {
-      var duration = wf.getDuration();
-      wf.setRegion(0, duration);
+      // Регион не трогаем — он будет установлен вызывающим кодом
     }).catch(function (err) {
       console.warn('[dictationEditorModal] Waveform load error', err);
     });

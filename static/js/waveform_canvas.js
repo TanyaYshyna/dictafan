@@ -45,7 +45,7 @@ class WaveformCanvas {
             waveColor: this.getCSSVariable('--color-waveform-wave-inside'),
             // regionColor: this.getCSSVariable('--color-waveform-region-overlay'),
             startMarkerColor: this.getCSSVariable('--color-waveform-marker'),
-            endMarkerColor: this.getCSSVariable('--color-waveform-marker'),
+            endMarkerColor: this.getCSSVariable('--color-panel-text-purple') || this.getCSSVariable('--color-waveform-marker'),
             playheadColor: this.getCSSVariable('--color-waveform-playhead'),
             backgroundColor: this.getCSSVariable('--color-waveform-bg-inside'),
             panelBgColor: this.getCSSVariable('--color-waveform-bg-outside'),
@@ -793,6 +793,15 @@ class WaveformCanvas {
             this.ctx.arc(x, dotY, dotSize, 0, Math.PI * 2);
             this.ctx.fill();
         }
+
+        // Символ < или > на маркере (белым цветом, по центру)
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = 'bold 11px monospace';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        var symbol = (type === 'start') ? '<' : '>';
+        // Рисуем символ чуть ниже трёх точек (на 8px ниже центра)
+        this.ctx.fillText(symbol, x, centerY + dotSpacing * 2);
     }
 
     /**
