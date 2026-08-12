@@ -3298,7 +3298,8 @@ function _syncWaveformRegion(field, value) {
 
 /**
  * Синхронизирует значение поля Start/End под волной с менеджером данных (state.content)
- * и с лейблами в таблице. Если у предложения есть audio_file, меняет кнопку f на молоточек.
+ * и с лейблами в таблице. Если значение региона действительно изменилось и у предложения
+ * есть audio_file/audio — меняет соответствующую кнопку на молоточек.
  */
 function _syncStartEndToSentence(field, value) {
   var table = document.getElementById(EDITOR_TABLE_ID);
@@ -3312,8 +3313,16 @@ function _syncStartEndToSentence(field, value) {
   var sentence = state.content.getSentence(key);
   if (!sentence) return;
 
-  // Обновляем данные в менеджере
   var strVal = (typeof value === 'number') ? value.toFixed(2) : String(value);
+
+  // Проверяем, действительно ли значение изменилось (сравниваем как числа,
+  // чтобы '0' и '0.00' считались одинаковыми)
+  var oldVal = (field === 'start') ? sentence.start : sentence.end;
+  var oldNum = parseFloat(oldVal);
+  var newNum = parseFloat(strVal);
+  var changed = isNaN(oldNum) || isNaN(newNum) ? (String(oldVal) !== strVal) : (Math.abs(oldNum - newNum) > 0.001);
+
+  // Обновляем данные в менеджере
   if (field === 'start') {
     sentence.start = strVal;
   } else if (field === 'end') {
@@ -3325,6 +3334,9 @@ function _syncStartEndToSentence(field, value) {
   var endLabel = selectedRow.querySelector('.col-end .time-label');
   if (startLabel) startLabel.textContent = sentence.start;
   if (endLabel) endLabel.textContent = sentence.end;
+
+  // Только если значение действительно изменилось — инвалидируем аудио
+  if (!changed) return;
 
   // Если у предложения есть audio_file — меняем кнопку f на молоточек (creating)
   if (sentence.audio_file) {
