@@ -1067,6 +1067,17 @@
   color: var(--color-button-text-yellow, #f9c609);
 }
 
+/* Спиннер загрузки (loader-2) в аудио-кнопках таблицы */
+.dictation-editor-modal__sentences-table .audio-btn i[data-lucide="loader-2"],
+.dictation-editor-modal__sentences-table .audio-btn svg.lucide-loader-2 {
+  animation: dictation-editor-modal-spin 1s linear infinite;
+}
+
+@keyframes dictation-editor-modal-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Поля ввода в таблице */
 .dictation-editor-modal__sentences-table td.col-original,
 .dictation-editor-modal__sentences-table td.col-translation,
