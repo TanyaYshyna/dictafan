@@ -486,18 +486,20 @@
       </div>
       <div class="add-row-modal__translations-section">
         <label>Переводы:</label>
-        <table id="addRowModalTranslationsTable">
-          <thead>
-            <tr>
-              <th class="add-row-modal__col-flag"></th>
-              <th class="add-row-modal__col-lang">Язык</th>
-              <th class="add-row-modal__col-text">Перевод</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Строки через JS -->
-          </tbody>
-        </table>
+        <div class="add-row-modal__translations-panel">
+          <table id="addRowModalTranslationsTable">
+            <thead>
+              <tr>
+                <th class="add-row-modal__col-flag"></th>
+                <th class="add-row-modal__col-lang">Язык</th>
+                <th class="add-row-modal__col-text">Перевод</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Строки через JS -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
     <div class="add-row-modal__footer">
@@ -506,7 +508,7 @@
         <div class="add-row-modal__position-options">
           <label class="add-row-modal__position-radio">
             <input type="radio" name="addRowPosition" value="start" />
-            <span>Начало строки</span>
+            <span>Начало списка</span>
           </label>
           <label class="add-row-modal__position-radio">
             <input type="radio" name="addRowPosition" value="above" />
@@ -518,7 +520,7 @@
           </label>
           <label class="add-row-modal__position-radio">
             <input type="radio" name="addRowPosition" value="end" />
-            <span>Конец строки</span>
+            <span>Конец списка</span>
           </label>
         </div>
       </div>
