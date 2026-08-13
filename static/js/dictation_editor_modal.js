@@ -241,6 +241,9 @@ function _setButtonState(button, stateStr) {
     case 'creating_mic':
       newIcon = 'mic';
       break;
+    case 'loading':
+      newIcon = 'loader-2';
+      break;
     default:
       newIcon = 'play';
   }
@@ -939,8 +942,8 @@ async function _handleHammerGenerateTts(button, key, lang, sentence) {
   var dictationId = state.config ? state.config.dictationId : '';
   if (!dictationId) return;
 
-  // Показываем состояние загрузки (две полоски = pause icon как loading indicator)
-  _setButtonState(button, 'playing');
+  // Показываем состояние загрузки (кружок-спиннер)
+  _setButtonState(button, 'loading');
   button.disabled = true;
 
   var safeEmail = '';
@@ -1044,7 +1047,7 @@ async function _handleCutAudioForSentence(button, sentence, lang, field) {
   var dictationId = state.config ? state.config.dictationId : '';
   if (!dictationId) return;
 
-  _setButtonState(button, 'creating'); // Показываем молоток (загрузка)
+  _setButtonState(button, 'loading'); // Показываем спиннер (загрузка)
 
   try {
     // Читаем shared audio file как base64
