@@ -2078,9 +2078,37 @@
   letter-spacing: 0.5px;
 }
 
+.add-row-modal__translations-panel {
+  border: 1px solid var(--color-border-light, #e9ecef);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 96px;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+}
+
 #addRowModalTranslationsTable {
   width: 100%;
   border-collapse: collapse;
+}
+
+#addRowModalTranslationsTable thead {
+  flex-shrink: 0;
+}
+
+#addRowModalTranslationsTable tbody {
+  display: block;
+  overflow-y: auto;
+  min-height: 48px;
+  max-height: 180px;
+}
+
+#addRowModalTranslationsTable thead,
+#addRowModalTranslationsTable tbody tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
 }
 
 #addRowModalTranslationsTable th,
@@ -2129,7 +2157,7 @@
 .add-row-modal__footer {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   margin-top: 16px;
 }
 
@@ -2188,7 +2216,37 @@
 }
 
 .add-row-modal__position-radio input[type="radio"] {
-  accent-color: var(--color-button-text-yellow, rgb(255, 198, 9));
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border-light, #bbb);
+  border-radius: 50%;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: border-color 0.2s;
+  margin: 0;
+}
+
+.add-row-modal__position-radio input[type="radio"]:checked {
+  border-color: var(--color-button-text-yellow, #f9c609);
+}
+
+.add-row-modal__position-radio input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-button-text-yellow, #f9c609);
+  border-radius: 50%;
+}
+
+.add-row-modal__position-radio input[type="radio"]:hover {
+  border-color: var(--color-button-text-yellow, #f9c609);
 }
 
 /* ---- Код строки (бейдж в хедере) ---- */
