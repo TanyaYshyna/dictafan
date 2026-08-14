@@ -39,6 +39,10 @@
     _headerLangPairSelector: null,
     // Начальный язык перевода, вычисленный в renderModalLangPair (применяется к сессии после её создания)
     _initialTranslationLang: '',
+    // Ключ предложения, активного на момент начала аудиозаписи.
+    // Хранится в state, а не в замыкании панели, т.к. панель переиспользуется
+    // между диктантами (см. ensureSpeechPanel).
+    _recordingSentenceKey: null,
   };
 
   function startNewRewardCycle() {
@@ -3010,6 +3014,9 @@
     }
 
     const spendAndApply = async () => {
+      // Панель и обработчики coinExchange биндятся один раз и переиспользуются
+      // между диктантами, поэтому session из замыкания устаревает. Берём активную.
+      const session = window.__dictationModalActiveSession;
       const st = getCurrentSentenceStateFromSession(session);
       if (!st) return;
 
@@ -3683,19 +3690,26 @@
     // Захватывается в onRecordingStart, чтобы onRecognitionComplete
     // применялся к правильному предложению, даже если пользователь
     // переключился на другое во время записи.
-    // Храним в state, чтобы гарантированно сбрасывать при каждом вызове
-    // ensureSpeechPanel (даже если panel уже существует).
-    var _recordingSentenceKey = null;
+    // Храним в dictationModalState, чтобы гарантированно сбрасывать при каждом
+    // вызове ensureSpeechPanel (даже если panel уже существует). Замыкания ниже
+    // НЕ должны захватывать session — панель переиспользуется между диктантами.
+    try {
+      dictationModalState._recordingSentenceKey = null;
+    } catch (eResetKey) {
+    }
     if (!panel) {
       try {
         panel = new window.DictationSpeechRecognitionPanel({
         minMatchPercent: 80,
         onRecordingStart: function () {
+          // Берём активную сессию в момент вызова: панель переиспользуется
+          // между диктантами, поэтому захват session из замыкания устаревает.
+          var session = window.__dictationModalActiveSession;
           try {
             var _v = getCurrentSentenceViewFromSession(session);
-            _recordingSentenceKey = (_v && _v.key != null) ? String(_v.key) : null;
+            dictationModalState._recordingSentenceKey = (_v && _v.key != null) ? String(_v.key) : null;
           } catch (e) {
-            _recordingSentenceKey = null;
+            dictationModalState._recordingSentenceKey = null;
           }
           // При старте записи запускаем оба таймера:
           // - таймер аудио (30с) — проверяет аудио через 30 секунд
@@ -3710,8 +3724,16 @@
           // Сброс таймера бездействия происходит только от действий пользователя
           // через bindInactivityWatchers (keydown, mousemove и т.д.).
           clearAudioCheckTimer();
+          // Берём активную сессию в момент вызова. Панель переиспользуется между
+          // диктантами, и если захватывать session из замыкания, аудио будет
+          // засчитываться первому (уже завершённому) диктанту — отсюда ложное
+          // «Поздравляем, игра окончена» и незасчитанный микрофон.
+          var session = window.__dictationModalActiveSession;
+          if (!session) {
+            return;
+          }
           try {
-            var _key = _recordingSentenceKey;
+            var _key = dictationModalState._recordingSentenceKey;
             if (_key == null) {
               // fallback: если ключ не был захвачен, берём текущее предложение
               var _v = getCurrentSentenceViewFromSession(session);
