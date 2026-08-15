@@ -488,6 +488,28 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   margin-top: 6px;
 }
 
+#dictationModal #completionModal .modal-content {
+  position: relative;
+}
+
+#dictationModal #completionModal #multContainer {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 200px;
+  height: 200px;
+  background: transparent;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#dictationModal #completionModal #multCanvas {
+  width: 200px;
+  height: 200px;
+  display: block;
+  border-radius: 0;
+}
+
 #dictationModal #completionModal.modal {
   position: fixed;
   inset: 0;
