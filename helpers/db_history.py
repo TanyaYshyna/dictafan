@@ -1396,6 +1396,7 @@ def get_history_by_day_totals_for_date(user_id: int, target_date) -> dict:
         conn.close()
 
 
+
 def get_successes_sum_from_history_by_day(user_id: int, dictation_id: int, selected_sentence_positions=None) -> int:
     """Return total sum of successes from history_by_day for a user/dictation/positions."""
     conn = get_db_connection()
