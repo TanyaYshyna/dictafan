@@ -61,6 +61,17 @@
       });
     }
 
+    // Задать сетку кадров: cols × rows. Размер одного кадра вычисляется
+    // как naturalWidth/cols × naturalHeight/rows, а отображается всегда 200×200.
+    setGrid(cols, rows) {
+      const c = Math.floor(Number(cols));
+      const r = Math.floor(Number(rows));
+      this.cols = Number.isFinite(c) && c > 0 ? c : COLS;
+      this.rows = Number.isFinite(r) && r > 0 ? r : ROWS;
+      this.totalFrames = this.cols * this.rows;
+      this.frameHoldMs = this.cycleMs / this.totalFrames;
+    }
+
     clear() {
       if (this.ctx) this.ctx.clearRect(0, 0, this.frameSize, this.frameSize);
     }
@@ -74,15 +85,17 @@
 
     drawFrame(frameIndex) {
       if (!this.ctx) return;
-      const col = frameIndex % this.cols;
-      const row = Math.floor(frameIndex / this.cols);
-      const sx = col * this.frameSize;
-      const sy = row * this.frameSize;
       this.clear();
       if (!this._image) return;
+      const frameW = this._image.naturalWidth / this.cols;
+      const frameH = this._image.naturalHeight / this.rows;
+      const col = frameIndex % this.cols;
+      const row = Math.floor(frameIndex / this.cols);
+      const sx = col * frameW;
+      const sy = row * frameH;
       this.ctx.drawImage(
         this._image,
-        sx, sy, this.frameSize, this.frameSize,
+        sx, sy, frameW, frameH,
         0, 0, this.frameSize, this.frameSize,
       );
     }
@@ -206,6 +219,11 @@
       const fileInput = document.getElementById('multPreviewFile');
       if (fileInput) fileInput.addEventListener('change', () => this._loadPreviewFile());
 
+      const framesW = document.getElementById('multPreviewFramesW');
+      if (framesW) framesW.addEventListener('change', () => this._loadPreviewFile());
+      const framesH = document.getElementById('multPreviewFramesH');
+      if (framesH) framesH.addEventListener('change', () => this._loadPreviewFile());
+
       const playBtn = document.getElementById('multPreviewPlayBtn');
       if (playBtn) playBtn.addEventListener('click', () => this._togglePreviewPlay());
     },
@@ -224,6 +242,20 @@
       return idx;
     },
 
+    _readPreviewCols() {
+      const input = document.getElementById('multPreviewFramesW');
+      const raw = input ? Number(input.value) : NaN;
+      const val = Number.isFinite(raw) ? Math.floor(raw) : COLS;
+      return val > 0 ? val : COLS;
+    },
+
+    _readPreviewRows() {
+      const input = document.getElementById('multPreviewFramesH');
+      const raw = input ? Number(input.value) : NaN;
+      const val = Number.isFinite(raw) ? Math.floor(raw) : ROWS;
+      return val > 0 ? val : ROWS;
+    },
+
     _updatePreviewFilename() {
       const idx = this._readPreviewIndex();
       const filename = document.getElementById('multPreviewFilename');
@@ -237,6 +269,7 @@
 
       const player = this._getPreviewPlayer();
       player.stop(false);
+      player.setGrid(this._readPreviewCols(), this._readPreviewRows());
 
       let image = null;
       try {
