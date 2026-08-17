@@ -128,6 +128,15 @@
   padding-top: 4px;
 }
 
+/* Общая нижняя секция — видна всем пользователям */
+.tool-palette.tool-palette--desk .tool-palette-common {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+}
+
 /* Селектор языка в tool-palette — компактный, только флаг */
 .tool-palette.tool-palette--desk .tool-palette-lang-selector {
   position: relative;

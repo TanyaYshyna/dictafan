@@ -46,132 +46,11 @@
   };
 
   /**
-   * Проигрыватель мультфильма победы.
-   * Из изображения 800×400 (сетка 4×2 = 8 кадров по 200×200)
-   * вырезает и последовательно отображает кадры в canvas 200×200.
+   * Доступ к менеджеру мультфильмов победы (см. static/js/mult_manager.js).
+   * Проигрыватель вынесен в отдельный модуль window.MultManager.
    */
-  class MultPlayer {
-    constructor(canvasId) {
-      this.canvas = document.getElementById(canvasId);
-      this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
-      this.currentFrame = 0;
-      this.totalFrames = 8;
-      this.cols = 4;
-      this.rows = 2;
-      this.frameSize = 200;
-      this.imageWidth = 800;
-      this.imageHeight = 400;
-      this.fps = 12;
-      this.cycleMs = 5000;
-      this.isPlaying = false;
-      this._interval = null;
-      this._image = null;
-      this._tickMs = 1000 / this.fps;
-      this._frameHoldMs = this.cycleMs / this.totalFrames;
-    }
-
-    // Номер мультфильма от количества побед.
-    // 1-я победа -> 001.png, 2-я -> 002.png, 101-я -> снова 001.png.
-    getMultIndex(wins) {
-      const n = Math.floor(Number(wins) || 0);
-      if (n <= 0) return 1;
-      return ((n - 1) % 100) + 1;
-    }
-
-    getImagePath(multIndex) {
-      return `static/data/mult/${String(multIndex).padStart(3, '0')}.png`;
-    }
-
-    loadImage(path) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error(`Не удалось загрузить: ${path}`));
-        img.src = path;
-      });
-    }
-
-    drawFrame(frameIndex) {
-      if (!this.ctx) return;
-      const col = frameIndex % this.cols;
-      const row = Math.floor(frameIndex / this.cols);
-      const sx = col * this.frameSize;
-      const sy = row * this.frameSize;
-
-      this.ctx.clearRect(0, 0, 200, 200);
-      if (!this._image) return;
-      this.ctx.drawImage(
-        this._image,
-        sx, sy, this.frameSize, this.frameSize,
-        0, 0, 200, 200,
-      );
-    }
-
-    _drawPlaceholder() {
-      if (!this.ctx) return;
-      this.ctx.clearRect(0, 0, 200, 200);
-      this.ctx.fillStyle = '#f0f0f0';
-      this.ctx.fillRect(0, 0, 200, 200);
-    }
-
-    async play(wins) {
-      this.stop(false);
-      this.isPlaying = true;
-      this.currentFrame = 0;
-
-      const multIndex = this.getMultIndex(wins);
-      const path = this.getImagePath(multIndex);
-
-      let image = null;
-      try {
-        image = await this.loadImage(path);
-      } catch (e) {
-        // Если файла нет — показываем первый мультфильм.
-        try {
-          image = await this.loadImage(this.getImagePath(1));
-        } catch (e2) {
-          console.error('Ошибка загрузки мультфильма:', e2);
-          this._drawPlaceholder();
-          this.isPlaying = false;
-          return;
-        }
-      }
-
-      this._image = image;
-      this.drawFrame(0);
-
-      // Один цикл из 8 кадров занимает ~cycleMs (5 секунд),
-      // при этом перерисовка идёт с частотой fps (12 кадров/с).
-      // После окончания цикл повторяется до вызова stop().
-      let accumulated = 0;
-      this._interval = setInterval(() => {
-        if (!this.isPlaying) return;
-        accumulated += this._tickMs;
-        if (accumulated >= this._frameHoldMs) {
-          accumulated = 0;
-          this.currentFrame = (this.currentFrame + 1) % this.totalFrames;
-        }
-        this.drawFrame(this.currentFrame);
-      }, this._tickMs);
-    }
-
-    stop(clear = true) {
-      this.isPlaying = false;
-      if (this._interval) {
-        clearInterval(this._interval);
-        this._interval = null;
-      }
-      this._image = null;
-      if (clear && this.ctx) {
-        this.ctx.clearRect(0, 0, 200, 200);
-      }
-    }
-  }
-
-  let _multPlayer = null;
   function getMultPlayer() {
-    if (!_multPlayer) _multPlayer = new MultPlayer('multCanvas');
-    return _multPlayer;
+    return window.MultManager || null;
   }
 
   function startNewRewardCycle() {
@@ -709,7 +588,8 @@
     } catch (e) {
     }
     try {
-      if (_multPlayer) _multPlayer.stop(true);
+      const mgr = getMultPlayer();
+      if (mgr && typeof mgr.stop === 'function') mgr.stop('multCanvas');
     } catch (e) {
     }
   }
@@ -1088,8 +968,10 @@
     // Номер мультфильма определяется количеством побед, которое уже подсчитано
     // выше (completionCountAfter) до показа окна победы.
     try {
-      const player = getMultPlayer();
-      player.play(completionCountAfter);
+      const mgr = getMultPlayer();
+      if (mgr && typeof mgr.play === 'function') {
+        mgr.play('multCanvas', completionCountAfter);
+      }
     } catch (eMult) {
       console.error('[DM] Не удалось запустить мультфильм победы:', eMult);
     }

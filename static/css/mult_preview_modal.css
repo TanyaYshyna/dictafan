@@ -1,0 +1,69 @@
+/* mult-preview-modal: окно предпросмотра мультфильмов победы */
+
+#multPreviewModal .mult-preview-modal-content {
+  max-width: 520px;
+  width: 90%;
+}
+
+#multPreviewModal .mult-preview-body {
+  display: flex;
+  gap: 24px;
+  padding: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+#multPreviewModal .mult-preview-left {
+  flex: 0 0 auto;
+  width: 200px;
+  height: 200px;
+  background: #f0f0f0;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#multPreviewModal #multPreviewCanvas {
+  width: 200px;
+  height: 200px;
+  display: block;
+}
+
+#multPreviewModal .mult-preview-right {
+  flex: 1 1 200px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#multPreviewModal .mult-preview-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+}
+
+#multPreviewModal .mult-preview-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#multPreviewModal #multPreviewFile {
+  width: 120px;
+}
+
+#multPreviewModal .mult-preview-filename {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+  font-family: monospace;
+}
+
+#multPreviewModal #multPreviewPlayBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
