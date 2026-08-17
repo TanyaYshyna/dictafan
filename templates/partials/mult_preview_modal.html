@@ -1,0 +1,27 @@
+<!-- mult-preview-modal: окно предпросмотра мультфильмов победы -->
+<div id="multPreviewModal" class="modal" style="display: none;">
+  <div class="modal-content mult-preview-modal-content">
+    <div class="modal-header">
+      <h2>Просмотр мультфильмов</h2>
+      <button class="modal-close" id="multPreviewModalClose" title="Закрыть">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="mult-preview-body">
+      <div class="mult-preview-left">
+        <canvas id="multPreviewCanvas" width="200" height="200"></canvas>
+      </div>
+      <div class="mult-preview-right">
+        <label class="mult-preview-label" for="multPreviewFile">Файл PNG</label>
+        <div class="mult-preview-file-row">
+          <input type="number" id="multPreviewFile" class="text-input" min="1" max="100" value="1">
+          <span class="mult-preview-filename" id="multPreviewFilename">001.png</span>
+        </div>
+        <button id="multPreviewPlayBtn" type="button" class="button-color-yellow">
+          <i data-lucide="play" id="multPreviewPlayIcon"></i>
+          <span id="multPreviewPlayLabel">Проиграть</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

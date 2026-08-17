@@ -990,6 +990,17 @@ window.Desktop = window.Desktop || {
           return;
         }
 
+        if (action === 'desktop-mult-preview') {
+          try {
+            if (window.MultManager && typeof window.MultManager.openPreview === 'function') {
+              window.MultManager.openPreview();
+            }
+          } catch (e2) {
+            console.error('[desktop] mult preview error', e2);
+          }
+          return;
+        }
+
         if (action === 'desktop-recalc-history') {
           (async () => {
             try {

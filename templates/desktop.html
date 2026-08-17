@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="/static/css/language_selector.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/license_purchase_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/admin_license_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/mult_preview_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
 {% endblock %}
 
@@ -140,6 +141,12 @@
                     </div>
                 </div>
             </div>
+            <div class="tool-palette-common" id="desktopToolPaletteCommon">
+                <div class="tool-palette-separator"></div>
+                <button class="tool-palette-btn" type="button" data-action="desktop-mult-preview" title="Просмотр мультфильмов">
+                    <i data-lucide="film"></i>
+                </button>
+            </div>
         </div>
 
         <div class="desk-zone" id="desktopDeskZone">
@@ -170,6 +177,7 @@
 
     {% include 'partials/license_purchase_modal.html' %}
     {% include 'partials/admin_license_modal.html' %}
+    {% include 'partials/mult_preview_modal.html' %}
 {% endblock %}
 
 {% block scripts %}
@@ -219,5 +227,6 @@
     <script defer src="/static/js/statistics_report.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/license_purchase_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/admin_license_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/mult_manager.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop.js?v={{ app_cache_revision }}"></script>
 {% endblock %}
