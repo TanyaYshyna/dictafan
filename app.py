@@ -197,6 +197,7 @@ from routes.statistics import statistics_bp
 from routes.library import library_bp
 from routes.desk import desk_bp
 from routes.desktop import desktop_bp
+from routes.mult import mult_bp
 from routes.groups import groups_bp
 from routes.assignments import assignments_bp
 from routes.plan_tasks import plan_tasks_bp
@@ -210,6 +211,7 @@ app.register_blueprint(statistics_bp)
 app.register_blueprint(library_bp)
 app.register_blueprint(desk_bp)
 app.register_blueprint(desktop_bp)
+app.register_blueprint(mult_bp)
 app.register_blueprint(groups_bp)
 app.register_blueprint(assignments_bp)
 app.register_blueprint(plan_tasks_bp)

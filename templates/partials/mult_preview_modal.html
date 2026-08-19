@@ -12,11 +12,16 @@
         <canvas id="multPreviewCanvas" width="200" height="200"></canvas>
       </div>
       <div class="mult-preview-right">
-        <label class="mult-preview-label" for="multPreviewFile">Файл PNG</label>
+        <label class="mult-preview-label" for="multPreviewFile">Номер мультфильма</label>
         <div class="mult-preview-file-row">
           <input type="number" id="multPreviewFile" class="text-input" min="1" max="100" value="1">
-          <span class="mult-preview-filename" id="multPreviewFilename">001.png</span>
         </div>
+
+        <label class="mult-preview-label" for="multPreviewPng">Файл PNG</label>
+        <div class="mult-preview-file-row">
+          <input type="text" id="multPreviewPng" class="text-input" placeholder="001.png">
+        </div>
+
         <div class="mult-preview-frames-row">
           <div class="mult-preview-frames-field">
             <label class="mult-preview-label" for="multPreviewFramesW">Кадров в ширину</label>
@@ -27,10 +32,33 @@
             <input type="number" id="multPreviewFramesH" class="text-input" min="1" max="100" value="2">
           </div>
         </div>
-        <button id="multPreviewPlayBtn" type="button" class="button-color-yellow">
-          <i data-lucide="play" id="multPreviewPlayIcon"></i>
-          <span id="multPreviewPlayLabel">Проиграть</span>
-        </button>
+
+        <div class="mult-preview-speed-row">
+          <label class="mult-preview-label" for="multPreviewSpeed">Скорость</label>
+          <input type="range" id="multPreviewSpeed" class="mult-preview-speed" min="1" max="30" step="1" value="12">
+          <span class="mult-preview-speed-value" id="multPreviewSpeedValue">12 кадр/с</span>
+        </div>
+
+        <label class="mult-preview-label" for="multPreviewAudio">Аудио файл</label>
+        <div class="mult-preview-file-row">
+          <input type="text" id="multPreviewAudio" class="text-input" placeholder="не выбран">
+          <button type="button" id="multPreviewAudioChooseBtn" class="button-color-gray">
+            <i data-lucide="music"></i>
+            <span>Выбрать</span>
+          </button>
+          <input type="file" id="multPreviewAudioFile" accept="audio/*" style="display: none;">
+        </div>
+
+        <div class="mult-preview-actions">
+          <button id="multPreviewPlayBtn" type="button" class="button-color-yellow">
+            <i data-lucide="play" id="multPreviewPlayIcon"></i>
+            <span id="multPreviewPlayLabel">Проиграть</span>
+          </button>
+          <button id="multPreviewSaveBtn" type="button" class="button-color-mint">
+            <i data-lucide="save"></i>
+            <span>Сохранить параметры</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>

@@ -101,6 +101,17 @@
   width: 120px;
 }
 
+#multPreviewModal #multPreviewPng {
+  width: 160px;
+  font-family: monospace;
+}
+
+#multPreviewModal #multPreviewAudio {
+  flex: 1 1 120px;
+  min-width: 120px;
+  font-family: monospace;
+}
+
 #multPreviewModal .mult-preview-filename {
   font-size: 13px;
   color: var(--color-text-secondary, #6b7280);
@@ -114,6 +125,46 @@
   flex-wrap: wrap;
 }
 
+#multPreviewModal .mult-preview-speed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#multPreviewModal .mult-preview-speed {
+  flex: 1 1 120px;
+  min-width: 120px;
+  height: 20px;
+  cursor: pointer;
+}
+
+#multPreviewModal .mult-preview-speed-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+  white-space: nowrap;
+}
+
+#multPreviewModal #multPreviewAudioChooseBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+#multPreviewModal .mult-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
 #multPreviewModal .mult-preview-frames-field {
   display: flex;
   flex-direction: column;
@@ -124,7 +175,8 @@
   width: 80px;
 }
 
-#multPreviewModal #multPreviewPlayBtn {
+#multPreviewModal #multPreviewPlayBtn,
+#multPreviewModal #multPreviewSaveBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -132,4 +184,5 @@
   height: 44px;
   padding: 0 18px;
   border-radius: 10px;
+  cursor: pointer;
 }

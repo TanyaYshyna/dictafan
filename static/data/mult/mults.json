@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "mults": [
+    {
+      "number": 1,
+      "png": "001.png",
+      "frames_w": 4,
+      "frames_h": 2,
+      "speed": 12,
+      "audio": null
+    }
+  ]
+}

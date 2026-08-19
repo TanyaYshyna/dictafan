@@ -622,6 +622,54 @@ self.addEventListener('fetch', (event) => {
   } catch (e) {
   }
 
+  // Конфигурация мультфильмов (static/data/mult/mults.json): network-first.
+  // При онлайне всегда берём свежую версию с сервера и обновляем кеш;
+  // при офлайне отдаём кеш (плюс fallback на localStorage делает сам mult_manager.js).
+  try {
+    const url = new URL(request.url);
+    if (url.pathname && url.pathname.startsWith('/static/data/mult/') && url.pathname.endsWith('.json')) {
+      const label = `sw#${reqId} mults ${reqPath}`;
+      swTimeStart(label);
+      event.respondWith((async () => {
+        try {
+          const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+          const cacheKey = normalizeCacheKey(request);
+
+          try {
+            const netRes = await fetch(request);
+            if (netRes && netRes.ok) {
+              try {
+                await cache.put(cacheKey, netRes.clone());
+              } catch (e) {
+              }
+              return netRes;
+            }
+            if (netRes) return netRes;
+          } catch (e) {
+          }
+
+          try {
+            const cached = await cache.match(cacheKey);
+            if (cached) return cached;
+            const cachedNoQuery = await cache.match(request, { ignoreSearch: true });
+            if (cachedNoQuery) return cachedNoQuery;
+          } catch (e) {
+          }
+        } catch (e) {
+        }
+
+        return new Response('Offline', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })().finally(() => {
+        swTimeEnd(label);
+      }));
+      return;
+    }
+  } catch (e) {
+  }
+
   if (!shouldHandleRequest(request.url)) return;
 
   // Для app shell навигации (HTML) используем network-first,
