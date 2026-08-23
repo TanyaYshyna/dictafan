@@ -161,6 +161,11 @@ function normalizeCacheKey(requestOrUrl) {
       return `${url.origin}${path}`;
     }
 
+    // Мультфильмы победы (PNG/аудио через B2) и их конфигурация: игнорируем query-параметры.
+    if (path.startsWith('/api/mult/asset/') || path === '/api/mult/config') {
+      return `${url.origin}${path}`;
+    }
+
     return typeof requestOrUrl === 'string' ? raw : requestOrUrl;
   } catch (e) {
     return typeof requestOrUrl === 'string' ? requestOrUrl : requestOrUrl;
@@ -264,6 +269,7 @@ function isMediaUrl(requestUrl) {
     const path = url.pathname;
     if (path.startsWith('/api/dictations/')) return true;
     if (path.startsWith('/api/dictations_covers/')) return true;
+    if (path.startsWith('/api/mult/asset/')) return true;
     return false;
   } catch (e) {
     return false;
@@ -301,6 +307,8 @@ function shouldHandleRequest(requestUrl) {
     if (url.hostname === 'cdn.jsdelivr.net') return true;
 
     if (path.startsWith('/api/dictations/')) return true;
+    if (path.startsWith('/api/mult/asset/')) return true;
+    if (path === '/api/mult/config') return true;
     if (path === '/library/api/book-cover') return true;
     if (path === '/user/api/avatar') return true;
 
@@ -622,13 +630,63 @@ self.addEventListener('fetch', (event) => {
   } catch (e) {
   }
 
-  // Конфигурация мультфильмов (static/data/mult/mults.json): network-first.
+  // PNG/аудио мультфильмов победы (B2 через /api/mult/asset/*): cache-first в постоянном
+  // медиа-кеше. Файлы меняются редко, а при загрузке нового файла имя обычно другое.
+  try {
+    const url = new URL(request.url);
+    if (url.pathname && url.pathname.startsWith('/api/mult/asset/')) {
+      const label = `sw#${reqId} mult-asset ${reqPath}`;
+      swTimeStart(label);
+      event.respondWith((async () => {
+        try {
+          const cache = await caches.open(MEDIA_CACHE_PERSIST);
+          const cacheKey = normalizeCacheKey(request);
+
+          let cached = await cache.match(cacheKey);
+          if (cached) return cached;
+
+          // Подстраховка: если закешировано с query или без.
+          cached = await cache.match(request, { ignoreSearch: true });
+          if (cached) {
+            try {
+              await cache.put(cacheKey, cached.clone());
+            } catch (e) {
+            }
+            return cached;
+          }
+
+          const netRes = await fetch(request);
+          if (netRes && netRes.ok) {
+            try {
+              await cache.put(cacheKey, netRes.clone());
+            } catch (e) {
+            }
+            return netRes;
+          }
+
+          if (netRes) return netRes;
+        } catch (e) {
+        }
+
+        return new Response('Offline', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })().finally(() => {
+        swTimeEnd(label);
+      }));
+      return;
+    }
+  } catch (e) {
+  }
+
+  // Конфигурация мультфильмов (/api/mult/config): network-first.
   // При онлайне всегда берём свежую версию с сервера и обновляем кеш;
   // при офлайне отдаём кеш (плюс fallback на localStorage делает сам mult_manager.js).
   try {
     const url = new URL(request.url);
-    if (url.pathname && url.pathname.startsWith('/static/data/mult/') && url.pathname.endsWith('.json')) {
-      const label = `sw#${reqId} mults ${reqPath}`;
+    if (url.pathname && url.pathname === '/api/mult/config') {
+      const label = `sw#${reqId} mult-config ${reqPath}`;
       swTimeStart(label);
       event.respondWith((async () => {
         try {
