@@ -9,15 +9,16 @@
  *   (play/stop по id canvas) и модальное окно предпросмотра мультфильмов
  *   (выбор PNG, настройка сетки/скорости/аудио + сохранение в JSON на сервер).
  *
- * Конфигурация читается из static/data/mult/mults.json (см. также sw.js:
- * для этого файла используется network-first, чтобы свежие параметры
- * сразу попадали в кеш; при офлайне берётся кеш или localStorage).
+ * Конфигурация и ассеты (PNG/аудио) отдаются через API /api/mult/*,
+ * который работает по принципу B2-first с локальным кешем/fallback
+ * (см. routes/mult.py). В sw.js для этих URL прописаны network-first (конфиг)
+ * и cache-first (ассеты) обработчики, чтобы всё работало офлайн.
  */
 (function () {
   'use strict';
 
-  const MULT_DIR = 'static/data/mult/';
-  const CONFIG_URL = MULT_DIR + 'mults.json';
+  const CONFIG_URL = '/api/mult/config';
+  const MULT_ASSET_URL = '/api/mult/asset/';
   const FRAME_SIZE = 200;
   const DEFAULT_COLS = 4;
   const DEFAULT_ROWS = 2;
@@ -45,6 +46,73 @@
     return String(idx).padStart(3, '0');
   }
 
+  // Общий кеш загруженных изображений (ключ — путь к файлу).
+  // Значение — Promise<Image>, чтобы параллельные запросы одного и того же
+  // файла не создавали дублирующихся загрузок, а предзагруженное в начале
+  // диктанта изображение мгновенно переиспользовалось в момент победы.
+  const imageCache = new Map();
+
+  function loadImageCached(path) {
+    if (imageCache.has(path)) return imageCache.get(path);
+    const promise = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => {
+        // При ошибке убираем из кеша, чтобы следующий play() мог попробовать снова.
+        imageCache.delete(path);
+        reject(new Error('Не удалось загрузить: ' + path));
+      };
+      img.src = path;
+    });
+    imageCache.set(path, promise);
+    return promise;
+  }
+
+  // Кеш декодированных кадров: ключ — путь к файлу + сетка.
+  // Каждый кадр заранее вырезается из спрайт-листа в offscreen-канвас 200×200,
+  // чтобы анимация в момент победы не делала дорогой drawImage из большого
+  // исходного изображения на каждом тике.
+  const frameCache = new Map();
+
+  function decodeFramesCached(path, cols, rows) {
+    const c = toInt(cols, DEFAULT_COLS);
+    const r = toInt(rows, DEFAULT_ROWS);
+    const key = path + '|' + c + 'x' + r;
+    if (frameCache.has(key)) return frameCache.get(key);
+
+    const promise = (async () => {
+      const image = await loadImageCached(path);
+      const frameW = image.naturalWidth / c;
+      const frameH = image.naturalHeight / r;
+      const total = c * r;
+      const frames = [];
+      for (let i = 0; i < total; i++) {
+        const canvas = document.createElement('canvas');
+        canvas.width = FRAME_SIZE;
+        canvas.height = FRAME_SIZE;
+        const cx = canvas.getContext('2d');
+        const col = i % c;
+        const row = Math.floor(i / c);
+        cx.drawImage(image, col * frameW, row * frameH, frameW, frameH, 0, 0, FRAME_SIZE, FRAME_SIZE);
+        frames.push(canvas);
+      }
+      return frames;
+    })();
+
+    promise.catch(() => frameCache.delete(key));
+    frameCache.set(key, promise);
+    return promise;
+  }
+
+  // Прогрев аудио-файла мультика в кеш Service Worker (без воспроизведения).
+  function preloadAudio(name) {
+    try {
+      const url = MULT_ASSET_URL + encodeURIComponent(name);
+      fetch(url, { method: 'GET' }).catch(() => {});
+    } catch (e) {
+    }
+  }
+
   class MultPlayer {
     constructor(canvasId) {
       this.canvas = document.getElementById(canvasId);
@@ -57,8 +125,11 @@
       this.tickMs = 1000 / this.fps;
       this.isPlaying = false;
       this.currentFrame = 0;
-      this._timer = null;
+      this._raf = 0;
+      this._nextTick = 0;
       this._image = null;
+      this._frames = null;
+      this._audio = null;
     }
 
     // Номер мультфильма от количества побед.
@@ -71,16 +142,44 @@
 
     getImagePath(multIndex, png) {
       const name = png || (padIndex(multIndex) + '.png');
-      return MULT_DIR + name;
+      return MULT_ASSET_URL + encodeURIComponent(name);
     }
 
     loadImage(path) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('Не удалось загрузить: ' + path));
-        img.src = path;
-      });
+      return loadImageCached(path);
+    }
+
+    getAudioPath(name) {
+      return MULT_ASSET_URL + encodeURIComponent(name);
+    }
+
+    // Воспроизвести аудио по готовому URL (останавливает предыдущее).
+    playAudioUrl(url) {
+      this.stopAudio();
+      if (!url) return;
+      try {
+        const audio = new Audio(url);
+        audio.play().catch(() => {});
+        this._audio = audio;
+      } catch (e) {
+      }
+    }
+
+    // Воспроизвести аудио мультика по имени файла из конфига.
+    playAudio(name) {
+      if (!name) return;
+      this.playAudioUrl(this.getAudioPath(name));
+    }
+
+    stopAudio() {
+      if (this._audio) {
+        try {
+          this._audio.pause();
+          this._audio.currentTime = 0;
+        } catch (e) {
+        }
+        this._audio = null;
+      }
     }
 
     // Задать сетку кадров: cols × rows. Размер одного кадра вычисляется
@@ -116,6 +215,13 @@
     drawFrame(frameIndex) {
       if (!this.ctx) return;
       this.clear();
+      const frames = this._frames;
+      if (frames && frames.length) {
+        const idx = ((frameIndex % frames.length) + frames.length) % frames.length;
+        const f = frames[idx];
+        if (f) this.ctx.drawImage(f, 0, 0, this.frameSize, this.frameSize);
+        return;
+      }
       if (!this._image) return;
       const frameW = this._image.naturalWidth / this.cols;
       const frameH = this._image.naturalHeight / this.rows;
@@ -131,21 +237,26 @@
     }
 
     startLoop() {
+      if (this.isPlaying) return;
       this.isPlaying = true;
-      const step = () => {
+      this._nextTick = performance.now();
+      const step = (now) => {
         if (!this.isPlaying) return;
-        this.currentFrame = (this.currentFrame + 1) % this.totalFrames;
-        this.drawFrame(this.currentFrame);
-        this._timer = setTimeout(step, this.tickMs);
+        if (now >= this._nextTick) {
+          this.currentFrame = (this.currentFrame + 1) % this.totalFrames;
+          this.drawFrame(this.currentFrame);
+          this._nextTick = now + this.tickMs;
+        }
+        this._raf = requestAnimationFrame(step);
       };
-      this._timer = setTimeout(step, this.tickMs);
+      this._raf = requestAnimationFrame(step);
     }
 
     stopLoop() {
       this.isPlaying = false;
-      if (this._timer) {
-        clearTimeout(this._timer);
-        this._timer = null;
+      if (this._raf) {
+        cancelAnimationFrame(this._raf);
+        this._raf = 0;
       }
     }
 
@@ -167,15 +278,19 @@
       const png = conf.png || null;
 
       let image = null;
+      let resolvedPath = null;
       try {
-        image = await this.loadImage(this.getImagePath(multIndex, png));
+        resolvedPath = this.getImagePath(multIndex, png);
+        image = await this.loadImage(resolvedPath);
       } catch (e) {
         // Если по конфигу не загрузилось — пробуем числовое имя.
         if (png) {
           try {
-            image = await this.loadImage(this.getImagePath(multIndex, null));
+            resolvedPath = this.getImagePath(multIndex, null);
+            image = await this.loadImage(resolvedPath);
           } catch (e2) {
             image = null;
+            resolvedPath = null;
           }
         }
       }
@@ -183,7 +298,8 @@
       if (!image) {
         // Файла нет — показываем первый мультфильм.
         try {
-          image = await this.loadImage(this.getImagePath(MIN_INDEX, null));
+          resolvedPath = this.getImagePath(MIN_INDEX, null);
+          image = await this.loadImage(resolvedPath);
         } catch (e3) {
           console.error('Ошибка загрузки мультфильма:', e3);
           this.drawPlaceholder();
@@ -193,14 +309,26 @@
       }
 
       this._image = image;
+      // Декодируем кадры спрайта в offscreen-канвасы, чтобы цикл анимации
+      // только переносил готовый кадр на основной canvas (быстрее и плавнее).
+      if (resolvedPath) {
+        this._frames = await decodeFramesCached(resolvedPath, this.cols, this.rows).catch(() => null);
+      }
       this.drawFrame(0);
       this.startLoop();
+
+      // Запускаем аудио мультика (если задано в конфиге).
+      if (conf.audio) {
+        this.playAudio(conf.audio);
+      }
     }
 
     stop(clearCanvas = true) {
       this.stopLoop();
+      this.stopAudio();
       if (clearCanvas) {
         this._image = null;
+        this._frames = null;
         this.clear();
       }
     }
@@ -227,10 +355,11 @@
           const res = await fetch(CONFIG_URL + '?v=' + Date.now(), { cache: 'no-store' });
           if (res && res.ok) {
             const data = await res.json();
-            if (data && Array.isArray(data.mults)) {
-              cfg = { version: data.version || 1, mults: data.mults };
-            } else if (Array.isArray(data)) {
-              cfg = { version: 1, mults: data };
+            const body = data && data.config ? data.config : data;
+            if (body && Array.isArray(body.mults)) {
+              cfg = { version: body.version || 1, mults: body.mults };
+            } else if (Array.isArray(body)) {
+              cfg = { version: 1, mults: body };
             }
           }
         } catch (e) {
@@ -280,9 +409,44 @@
       if (p) p.stop(true);
     },
 
+    // Предзагрузка мультфильма для будущей победы (номер = wins).
+    // Вызывается заранее (в начале диктанта, когда номер будущей победы уже
+    // известен), чтобы изображение попало в imageCache и в момент победы
+    // показывалось мгновенно — без сетевой задержки.
+    async preload(wins) {
+      try {
+        const player = getPlayer('multCanvas');
+        const multIndex = player.getMultIndex(wins);
+        const cfg = await this.getMultConfig(multIndex);
+        const png = cfg && cfg.png ? cfg.png : null;
+        const cols = cfg && cfg.frames_w ? cfg.frames_w : player.cols;
+        const rows = cfg && cfg.frames_h ? cfg.frames_h : player.rows;
+
+        // Прогреваем основной файл и сразу декодируем кадры в offscreen-канвасы.
+        const mainPath = player.getImagePath(multIndex, png);
+        await loadImageCached(mainPath).catch(() => {});
+        decodeFramesCached(mainPath, cols, rows).catch(() => {});
+
+        // Если конфиг указывает отдельный png, прогреваем и запасной числовой
+        // вариант, чтобы fallback в play() тоже был мгновенным.
+        if (png) {
+          loadImageCached(player.getImagePath(multIndex, null)).catch(() => {});
+        }
+
+        // Прогреваем аудио-файл в кеш Service Worker.
+        if (cfg && cfg.audio) {
+          preloadAudio(cfg.audio);
+        }
+      } catch (e) {
+        // Не критично: в момент победы play() повторит попытку загрузки.
+      }
+    },
+
     // --- Модальное окно предпросмотра ---
     _previewPlaying: false,
     _previewPlayer: null,
+    _previewPngFile: null,
+    _previewAudioFile: null,
 
     openPreview() {
       const modal = document.getElementById('multPreviewModal');
@@ -339,14 +503,28 @@
         });
       }
 
+      const pngChoose = document.getElementById('multPreviewPngChooseBtn');
+      const pngFile = document.getElementById('multPreviewPngFile');
+      if (pngChoose && pngFile) {
+        pngChoose.addEventListener('click', () => pngFile.click());
+        pngFile.addEventListener('change', () => {
+          if (pngFile.files && pngFile.files[0]) {
+            this._previewPngFile = pngFile.files[0];
+            if (pngInput) pngInput.value = pngFile.files[0].name;
+            this._renderPreview();
+          }
+        });
+      }
+
       const audioChoose = document.getElementById('multPreviewAudioChooseBtn');
       const audioFile = document.getElementById('multPreviewAudioFile');
       const audioInput = document.getElementById('multPreviewAudio');
       if (audioChoose && audioFile) {
         audioChoose.addEventListener('click', () => audioFile.click());
         audioFile.addEventListener('change', () => {
-          if (audioFile.files && audioFile.files[0] && audioInput) {
-            audioInput.value = audioFile.files[0].name;
+          if (audioFile.files && audioFile.files[0]) {
+            this._previewAudioFile = audioFile.files[0];
+            if (audioInput) audioInput.value = audioFile.files[0].name;
           }
         });
       }
@@ -439,15 +617,30 @@
       player.setGrid(this._readPreviewCols(), this._readPreviewRows());
       player.setSpeed(this._readPreviewSpeed());
 
+      // Если выбран локальный файл, которого ещё нет на сервере — превьюим его
+      // напрямую через object URL (без предварительной загрузки в B2).
+      let path = null;
+      if (this._previewPngFile) {
+        try {
+          path = URL.createObjectURL(this._previewPngFile);
+        } catch (e) {
+          path = null;
+        }
+      }
+      if (!path) {
+        path = player.getImagePath(idx, this._readPreviewPng());
+      }
+
       let image = null;
       try {
-        image = await player.loadImage(player.getImagePath(idx, this._readPreviewPng()));
+        image = await player.loadImage(path);
       } catch (e) {
         console.error('Ошибка загрузки мультфильма:', e);
         player.drawPlaceholder();
         return;
       }
       player._image = image;
+      player._frames = await decodeFramesCached(path, player.cols, player.rows).catch(() => null);
       player.drawFrame(0);
     },
 
@@ -469,11 +662,27 @@
       player.currentFrame = 0;
       player.drawFrame(0);
       player.startLoop();
+
+      // Запускаем аудио: локальный выбранный файл или имя из конфига.
+      player.stopAudio();
+      let audioUrl = null;
+      if (this._previewAudioFile) {
+        try {
+          audioUrl = URL.createObjectURL(this._previewAudioFile);
+        } catch (e) {
+          audioUrl = null;
+        }
+      } else {
+        const name = this._readPreviewAudio();
+        if (name) audioUrl = player.getAudioPath(name);
+      }
+      if (audioUrl) player.playAudioUrl(audioUrl);
     },
 
     _stopPreview() {
       const player = this._getPreviewPlayer();
       player.stopLoop();
+      player.stopAudio();
       this._setPreviewPlaying(false);
     },
 
@@ -513,7 +722,52 @@
       }
     },
 
+    async _uploadAsset(file) {
+      if (!file) return null;
+      const token = (() => {
+        try { return localStorage.getItem('jwt_token'); } catch (e) { return null; }
+      })();
+      if (!token) {
+        this._toast('Нет токена авторизации для загрузки файла', { durationMs: 3500 });
+        return null;
+      }
+      const fd = new FormData();
+      fd.append('file', file, file.name);
+      try {
+        const res = await fetch('/api/mult/asset/upload', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+          body: fd,
+        });
+        const data = res.ok ? await res.json() : null;
+        if (data && data.success && data.name) return data.name;
+        this._toast((data && data.error) ? String(data.error) : 'Ошибка загрузки файла', { durationMs: 3500 });
+        return null;
+      } catch (e) {
+        this._toast('Ошибка соединения при загрузке файла', { durationMs: 3500 });
+        return null;
+      }
+    },
+
     async _savePreviewConfig() {
+      // Сначала загружаем выбранные PNG/аудио файлы в B2 (если они были выбраны).
+      if (this._previewPngFile) {
+        const uploaded = await this._uploadAsset(this._previewPngFile);
+        if (uploaded) {
+          const pngInput = document.getElementById('multPreviewPng');
+          if (pngInput) pngInput.value = uploaded;
+          this._previewPngFile = null;
+        }
+      }
+      if (this._previewAudioFile) {
+        const uploaded = await this._uploadAsset(this._previewAudioFile);
+        if (uploaded) {
+          const audioInput = document.getElementById('multPreviewAudio');
+          if (audioInput) audioInput.value = uploaded;
+          this._previewAudioFile = null;
+        }
+      }
+
       const idx = this._readPreviewIndex();
       const entry = {
         number: idx,

@@ -7209,6 +7209,21 @@
             console.error('[DM:open] ошибка в loadCompletionCount:', eCc);
           }
 
+          // Предзагружаем мультфильм будущей победы параллельным процессом.
+          // Номер будущей победы уже известен: текущий completionCount + 1
+          // (showCompletionModal инкрементит счётчик перед показом окна).
+          // Изображение попадает в imageCache менеджера, поэтому в момент
+          // победы мультик показывается мгновенно, без сетевой задержки.
+          try {
+            const mgrPre = getMultPlayer();
+            if (mgrPre && typeof mgrPre.preload === 'function') {
+              const nextWins = (Number(session.completionCount) || 0) + 1;
+              mgrPre.preload(nextWins);
+            }
+          } catch (ePre) {
+            console.error('[DM:open] ошибка предзагрузки мультфильма:', ePre);
+          }
+
           // Загружаем рекорд диктанта и показываем лейбл под заголовком
           try {
             _updateDictationRecordLabel();
