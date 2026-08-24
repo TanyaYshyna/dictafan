@@ -510,7 +510,7 @@
         pngFile.addEventListener('change', () => {
           if (pngFile.files && pngFile.files[0]) {
             this._previewPngFile = pngFile.files[0];
-            if (pngInput) pngInput.value = pngFile.files[0].name;
+            if (pngInput) pngInput.textContent = pngFile.files[0].name;
             this._renderPreview();
           }
         });
@@ -524,7 +524,7 @@
         audioFile.addEventListener('change', () => {
           if (audioFile.files && audioFile.files[0]) {
             this._previewAudioFile = audioFile.files[0];
-            if (audioInput) audioInput.value = audioFile.files[0].name;
+            if (audioInput) audioInput.textContent = audioFile.files[0].name;
           }
         });
       }
@@ -553,7 +553,7 @@
     _readPreviewPng() {
       const input = document.getElementById('multPreviewPng');
       const idx = this._readPreviewIndex();
-      const raw = input ? String(input.value || '').trim() : '';
+      const raw = input ? String(input.textContent || '').trim() : '';
       return raw || (padIndex(idx) + '.png');
     },
 
@@ -577,7 +577,8 @@
 
     _readPreviewAudio() {
       const input = document.getElementById('multPreviewAudio');
-      return input ? String(input.value || '').trim() : '';
+      const raw = input ? String(input.textContent || '').trim() : '';
+      return raw === 'не выбран' ? '' : raw;
     },
 
     _updatePreviewSpeedLabel() {
@@ -591,7 +592,7 @@
       const conf = await this.getMultConfig(idx);
 
       const png = document.getElementById('multPreviewPng');
-      if (png) png.value = (conf && conf.png) ? conf.png : (padIndex(idx) + '.png');
+      if (png) png.textContent = (conf && conf.png) ? conf.png : (padIndex(idx) + '.png');
 
       const framesW = document.getElementById('multPreviewFramesW');
       if (framesW && conf) framesW.value = toInt(conf.frames_w, DEFAULT_COLS);
@@ -602,7 +603,7 @@
       if (speed && conf) speed.value = toFloat(conf.speed, DEFAULT_SPEED);
 
       const audio = document.getElementById('multPreviewAudio');
-      if (audio && conf) audio.value = conf.audio || '';
+      if (audio && conf) audio.textContent = conf.audio || 'не выбран';
 
       this._updatePreviewSpeedLabel();
       await this._renderPreview();
@@ -755,7 +756,7 @@
         const uploaded = await this._uploadAsset(this._previewPngFile);
         if (uploaded) {
           const pngInput = document.getElementById('multPreviewPng');
-          if (pngInput) pngInput.value = uploaded;
+          if (pngInput) pngInput.textContent = uploaded;
           this._previewPngFile = null;
         }
       }
@@ -763,7 +764,7 @@
         const uploaded = await this._uploadAsset(this._previewAudioFile);
         if (uploaded) {
           const audioInput = document.getElementById('multPreviewAudio');
-          if (audioInput) audioInput.value = uploaded;
+          if (audioInput) audioInput.textContent = uploaded;
           this._previewAudioFile = null;
         }
       }
