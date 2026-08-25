@@ -62,6 +62,22 @@ class UserManager {
   getCurrentUser() {
     return this.userData;
   }
+
+  // Единая точка чтения токена: in-memory (обновляется при логине) → localStorage.
+  // Синхронизирует this.token из localStorage, если in-memory значение ещё не задано.
+  getToken() {
+    try {
+      if (this.token) return this.token;
+    } catch (e) {
+    }
+    try {
+      this.token = localStorage.getItem('jwt_token');
+    } catch (e) {
+      this.token = null;
+    }
+    return this.token;
+  }
+
   // Инициализация пользователя
   async init() {
     try {

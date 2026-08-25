@@ -723,11 +723,53 @@
       }
     },
 
+    // Токен получаем через UserManager.getToken() — единую точку работы с
+    // токеном во всём приложении. Раньше здесь читался только localStorage,
+    // из-за чего после авторизации сохранение всё равно сообщало «Нет токена».
+    _getToken() {
+      try {
+        if (window.UM && typeof window.UM.getToken === 'function') {
+          return window.UM.getToken();
+        }
+      } catch (e) {
+      }
+      try {
+        return localStorage.getItem('jwt_token');
+      } catch (e) {
+        return null;
+      }
+    },
+
+    // Ждём, пока пользователь войдёт через существующий API модалки логина
+    // (LoginModal.showAndWaitForLogin()), и возвращаем true после успешного входа.
+    // Если API недоступен — показываем окно авторизации через window.UM.requireAuth().
+    async _waitForLogin() {
+      try {
+        if (window.loginModal && typeof window.loginModal.showAndWaitForLogin === 'function') {
+          await window.loginModal.showAndWaitForLogin();
+          return true;
+        }
+      } catch (e) {
+      }
+      try {
+        if (typeof LoginModal !== 'undefined' && typeof LoginModal.showAndWaitForLogin === 'function') {
+          await LoginModal.showAndWaitForLogin();
+          return true;
+        }
+      } catch (e) {
+      }
+      try {
+        if (window.UM && typeof window.UM.requireAuth === 'function') {
+          window.UM.requireAuth();
+        }
+      } catch (e) {
+      }
+      return false;
+    },
+
     async _uploadAsset(file) {
       if (!file) return null;
-      const token = (() => {
-        try { return localStorage.getItem('jwt_token'); } catch (e) { return null; }
-      })();
+      const token = this._getToken();
       if (!token) {
         this._toast('Нет токена авторизации для загрузки файла', { durationMs: 3500 });
         return null;
@@ -796,12 +838,16 @@
       } catch (e) {
       }
 
-      const token = (() => {
-        try { return localStorage.getItem('jwt_token'); } catch (e) { return null; }
-      })();
+      let token = this._getToken();
       if (!token) {
+        // Показываем существующее окно авторизации и ждём успешного входа,
+        // затем автоматически повторяем сохранение на сервер.
         this._toast('Нет токена авторизации, параметры сохранены локально', { durationMs: 3500 });
-        return;
+        const loggedIn = await this._waitForLogin();
+        token = loggedIn ? this._getToken() : null;
+        if (!token) {
+          return;
+        }
       }
 
       try {
