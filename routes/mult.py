@@ -24,6 +24,7 @@ import os
 import tempfile
 
 from flask import Blueprint, current_app, jsonify, request, send_from_directory
+from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from helpers.db import get_db_cursor
 
@@ -297,18 +298,10 @@ def get_mult_config():
 
 
 @mult_bp.route("/api/mult/config", methods=["POST"])
+@jwt_required()
 def save_mult_config():
     """Сохранить конфигурацию мультфильмов (только админ)."""
-    from flask_jwt_extended import get_jwt_identity, jwt_required
-
-    identity = None
-    try:
-        identity = get_jwt_identity()
-    except Exception:
-        return jsonify({"success": False, "error": "Unauthorized"}), 401
-
-    if not identity:
-        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    identity = get_jwt_identity()
 
     try:
         if not _is_admin(identity):
@@ -391,18 +384,10 @@ def get_mult_asset(filename):
 
 
 @mult_bp.route("/api/mult/asset/upload", methods=["POST"])
+@jwt_required()
 def upload_mult_asset():
     """Загрузить PNG/аудио мультика в B2 (только админ)."""
-    from flask_jwt_extended import get_jwt_identity, jwt_required
-
-    identity = None
-    try:
-        identity = get_jwt_identity()
-    except Exception:
-        return jsonify({"success": False, "error": "Unauthorized"}), 401
-
-    if not identity:
-        return jsonify({"success": False, "error": "Unauthorized"}), 401
+    identity = get_jwt_identity()
 
     try:
         if not _is_admin(identity):
