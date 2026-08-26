@@ -104,10 +104,21 @@
     return promise;
   }
 
-  // Прогрев аудио-файла мультика в кеш Service Worker (без воспроизведения).
+  // Кеш прогретых аудио-элементов (ключ — URL).
+  const audioCache = new Map();
+
+  // Прогрев аудио-файла мультика: создаём Audio-элемент с preload="auto",
+  // чтобы файл был скачан и декодирован заранее (а не в момент победы),
+  // и дополнительно греем файл в кеш Service Worker.
   function preloadAudio(name) {
     try {
       const url = MULT_ASSET_URL + encodeURIComponent(name);
+      if (!url || audioCache.has(url)) return;
+      const audio = new Audio();
+      audio.preload = 'auto';
+      audio.src = url;
+      audio.load();
+      audioCache.set(url, audio);
       fetch(url, { method: 'GET' }).catch(() => {});
     } catch (e) {
     }
@@ -158,7 +169,16 @@
       this.stopAudio();
       if (!url) return;
       try {
-        const audio = new Audio(url);
+        let audio = audioCache.get(url);
+        if (!audio) {
+          audio = new Audio(url);
+          audioCache.set(url, audio);
+        } else {
+          try {
+            audio.currentTime = 0;
+          } catch (e) {
+          }
+        }
         audio.play().catch(() => {});
         this._audio = audio;
       } catch (e) {
@@ -424,7 +444,7 @@
 
         // Прогреваем основной файл и сразу декодируем кадры в offscreen-канвасы.
         const mainPath = player.getImagePath(multIndex, png);
-        await loadImageCached(mainPath).catch(() => {});
+        loadImageCached(mainPath).catch(() => {});
         decodeFramesCached(mainPath, cols, rows).catch(() => {});
 
         // Если конфиг указывает отдельный png, прогреваем и запасной числовой
@@ -433,7 +453,15 @@
           loadImageCached(player.getImagePath(multIndex, null)).catch(() => {});
         }
 
-        // Прогреваем аудио-файл в кеш Service Worker.
+        // Всегда прогреваем запасной мультфильм 001.png: именно на него
+        // play() падает, если файла текущего номера нет (например, 2-я победа
+        // при настроенном только 001). Это гарантирует мгновенный показ в
+        // момент победы даже без конфига для текущего номера.
+        const fallbackPath = player.getImagePath(MIN_INDEX, null);
+        loadImageCached(fallbackPath).catch(() => {});
+        decodeFramesCached(fallbackPath, DEFAULT_COLS, DEFAULT_ROWS).catch(() => {});
+
+        // Прогреваем аудио-файл (декодируем Audio-элемент + греем кеш SW).
         if (cfg && cfg.audio) {
           preloadAudio(cfg.audio);
         }
