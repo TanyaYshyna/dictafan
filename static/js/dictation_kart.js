@@ -637,6 +637,14 @@ window.DictationKart = window.DictationKart || {
   _bindHandlers(cardEl) {
     if (!cardEl) return;
 
+    try {
+      console.log(
+        '[DK:bind] _bindHandlers dictation-id=', cardEl.getAttribute('data-dictation-id'),
+        '| toggle-desk-explicit=', !!cardEl.querySelector('[data-action="toggle-desk-explicit"]'),
+        '| toggle-card-actions=', !!cardEl.querySelector('[data-action="toggle-card-actions"]')
+      );
+    } catch (e) {}
+
     const thumb = cardEl.querySelector('.short-thumb');
     if (thumb && thumb.hasAttribute('data-href')) {
       const open = (e) => {
@@ -935,7 +943,15 @@ window.DictationKart = window.DictationKart || {
 
     const kebabBtn = cardEl.querySelector('[data-action="toggle-card-actions"]');
     const menu = cardEl.querySelector('.short-card-actions-menu:not(.dictation-kart-launch-menu)');
-    if (!kebabBtn || !menu) return;
+    if (!kebabBtn || !menu) {
+      try {
+        console.warn(
+          '[DK:bind] РАННИЙ return: kebabBtn=', !!kebabBtn, 'menu=', !!menu,
+          '→ обработчик toggle-desk-explicit НЕ привязан, dictation-id=', cardEl.getAttribute('data-dictation-id')
+        );
+      } catch (e) {}
+      return;
+    }
 
     const closeMenu = () => {
       try {
@@ -1363,15 +1379,21 @@ window.DictationKart = window.DictationKart || {
     // Обработчик для кнопки "добавить/убрать со стола" (toggle-desk-explicit)
     var toggleDeskBtn = cardEl.querySelector('[data-action="toggle-desk-explicit"]');
     if (toggleDeskBtn) {
+      try {
+        console.log('[DK:bind] кнопка toggle-desk-explicit НАЙДЕНА, привязываю click-обработчик, dictation-id=', cardEl.getAttribute('data-dictation-id'));
+      } catch (e) {}
       toggleDeskBtn.addEventListener('click', async function (e) {
+        try { console.log('[DK:toggleDesk] КЛИК по кнопке toggle-desk-explicit'); } catch (e) {}
         e.preventDefault();
         e.stopPropagation();
         var dbId = toggleDeskBtn.getAttribute('data-dictation-id');
+        try { console.log('[DK:toggleDesk] data-dictation-id кнопки =', dbId); } catch (e) {}
         if (!dbId) return;
         dbId = Number(dbId);
         if (!Number.isFinite(dbId) || dbId <= 0) return;
 
         var isOnDesk = window.DictationKart.isDictationOnDesk(dbId);
+        try { console.log('[DK:toggleDesk] dbId=', dbId, '| isOnDesk=', isOnDesk); } catch (e) {}
         try {
           if (isOnDesk) {
             // Найти itemId для этого диктанта
@@ -1902,10 +1924,11 @@ window.DictationKart = window.DictationKart || {
    * @returns {Promise<object>}
    */
   async addToDesk(dbId) {
+    try { console.log('[DK:addToDesk] ВХОД dbId=', dbId, '| jwt_token=', !!localStorage.getItem('jwt_token')); } catch (e) {}
     var token = (function () {
       try { return localStorage.getItem('jwt_token'); } catch (e) { return null; }
     })();
-    if (!token) throw new Error('No auth token');
+    if (!token) { console.warn('[DK:addToDesk] НЕТ JWT токена'); throw new Error('No auth token'); }
 
     var resp = await fetch('/desk/api/items', {
       method: 'POST',
@@ -1915,8 +1938,10 @@ window.DictationKart = window.DictationKart || {
       },
       body: JSON.stringify({ dictation_id: Number(dbId) })
     });
+    try { console.log('[DK:addToDesk] POST /desk/api/items статус=', resp.status); } catch (e) {}
     var data = await resp.json();
-    if (!data.success) throw new Error(data.error || 'Failed to add to desk');
+    try { console.log('[DK:addToDesk] ответ сервера:', data); } catch (e) {}
+    if (!data.success) { console.warn('[DK:addToDesk] сервер вернул success=false:', data); throw new Error(data.error || 'Failed to add to desk'); }
 
     // Обновляем кеш ID диктантов на столе
     try {
