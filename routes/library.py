@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, jsonify, request, current_app, sen
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from PIL import Image
 
+from helpers.db import get_db_cursor
 from helpers.db_users import get_user_by_email
 from helpers.db_books import (
     get_public_books,
@@ -72,6 +73,101 @@ def enrich_dictation_data(dictation):
     dictation['sentences_count'] = sentences_count
     
     return dictation
+
+
+def _build_desk_item_payload(dictation_id: int, desk_item_id: int, planned_date) -> dict:
+    """
+    Собирает объект «карточка рабочего стола» для диктанта БЕЗ обращения к B2.
+
+    Обложка задаётся каноническим URL /api/dictations_covers/<id>.webp — без проверки
+    существования файла в B2 (это платные запросы). Если файла нет, фронт сам подставит
+    fallback через onerror. Если файл есть — он уже закэширован браузером/SW, т.к.
+    показывался в книге.
+    """
+    conn, cur = get_db_cursor()
+    try:
+        # Динамически определяем наличие необязательных колонок, чтобы не падать,
+        # если какая-то миграция не применена.
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'dictations'
+              AND column_name IN ('sentences_count', 'audio_order')
+            """
+        )
+        existing_cols = {row["column_name"] for row in (cur.fetchall() or [])}
+
+        sentences_count_sql = (
+            "COALESCE(d.sentences_count, 0)"
+            if "sentences_count" in existing_cols
+            else "0"
+        )
+        audio_order_sql = (
+            "COALESCE(d.audio_order, '')"
+            if "audio_order" in existing_cols
+            else "''"
+        )
+
+        query = f"""
+            SELECT
+                d.id,
+                d.title,
+                d.language_code,
+                d.level,
+                d.owner_id,
+                {sentences_count_sql} AS sentences_count,
+                {audio_order_sql} AS audio_order,
+                (SELECT DISTINCT language_code
+                 FROM dictation_sentences
+                 WHERE dictation_id = d.id AND language_code != d.language_code
+                 LIMIT 1) AS language_translation
+            FROM dictations d
+            WHERE d.id = %s
+        """
+        cur.execute(query, (dictation_id,))
+        row = cur.fetchone()
+        if not row:
+            return {}
+
+        language_original = row["language_code"] or "en"
+        language_translation = row["language_translation"] or language_original
+
+        translation_languages = []
+        try:
+            cur.execute(
+                "SELECT DISTINCT language_code FROM dictation_sentences WHERE dictation_id = %s",
+                (dictation_id,),
+            )
+            translation_languages = sorted(
+                [
+                    str(r["language_code"] or "").strip().lower()
+                    for r in (cur.fetchall() or [])
+                    if r["language_code"]
+                    and str(r["language_code"]).strip().lower() != str(language_original).strip().lower()
+                ]
+            )
+        except Exception:
+            translation_languages = []
+
+        return {
+            "id": desk_item_id,
+            "dictation_id": dictation_id,
+            "created_at": None,
+            "planned_date": planned_date,
+            "title": row["title"],
+            "language_code": language_original,
+            "language_translation": language_translation,
+            "translation_languages": translation_languages,
+            "owner_id": row["owner_id"],
+            "level": row["level"],
+            "sentences_count": row["sentences_count"] or 0,
+            "audio_order": row["audio_order"] or "",
+            "cover_url": f"/api/dictations_covers/{dictation_id}.webp",
+        }
+    finally:
+        cur.close()
+        conn.close()
 
 
 # Страница публичной библиотеки удалена - теперь используется только приватная библиотека
@@ -248,12 +344,23 @@ def api_add_dictation_to_desk(dictation_id: int):
     planned_date = payload.get("planned_date")  # может быть None
 
     try:
-        added = add_dictation_to_desk(
+        desk_item_id = add_dictation_to_desk(
             user_id=user["id"],
             dictation_id=dictation_id,
             planned_date=planned_date,
         )
-        return jsonify({"success": True, "added": added})
+        item = None
+        if desk_item_id:
+            try:
+                item = _build_desk_item_payload(dictation_id, desk_item_id, planned_date)
+            except Exception as exc:
+                logger.warning(
+                    "Не удалось собрать карточку стола для диктанта %s: %s",
+                    dictation_id,
+                    exc,
+                    exc_info=True,
+                )
+        return jsonify({"success": True, "added": desk_item_id is not None, "item": item})
     except Exception as exc:
         logger.error("Ошибка добавления диктанта %s на стол: %s", dictation_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500

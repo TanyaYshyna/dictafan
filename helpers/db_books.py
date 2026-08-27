@@ -421,10 +421,14 @@ def add_dictation_to_desk(
     user_id: int,
     dictation_id: int,
     planned_date: Optional[str] = None,
-) -> bool:
+):
     """
     Добавляет диктант на «Стол» пользователя (desk_items).
     planned_date может быть строкой в формате YYYY-MM-DD или None.
+
+    Returns:
+        int | None: id записи desk_items (новой или уже существующей),
+        либо None, если не удалось определить.
     """
     conn, cur = get_db_cursor()
     try:
@@ -432,10 +436,22 @@ def add_dictation_to_desk(
             INSERT INTO desk_items (user_id, dictation_id, planned_date)
             VALUES (%s, %s, %s)
             ON CONFLICT (user_id, dictation_id) DO NOTHING
+            RETURNING id
         """
         cur.execute(query, (user_id, dictation_id, planned_date))
+        row = cur.fetchone()
         conn.commit()
-        return cur.rowcount > 0
+
+        if row is not None:
+            return row["id"]
+
+        # Конфликт: запись уже существовала — вернём её id.
+        cur.execute(
+            "SELECT id FROM desk_items WHERE user_id = %s AND dictation_id = %s",
+            (user_id, dictation_id),
+        )
+        existing = cur.fetchone()
+        return existing["id"] if existing else None
     finally:
         cur.close()
         conn.close()

@@ -155,11 +155,44 @@
 
         if (!target || target === 'own') {
           // Добавляем на свой рабочий стол.
-          await apiRequest(`/library/api/dictation/${encodeURIComponent(String(dictationIdNum))}/add-to-desk`, {
+          const res = await apiRequest(`/library/api/dictation/${encodeURIComponent(String(dictationIdNum))}/add-to-desk`, {
             method: 'POST',
             body: JSON.stringify({ planned_date: plannedDate }),
           });
           showToast('Диктант добавлен на ваш рабочий стол', { durationMs: 3000 });
+
+          // Обновляем индикацию «на столе» и добавляем ТОЛЬКО новую карточку.
+          // Полную перезагрузку (/desk/api/items) не вызываем: она перечитывает
+          // и проверяет в B2 обложки ВСЕХ диктантов на столе (платные запросы).
+          try {
+            window.__deskItemIds = window.__deskItemIds || [];
+            if (window.__deskItemIds.indexOf(dictationIdNum) === -1) {
+              window.__deskItemIds.push(dictationIdNum);
+            }
+          } catch (e) {
+          }
+          try {
+            if (res && res.item && window.Desktop && typeof window.Desktop.addDeskCard === 'function') {
+              window.Desktop.addDeskCard(res.item);
+            }
+          } catch (e) {
+          }
+          try {
+            const bookCard = document.querySelector(`.dictation-kart--book-row[data-dictation-id="${String(dictationIdNum)}"]`);
+            if (bookCard) {
+              bookCard.classList.add('short-card--on-desk');
+              bookCard.classList.remove('short-card--off-desk');
+              const btn = bookCard.querySelector('[data-action="toggle-desk-explicit"]');
+              if (btn) {
+                const icon = btn.querySelector('i[data-lucide]');
+                if (icon) icon.setAttribute('data-lucide', 'arrow-big-down-dash');
+                if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                  window.lucide.createIcons({ root: bookCard });
+                }
+              }
+            }
+          } catch (e) {
+          }
         } else {
           const groupIdNum = Number(target);
           if (!Number.isFinite(groupIdNum) || groupIdNum <= 0) {
@@ -174,23 +207,6 @@
         }
 
         closeModal();
-
-        // Обновляем индикацию на карточках и рабочий стол.
-        try {
-          if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
-            window.Desktop.loadDeskItems();
-          }
-        } catch (e) {
-        }
-        try {
-          if (window.DictationKart && typeof window.DictationKart.addToDesk === 'function') {
-            window.__deskItemIds = window.__deskItemIds || [];
-            if (window.__deskItemIds.indexOf(dictationIdNum) === -1) {
-              window.__deskItemIds.push(dictationIdNum);
-            }
-          }
-        } catch (e) {
-        }
       } catch (err) {
         showToast(err && err.message ? String(err.message) : 'Ошибка добавления', { durationMs: 3500 });
       } finally {

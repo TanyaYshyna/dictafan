@@ -1127,6 +1127,91 @@ window.Desktop = window.Desktop || {
     }
   },
 
+  /**
+   * Добавляет ОДНУ новую карточку на стол без полной перерисовки.
+   * Используется после добавления диктанта на свой стол, чтобы не дёргать
+   * /desk/api/items (и, как следствие, платные B2-проверки всех обложек).
+   */
+  addDeskCard(item) {
+    if (!item) return;
+    const container = document.getElementById('deskCardsContainer');
+    if (!container) return;
+
+    this.ensureDictationKartDeps();
+
+    // Соблюдаем фильтр активного языка, как в renderDeskCards.
+    const activeLang = this._activeLanguage;
+    if (activeLang && item.language_code && String(item.language_code).toLowerCase() !== String(activeLang).toLowerCase()) {
+      return;
+    }
+
+    // Обновляем память всех items (для переключения языка без запроса).
+    try {
+      if (!Array.isArray(this._allDeskItems)) this._allDeskItems = [];
+      const idx = this._allDeskItems.findIndex(function (x) {
+        return x && Number(x.dictation_id) === Number(item.dictation_id);
+      });
+      if (idx === -1) {
+        this._allDeskItems.unshift(item);
+      } else {
+        this._allDeskItems[idx] = item;
+      }
+    } catch (e) {
+    }
+
+    // Убираем плейсхолдер «Рабочий стол пуст» / «Немає диктантів…».
+    try {
+      if (container.firstElementChild && !container.firstElementChild.classList.contains('shorts-grid')) {
+        container.innerHTML = '';
+      }
+    } catch (e) {
+    }
+
+    let grid = container.querySelector('.shorts-grid');
+    if (!grid) {
+      grid = document.createElement('div');
+      grid.className = 'shorts-grid';
+      container.appendChild(grid);
+    }
+
+    // Не дублируем уже существующую карточку.
+    const existing = grid.querySelector(`.desk-card[data-dictation-id="${String(item.dictation_id)}"]`);
+    if (existing) return;
+
+    try {
+      if (window.DictationKart && typeof window.DictationKart.createDeskCardElement === 'function') {
+        const el = window.DictationKart.createDeskCardElement(item);
+        if (el) {
+          // Новые записи идут первыми (как ORDER BY created_at DESC).
+          grid.insertBefore(el, grid.firstChild);
+          this.renderLucide(container);
+          this.applyDeskLayoutIfNeeded();
+          try {
+            if (window.DictationKart && typeof window.DictationKart.loadCardMedals === 'function') {
+              window.DictationKart.loadCardMedals();
+            }
+          } catch (e) {
+          }
+          return;
+        }
+      }
+    } catch (e) {
+    }
+
+    try {
+      if (window.DictationKart && typeof window.DictationKart.render === 'function') {
+        const html = window.DictationKart.render(item, { context: 'desk' });
+        if (html) {
+          grid.insertAdjacentHTML('afterbegin', html);
+        }
+      }
+    } catch (e) {
+    }
+
+    this.renderLucide(container);
+    this.applyDeskLayoutIfNeeded();
+  },
+
   async loadDeskItems() {
     const token = (() => {
       try { return localStorage.getItem('jwt_token'); } catch (e) { return null; }
