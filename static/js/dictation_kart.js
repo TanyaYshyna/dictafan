@@ -637,14 +637,6 @@ window.DictationKart = window.DictationKart || {
   _bindHandlers(cardEl) {
     if (!cardEl) return;
 
-    try {
-      console.log(
-        '[DK:bind] _bindHandlers dictation-id=', cardEl.getAttribute('data-dictation-id'),
-        '| toggle-desk-explicit=', !!cardEl.querySelector('[data-action="toggle-desk-explicit"]'),
-        '| toggle-card-actions=', !!cardEl.querySelector('[data-action="toggle-card-actions"]')
-      );
-    } catch (e) {}
-
     const thumb = cardEl.querySelector('.short-thumb');
     if (thumb && thumb.hasAttribute('data-href')) {
       const open = (e) => {
@@ -669,10 +661,7 @@ window.DictationKart = window.DictationKart || {
           var match = href.match(/\/dictation\/(dict_\d+)\//);
           var dictIdFormatted = match ? match[1] : ('dict_' + dictationId);
 
-          console.log('[DK:thumbClick] dictationIdFormatted=', dictIdFormatted, 'langOriginal=', langOriginal, 'availableTranslations=', availableTranslations, 'DictationLanguageModal=', !!window.DictationLanguageModal);
-
           if (availableTranslations.length >= 1 && window.DictationLanguageModal && typeof window.DictationLanguageModal.open === 'function') {
-            console.log('[DK:thumbClick] открываю DictationLanguageModal');
             window.DictationLanguageModal.open({
               dictationId: dictIdFormatted,
               langOriginal: langOriginal,
@@ -683,7 +672,6 @@ window.DictationKart = window.DictationKart || {
           }
 
           // Fallback: если модалка не загружена — открываем сразу
-          console.log('[DK:thumbClick] fallback: DictationLanguageModal не загружен или нет переводов, вызываю openDictationLaunch');
           if (Number.isFinite(dictationId) && dictationId > 0 && typeof window.openDictationLaunch === 'function') {
             window.openDictationLaunch(dictationId, href, cardEl, dictationTitle);
           } else {
@@ -696,6 +684,60 @@ window.DictationKart = window.DictationKart || {
       thumb.addEventListener('keydown', (e) => {
         if (!e || (e.key !== 'Enter' && e.key !== ' ')) return;
         open(e);
+      });
+    }
+
+    // Двойной клик по картинке в карточке книги:
+    // добавляем диктант на рабочий стол (если его там ещё нет) и запускаем диктант —
+    // аналогично двойному клику по картинке на рабочем столе.
+    if (thumb && cardEl.classList.contains('dictation-kart--book-row') && !thumb.dataset.boundBookDbl) {
+      thumb.dataset.boundBookDbl = '1';
+      thumb.addEventListener('dblclick', async (e) => {
+        try {
+          e.preventDefault();
+          e.stopPropagation();
+          const dbId = Number(cardEl.getAttribute('data-dictation-id'));
+          if (!Number.isFinite(dbId) || dbId <= 0) return;
+
+          // 1. Добавляем на стол, если ещё нет
+          try {
+            if (!window.DictationKart.isDictationOnDesk(dbId)) {
+              await window.DictationKart.addToDesk(dbId);
+            }
+          } catch (e2) {
+          }
+
+          // 2. Запускаем диктант (выбор языка перевода или сразу весь диктант)
+          const langOriginal = (cardEl.getAttribute('data-lang-original') || '').toLowerCase();
+          var rawTranslations = cardEl.getAttribute('data-available-translations') || '[]';
+          var availableTranslations = [];
+          try { availableTranslations = JSON.parse(rawTranslations); } catch (e3) { availableTranslations = []; }
+          if (!Array.isArray(availableTranslations)) availableTranslations = [];
+
+          const titleEl = cardEl.querySelector('.short-title');
+          const dictationTitle = titleEl ? String(titleEl.textContent || '').trim() : '';
+          const dictIdFormatted = 'dict_' + dbId;
+
+          if (availableTranslations.length >= 1 && window.DictationLanguageModal && typeof window.DictationLanguageModal.open === 'function') {
+            window.DictationLanguageModal.open({
+              dictationId: dictIdFormatted,
+              langOriginal: langOriginal,
+              translationLanguages: availableTranslations,
+              cardEl: cardEl,
+            });
+            return;
+          }
+
+          const nativeLang = _getUserNativeLang();
+          const langTranslation = availableTranslations[0] || nativeLang || langOriginal || 'en';
+          const href = '/dictation/' + encodeURIComponent(dictIdFormatted) + '/' + encodeURIComponent(langOriginal) + '/' + encodeURIComponent(langTranslation);
+          if (typeof window.openDictationLaunch === 'function') {
+            window.openDictationLaunch(dbId, href, cardEl, dictationTitle);
+          } else if (window.DictationModal && typeof window.DictationModal.open === 'function') {
+            window.DictationModal.open(href, { cardEl, subsetPositions: null });
+          }
+        } catch (e4) {
+        }
       });
     }
 
@@ -941,15 +983,31 @@ window.DictationKart = window.DictationKart || {
     } catch (e) {
     }
 
+    // Кнопка «толстая стрелка» в карточке книги: открывает модалку назначения диктанта
+    // ученику/группе (План по диктанту для [группа]) — независимо от того, есть диктант на столе или нет.
+    const assignBtn = cardEl.querySelector('[data-action="toggle-desk-explicit"]');
+    if (assignBtn && !assignBtn.dataset.boundAssign) {
+      assignBtn.dataset.boundAssign = '1';
+      assignBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const dbId = Number(assignBtn.getAttribute('data-dictation-id'));
+        if (!Number.isFinite(dbId) || dbId <= 0) return;
+        if (typeof window.openPlanTasksModal === 'function') {
+          window.openPlanTasksModal(dbId);
+        } else if (typeof window.openCreateAssignmentModal === 'function') {
+          window.openCreateAssignmentModal(dbId);
+        } else {
+          try {
+            window.DictationKart._showToast('Модалка назначения не загружена', { durationMs: 2500 });
+          } catch (e2) {}
+        }
+      });
+    }
+
     const kebabBtn = cardEl.querySelector('[data-action="toggle-card-actions"]');
     const menu = cardEl.querySelector('.short-card-actions-menu:not(.dictation-kart-launch-menu)');
     if (!kebabBtn || !menu) {
-      try {
-        console.warn(
-          '[DK:bind] РАННИЙ return: kebabBtn=', !!kebabBtn, 'menu=', !!menu,
-          '→ обработчик toggle-desk-explicit НЕ привязан, dictation-id=', cardEl.getAttribute('data-dictation-id')
-        );
-      } catch (e) {}
       return;
     }
 
@@ -1376,74 +1434,6 @@ window.DictationKart = window.DictationKart || {
       });
     });
 
-    // Обработчик для кнопки "добавить/убрать со стола" (toggle-desk-explicit)
-    var toggleDeskBtn = cardEl.querySelector('[data-action="toggle-desk-explicit"]');
-    if (toggleDeskBtn) {
-      try {
-        console.log('[DK:bind] кнопка toggle-desk-explicit НАЙДЕНА, привязываю click-обработчик, dictation-id=', cardEl.getAttribute('data-dictation-id'));
-      } catch (e) {}
-      toggleDeskBtn.addEventListener('click', async function (e) {
-        try { console.log('[DK:toggleDesk] КЛИК по кнопке toggle-desk-explicit'); } catch (e) {}
-        e.preventDefault();
-        e.stopPropagation();
-        var dbId = toggleDeskBtn.getAttribute('data-dictation-id');
-        try { console.log('[DK:toggleDesk] data-dictation-id кнопки =', dbId); } catch (e) {}
-        if (!dbId) return;
-        dbId = Number(dbId);
-        if (!Number.isFinite(dbId) || dbId <= 0) return;
-
-        var isOnDesk = window.DictationKart.isDictationOnDesk(dbId);
-        try { console.log('[DK:toggleDesk] dbId=', dbId, '| isOnDesk=', isOnDesk); } catch (e) {}
-        try {
-          if (isOnDesk) {
-            // Найти itemId для этого диктанта
-            var itemId = null;
-            try {
-              if (typeof window.idbGet === 'function') {
-                var cached = await window.idbGet('desk_items', 'latest');
-                var items = cached && Array.isArray(cached.items) ? cached.items : [];
-                for (var i = 0; i < items.length; i++) {
-                  if (Number(items[i].dictation_id) === dbId) {
-                    itemId = items[i].id;
-                    break;
-                  }
-                }
-              }
-            } catch (e) {
-            }
-            if (itemId) {
-              await window.DictationKart.removeFromDesk(itemId, dbId);
-            }
-          } else {
-            await window.DictationKart.addToDesk(dbId);
-          }
-          // Обновляем иконку и классы на карточке
-          var newIsOnDesk = window.DictationKart.isDictationOnDesk(dbId);
-          var icon = toggleDeskBtn.querySelector('i[data-lucide]');
-          if (icon) {
-            icon.setAttribute('data-lucide', newIsOnDesk ? 'arrow-big-down-dash' : 'arrow-big-up-dash');
-          }
-          try {
-            if (newIsOnDesk) {
-              cardEl.classList.add('short-card--on-desk');
-              cardEl.classList.remove('short-card--off-desk');
-            } else {
-              cardEl.classList.add('short-card--off-desk');
-              cardEl.classList.remove('short-card--on-desk');
-            }
-          } catch (e) {
-          }
-          try {
-            if (window.lucide && typeof window.lucide.createIcons === 'function') {
-              window.lucide.createIcons();
-            }
-          } catch (e) {
-          }
-        } catch (err) {
-          console.warn('[dictation_kart] toggle-desk error:', err);
-        }
-      });
-    }
   },
 
   buildMenuItems(context) {
@@ -1924,11 +1914,10 @@ window.DictationKart = window.DictationKart || {
    * @returns {Promise<object>}
    */
   async addToDesk(dbId) {
-    try { console.log('[DK:addToDesk] ВХОД dbId=', dbId, '| jwt_token=', !!localStorage.getItem('jwt_token')); } catch (e) {}
     var token = (function () {
       try { return localStorage.getItem('jwt_token'); } catch (e) { return null; }
     })();
-    if (!token) { console.warn('[DK:addToDesk] НЕТ JWT токена'); throw new Error('No auth token'); }
+    if (!token) throw new Error('No auth token');
 
     var resp = await fetch('/desk/api/items', {
       method: 'POST',
@@ -1938,10 +1927,8 @@ window.DictationKart = window.DictationKart || {
       },
       body: JSON.stringify({ dictation_id: Number(dbId) })
     });
-    try { console.log('[DK:addToDesk] POST /desk/api/items статус=', resp.status); } catch (e) {}
     var data = await resp.json();
-    try { console.log('[DK:addToDesk] ответ сервера:', data); } catch (e) {}
-    if (!data.success) { console.warn('[DK:addToDesk] сервер вернул success=false:', data); throw new Error(data.error || 'Failed to add to desk'); }
+    if (!data.success) throw new Error(data.error || 'Failed to add to desk');
 
     // Обновляем кеш ID диктантов на столе
     try {

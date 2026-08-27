@@ -179,10 +179,7 @@
       const todayTasks = Array.isArray(opts.todayTasks) ? opts.todayTasks : [];
       const teacherAvatars = opts.teacherAvatars || {};
 
-      console.log('[DLaunch:modal] openLaunchModal ВХОД dictationId=', dictationId, 'title=', title, 'exercises.length=', exercises.length, 'todayTasks.length=', todayTasks.length, 'openUrl=', openUrl);
-
       const modal = ensureModal();
-      console.log('[DLaunch:modal] modal ensured, display=', modal.style.display);
 
       // Показываем модалку
       try {
@@ -190,9 +187,7 @@
         modal.style.visibility = 'visible';
         modal.style.opacity = '1';
         modal.removeAttribute('hidden');
-        console.log('[DLaunch:modal] модалка показана (display=flex)');
       } catch (e) {
-        console.error('[DLaunch:modal] ошибка показа модалки:', e);
       }
 
       // Заголовок
@@ -290,7 +285,6 @@
       }
 
       listEl.innerHTML = html;
-      console.log('[DLaunch:modal] список построен, html length=', html.length, 'кнопок в DOM=', listEl.querySelectorAll('.dictation-launch-item').length);
 
       // Lucide иконки
       try {
@@ -321,10 +315,8 @@
      * Загружает упражнения и задания на сегодня, решает, показывать модалку или сразу открыть диктант.
      */
     async function openDictationLaunch(dictationId, openUrl, cardEl, dictationTitle) {
-      console.log('[DLaunch:open] ВХОД dictationId=', dictationId, 'openUrl=', openUrl, 'title=', dictationTitle, 'cardEl=', !!cardEl);
       const id = Number(dictationId);
       if (!Number.isFinite(id) || id <= 0) {
-        console.warn('[DLaunch:open] некорректный dictationId=', dictationId);
         // Если DictationModal не загружен — не пытаемся открыть старую страницу
         if (window.DictationModal && typeof window.DictationModal.open === 'function') {
           window.DictationModal.open(openUrl, { cardEl, subsetPositions: null });
@@ -333,8 +325,6 @@
         }
         return;
       }
-
-      console.log('[DLaunch:open] normalized id=', id);
 
       // 1. Загружаем упражнения
       let exercises = [];
@@ -353,24 +343,18 @@
           }
         }
       } catch (e) {
-        try { console.warn('[DLaunch:open] cache load error (non-fatal):', e); } catch (e2) {}
       }
-      console.log('[DLaunch:open] упражнений из кэша:', exercises.length);
 
       // Если в кэше нет — загружаем с сервера
       if (!exercises.length) {
         try {
-          console.log('[DLaunch:open] загружаем упражнения с сервера для id=', id);
           const res = await apiRequest(`/api/dictation/${encodeURIComponent(String(id))}/exercises`, { method: 'GET' });
-          console.log('[DLaunch:open] ответ сервера exercises:', res);
           const raw = (res && res.success && Array.isArray(res.exercises)) ? res.exercises : [];
           exercises = raw.map((x) => {
             const p = x && typeof x.positions === 'string' ? (() => { try { return JSON.parse(x.positions); } catch (e) { return []; } })() : (x && Array.isArray(x.positions) ? x.positions : []);
             return { id: x && x.id != null ? x.id : null, positions: normalizePositions(p) };
           });
-          console.log('[DLaunch:open] упражнений с сервера:', exercises.length, 'raw:', raw.length);
         } catch (e) {
-          try { console.warn('[DLaunch:open] server load error:', e); } catch (e2) {}
           exercises = [];
         }
       }
@@ -406,9 +390,7 @@
       } catch (e) {
         todayTasks = [];
       }
-      console.log('[DLaunch:open] заданий на сегодня:', todayTasks.length);
-
-      // 3. Всегда показываем стартовую модалку (с выбором упражнения или «весь диктант»)
+      // 3. Определяем список упражнений (уникальные по сигнатуре позиций)
       const visibleExercises = exercises.filter((x) => x && x.id != null);
       const uniqueBySig = new Map();
       for (const ex of visibleExercises) {
@@ -416,7 +398,26 @@
         if (!uniqueBySig.has(sig)) uniqueBySig.set(sig, ex);
       }
       const exerciseList = Array.from(uniqueBySig.values());
-      console.log('[DLaunch:open] exerciseList (после дедупликации):', exerciseList.length, 'элементов, сигнатуры:', exerciseList.map(function(e) { return (e.positions && e.positions.length) ? e.positions.join(',') : '(весь диктант)'; }));
+
+      // 4. Если существует только одно задание — «весь диктант» (пустые позиции) —
+      //    запускаем диктант сразу, минуя модалку выбора задания.
+      //    Не пропускаем модалку, если у учителя есть задание на конкретные предложения.
+      const hasSpecificTask = todayTasks.some(function (t) {
+        var p = t && t.selected_sentence_positions;
+        return Array.isArray(p) && p.length > 0;
+      });
+      const onlyWholeDictation =
+        !hasSpecificTask &&
+        (exerciseList.length === 0 ||
+         (exerciseList.length === 1 && (!exerciseList[0].positions || !exerciseList[0].positions.length)));
+      if (onlyWholeDictation) {
+        if (window.DictationModal && typeof window.DictationModal.open === 'function') {
+          window.DictationModal.open(openUrl, { cardEl, subsetPositions: null });
+        } else {
+          console.warn('[dictation_launch_modal] DictationModal не загружен, невозможно открыть диктант');
+        }
+        return;
+      }
 
       // Извлекаем URL обложки из карточки
       let coverUrl = '';
@@ -428,7 +429,6 @@
       } catch (e) {
       }
 
-      console.log('[DLaunch:open] вызываю openLaunchModal с exerciseList.length=', exerciseList.length, 'todayTasks.length=', todayTasks.length);
       // Показываем стартовую модалку
       openLaunchModal({
         dictationId: id,
@@ -440,7 +440,6 @@
         todayTasks,
         teacherAvatars,
       });
-      console.log('[DLaunch:open] openLaunchModal вызван — управление передано');
     }
 
     // Экспортируем
