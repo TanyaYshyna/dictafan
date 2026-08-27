@@ -22,7 +22,7 @@ class B2Storage:
         
         self.api = None
         self.bucket = None
-        
+
         if self.enabled:
             if not self.key_id or not self.application_key or not self.bucket_name:
                 logger.warning(
@@ -152,17 +152,18 @@ class B2Storage:
         """
         if not self._ensure_initialized() or not self.bucket:
             return False
-        
+
         try:
             self.bucket.get_file_info_by_name(remote_path)
             return True
         except B2Error as e:
             if self._is_not_found_error(e):
                 return False
-            logger.error("B2 file_exists error for %s: %s", remote_path, e, exc_info=True)
-            if raise_on_error:
-                raise
-            return False
+            else:
+                logger.error("B2 file_exists error for %s: %s", remote_path, e, exc_info=True)
+                if raise_on_error:
+                    raise
+                return False
     
     def get_download_url(self, remote_path, valid_duration_seconds=3600):
         """
