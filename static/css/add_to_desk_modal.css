@@ -1,0 +1,43 @@
+/* add_to_desk_modal.css */
+
+.add-to-desk-modal {
+  display: none;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 100200;
+}
+
+.add-to-desk-modal-content {
+  max-width: 520px;
+}
+
+.add-to-desk-form {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.add-to-desk-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #555);
+}
+
+.add-to-desk-target-select {
+  height: 42px;
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 14px;
+  background: #fff;
+}

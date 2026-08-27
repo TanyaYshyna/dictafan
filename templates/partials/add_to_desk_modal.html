@@ -1,0 +1,41 @@
+<!-- add-to-desk-modal: добавление диктанта на рабочий стол (себе или ученикам группы) -->
+<div id="add-to-desk-modal" class="modal add-to-desk-modal" style="display: none;">
+    <div class="modal-content create-assignment-modal-content add-to-desk-modal-content">
+        <div class="modal-header create-assignment-modal-header">
+            <div class="create-assignment-modal-title">
+                <div class="create-assignment-modal-title-icon"><i data-lucide="arrow-big-down-dash"></i></div>
+                <div class="create-assignment-modal-title-text">Добавить на рабочий стол</div>
+            </div>
+
+            <div class="create-assignment-modal-header-actions">
+                <button type="button" id="add-to-desk-save" class="btn-primary create-assignment-save-btn">
+                    <i data-lucide="plus"></i>
+                    <span>Добавить</span>
+                </button>
+                <button type="button" id="add-to-desk-close" class="modal-close create-assignment-close-btn" title="Закрыть">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="modal-body create-assignment-modal-body">
+            <input type="hidden" id="add-to-desk-dictation-id" value="">
+
+            <div class="create-assignment-top">
+                <div class="create-assignment-cover">
+                    <div class="create-assignment-cover-box">
+                        <img id="add-to-desk-cover-img" alt="" class="create-assignment-cover-img" />
+                    </div>
+                </div>
+                <div class="create-assignment-top-right">
+                    <div id="add-to-desk-dictation-title" class="create-assignment-dictation-title"></div>
+                    <div id="add-to-desk-cover-meta" class="create-assignment-cover-meta"></div>
+                    <div class="add-to-desk-form">
+                        <label class="add-to-desk-label" for="add-to-desk-target">Куда добавить</label>
+                        <select id="add-to-desk-target" class="create-assignment-select add-to-desk-target-select"></select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

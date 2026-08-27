@@ -983,8 +983,8 @@ window.DictationKart = window.DictationKart || {
     } catch (e) {
     }
 
-    // Кнопка «толстая стрелка» в карточке книги: открывает модалку назначения диктанта
-    // ученику/группе (План по диктанту для [группа]) — независимо от того, есть диктант на столе или нет.
+    // Кнопка «толстая стрелка» в карточке книги: открывает модалку «Добавить на рабочий стол»
+    // (себе или ученикам выбранной группы) — независимо от того, есть диктант на столе или нет.
     const assignBtn = cardEl.querySelector('[data-action="toggle-desk-explicit"]');
     if (assignBtn && !assignBtn.dataset.boundAssign) {
       assignBtn.dataset.boundAssign = '1';
@@ -993,13 +993,11 @@ window.DictationKart = window.DictationKart || {
         e.stopPropagation();
         const dbId = Number(assignBtn.getAttribute('data-dictation-id'));
         if (!Number.isFinite(dbId) || dbId <= 0) return;
-        if (typeof window.openPlanTasksModal === 'function') {
-          window.openPlanTasksModal(dbId);
-        } else if (typeof window.openCreateAssignmentModal === 'function') {
-          window.openCreateAssignmentModal(dbId);
+        if (typeof window.openAddToDeskModal === 'function') {
+          window.openAddToDeskModal(dbId);
         } else {
           try {
-            window.DictationKart._showToast('Модалка назначения не загружена', { durationMs: 2500 });
+            window.DictationKart._showToast('Модалка добавления на стол не загружена', { durationMs: 2500 });
           } catch (e2) {}
         }
       });
