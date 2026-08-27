@@ -92,13 +92,11 @@
       if (!res || !res.success) return [];
       const groups = Array.isArray(res.groups) ? res.groups : [];
 
-      const personal = groups.filter(g => g && g.is_personal === true);
+      // «Мой стол» — это личная группа пользователя, она дублируется первой опцией select.
+      // Поэтому в списке оставляем только учебные группы учителя.
       const activeTeacher = groups.filter(g => g && !g.archived_at && g.is_personal !== true);
 
-      const out = [];
-      (personal || []).forEach(g => out.push(g));
-      (activeTeacher || []).forEach(g => out.push(g));
-      return out;
+      return activeTeacher;
     }
 
     function fillTargetSelect(groups) {
@@ -115,9 +113,8 @@
       (Array.isArray(groups) ? groups : []).forEach(g => {
         const opt = document.createElement('option');
         opt.value = String(g && g.id != null ? g.id : '');
-        const isPersonal = Boolean(g && g.is_personal === true);
         const title = g && g.title ? String(g.title) : '';
-        opt.textContent = isPersonal ? 'Моя группа' : title;
+        opt.textContent = title || 'Группа';
         sel.appendChild(opt);
       });
 
@@ -158,7 +155,7 @@
 
         if (!target || target === 'own') {
           // Добавляем на свой рабочий стол.
-          await apiRequest(`/api/dictation/${encodeURIComponent(String(dictationIdNum))}/add-to-desk`, {
+          await apiRequest(`/library/api/dictation/${encodeURIComponent(String(dictationIdNum))}/add-to-desk`, {
             method: 'POST',
             body: JSON.stringify({ planned_date: plannedDate }),
           });
@@ -169,7 +166,7 @@
             showToast('Выберите группу', { durationMs: 2500 });
             return;
           }
-          await apiRequest(`/api/dictation/${encodeURIComponent(String(dictationIdNum))}/add-to-desk-group`, {
+          await apiRequest(`/library/api/dictation/${encodeURIComponent(String(dictationIdNum))}/add-to-desk-group`, {
             method: 'POST',
             body: JSON.stringify({ group_id: groupIdNum, planned_date: plannedDate }),
           });

@@ -440,6 +440,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - `100280` — `#crop-modal` (кроп обложки, используется `CoverManager`, группа `book_modal.*`)
 - `100300` — `#dictationEditorModal` (редактор диктанта в модальном окне, группа `dictation_editor_modal.*`)
 - `100310` — `#newDictationFillModal` (начальное заполнение нового диктанта, открывается поверх `#dictationEditorModal`)
+- `100320` — `#add-to-desk-modal` (добавление диктанта на рабочий стол, группа `add_to_desk_modal.*`)
 - `200500` — `#auto-toast` (всплывающие уведомления)
 
 ### Высота шапки (topbar) и нижней строки (sw-status-bar)
