@@ -80,6 +80,26 @@
   flex-shrink: 0;
 }
 
+.public-library-modal-content .library-reload-btn {
+  background: none;
+  border: none;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.public-library-modal-content .library-reload-btn:hover {
+  background: var(--color-panel-bg, #fff);
+}
+
 .public-library-modal-content .btn-new-book {
   background: none;
   border: none;

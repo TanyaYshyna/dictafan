@@ -113,6 +113,38 @@
       });
     }
 
+    const USER_BOOKS_CACHE_KEY = 'library:user_books';
+
+    async function readBooksCache() {
+      try {
+        const idb = window.IdbManager;
+        if (!idb || typeof idb.idbGet !== 'function') return null;
+        const row = await idb.idbGet('book_view', USER_BOOKS_CACHE_KEY);
+        if (row && row.data && (Array.isArray(row.data.ownBooks) || Array.isArray(row.data.own_books))) {
+          return {
+            ownBooks: Array.isArray(row.data.ownBooks) ? row.data.ownBooks : (row.data.own_books || []),
+            shelfBooks: Array.isArray(row.data.shelfBooks) ? row.data.shelfBooks : (row.data.shelf_books || []),
+          };
+        }
+        return null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function writeBooksCache(ownBooks, shelfBooks) {
+      try {
+        const idb = window.IdbManager;
+        if (!idb || typeof idb.idbPut !== 'function') return;
+        await idb.idbPut('book_view', {
+          key: USER_BOOKS_CACHE_KEY,
+          data: { ownBooks, shelfBooks },
+          updatedAt: Date.now(),
+        });
+      } catch (e) {
+      }
+    }
+
     function createMiniBookCard(book) {
       const isOwn = !!(book && (book.isOwn === true || book.is_own === true));
       const foreignClass = isOwn ? '' : 'foreign';
@@ -243,12 +275,19 @@
       }
     }
 
-    async function loadBooksFromAPI() {
+    async function loadBooksFromAPI(options) {
+      const opts = options && typeof options === 'object' ? options : {};
+      const silent = opts.silent === true;
       try {
         const token = getToken();
         if (!token) {
           try { if (window.UM) window.UM.requireAuth(); } catch (e) { }
           return;
+        }
+
+        if (!silent) {
+          const container = document.getElementById('booksList');
+          if (container) container.innerHTML = '<div style="padding: 20px; text-align: center;">Загрузка...</div>';
         }
 
         const response = await fetch('/library/api/user-books', {
@@ -265,10 +304,11 @@
           if (data && data.success) {
             state.lastOwnBooks = Array.isArray(data.own_books) ? data.own_books : [];
             state.lastShelfBooks = Array.isArray(data.shelf_books) ? data.shelf_books : [];
+            await writeBooksCache(state.lastOwnBooks, state.lastShelfBooks);
             renderBooksList(state.lastOwnBooks, state.lastShelfBooks);
             return;
           }
-          showToast('Ошибка загрузки книг');
+          if (!silent) showToast('Ошибка загрузки книг');
           return;
         }
 
@@ -277,9 +317,9 @@
           return;
         }
 
-        showToast('Ошибка загрузки книг');
+        if (!silent) showToast('Ошибка загрузки книг');
       } catch (e) {
-        showToast('Ошибка загрузки книг');
+        if (!silent) showToast('Ошибка загрузки книг');
       }
     }
 
@@ -335,7 +375,19 @@
       modal.style.display = 'flex';
       state._loadedAt = Date.now();
       initializeBooksLanguageSelector();
-      loadBooksFromAPI().catch(() => { });
+
+      readBooksCache()
+        .then((cached) => {
+          if (cached && (Array.isArray(cached.ownBooks) || Array.isArray(cached.shelfBooks))) {
+            state.lastOwnBooks = Array.isArray(cached.ownBooks) ? cached.ownBooks : [];
+            state.lastShelfBooks = Array.isArray(cached.shelfBooks) ? cached.shelfBooks : [];
+            renderBooksList(state.lastOwnBooks, state.lastShelfBooks);
+          }
+          loadBooksFromAPI({ silent: !!cached }).catch(() => { });
+        })
+        .catch(() => {
+          loadBooksFromAPI({ silent: false }).catch(() => { });
+        });
 
       try {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -367,6 +419,16 @@
         modal.dataset.bound = '1';
         modal.addEventListener('click', (event) => {
           if (event && event.target === modal) close();
+        });
+      }
+
+      const reloadBtn = document.getElementById('home-library-reload');
+      if (reloadBtn && reloadBtn.dataset.bound !== '1') {
+        reloadBtn.dataset.bound = '1';
+        reloadBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          loadBooksFromAPI({ silent: false }).catch(() => { });
         });
       }
 
