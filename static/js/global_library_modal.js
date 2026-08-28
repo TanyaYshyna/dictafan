@@ -329,21 +329,6 @@
         });
       }
 
-      const addBtn = document.getElementById('public-library-add');
-      if (addBtn && addBtn.dataset.bound !== '1') {
-        addBtn.dataset.bound = '1';
-        addBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          try {
-            if (window.BookModal && typeof window.BookModal.openEdit === 'function') {
-              window.BookModal.openEdit(null);
-            }
-          } catch (e2) {
-          }
-        });
-      }
-
       const modal = document.getElementById('public-library-modal');
       if (modal && modal.dataset.bound !== '1') {
         modal.dataset.bound = '1';

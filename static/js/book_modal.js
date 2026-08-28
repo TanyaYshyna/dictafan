@@ -818,18 +818,28 @@
         const m = window.CoverManager;
         if (!m || typeof m.bind !== 'function') return;
 
+        // Защита от повторного биндинга при повторных открытиях модалки
+        const uploadBtn = document.getElementById('book-cover-upload-btn');
+        if (uploadBtn && uploadBtn.getAttribute('data-cover-bound') === '1') return;
+        if (uploadBtn) uploadBtn.setAttribute('data-cover-bound', '1');
+
         m.bind({
           kind: 'book',
           fileInputId: 'book-cover-upload',
-          openFileBtnId: 'book-cover-upload-btn',
-          clickablePreviewId: 'book-cover-clickable',
+          uploadBtnId: 'book-cover-upload-btn',
+          clickableId: 'book-cover-clickable',
           previewImgId: 'book-cover-preview',
           placeholderId: 'book-cover-placeholder',
-          cropModalId: 'crop-modal',
+          modalId: 'crop-modal',
           cropImageId: 'crop-image',
-          cropCloseId: 'crop-close',
-          cropCancelId: 'crop-cancel',
-          cropConfirmId: 'crop-confirm',
+          closeBtnId: 'crop-close',
+          cancelBtnId: 'crop-cancel',
+          confirmBtnId: 'crop-confirm',
+          aspectRatio: 1,
+          outputWidth: 200,
+          outputHeight: 200,
+          outputType: 'image/webp',
+          outputQuality: 0.9,
           maxFileSizeBytes: 5 * 1024 * 1024,
           successToast: 'Обложка готова к сохранению',
           onDirty: () => {

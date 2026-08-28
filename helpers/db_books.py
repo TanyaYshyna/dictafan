@@ -3,6 +3,7 @@
 book_dictations, user_books, desk_items).
 """
 
+import re
 from typing import List, Optional, Dict, Any, Tuple
 
 from .db import get_db_cursor
@@ -812,6 +813,42 @@ def get_book_sections(parent_id: int) -> List[Dict[str, Any]]:
         conn.close()
 
 
+def _next_book_id(cur) -> Optional[int]:
+    """
+    Возвращает следующий id для таблицы books, используя её последовательность.
+    Нужно для явного задания root_book_id = id при создании книги верхнего уровня
+    (колонка root_book_id — NOT NULL без DEFAULT).
+    """
+    try:
+        cur.execute("SELECT pg_get_serial_sequence('books', 'id') AS seq")
+        seq_row = cur.fetchone()
+        seq = seq_row["seq"] if seq_row else None
+        if seq:
+            cur.execute("SELECT nextval(%s)", (seq,))
+            nxt = cur.fetchone()
+            if nxt:
+                return int(nxt[0])
+
+        # Фолбэк для IDENTITY-колонок, где pg_get_serial_sequence может вернуть NULL
+        cur.execute("""
+            SELECT column_default
+            FROM information_schema.columns
+            WHERE table_name='books' AND column_name='id'
+        """)
+        def_row = cur.fetchone()
+        default = def_row["column_default"] if def_row else None
+        if default:
+            m = re.search(r"nextval\('([^']+)'", str(default))
+            if m:
+                cur.execute("SELECT nextval(%s)", (m.group(1),))
+                nxt = cur.fetchone()
+                if nxt:
+                    return int(nxt[0])
+    except Exception:
+        pass
+    return None
+
+
 def create_book(
     *,
     creator_user_id: int,
@@ -831,82 +868,86 @@ def create_book(
     """
     conn, cur = get_db_cursor()
     try:
-        # Проверяем, существует ли колонка author_materials_url
+        # Узнаём, какие колонки есть в таблице books
         cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name='books' AND column_name='author_materials_url'
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='books'
         """)
-        has_author_materials_url = cur.fetchone() is not None
-        
+        book_cols = {row["column_name"] for row in cur.fetchall()}
+
+        has_author_materials_url = "author_materials_url" in book_cols
+        has_root_book_id = "root_book_id" in book_cols
+
+        fields: Dict[str, Any] = {
+            "title": title,
+            "author_text": author_text,
+            "creator_user_id": creator_user_id,
+            "original_language": original_language,
+            "visibility": visibility,
+            "short_description": short_description,
+            "theme": theme,
+            "parent_id": parent_id,
+            "order_index": order_index,
+        }
         if has_author_materials_url:
-            cur.execute(
-                """
-                INSERT INTO books (
-                    title,
-                    author_text,
-                    creator_user_id,
-                    original_language,
-                    visibility,
-                    short_description,
-                    theme,
-                    parent_id,
-                    order_index,
-                    author_materials_url
+            fields["author_materials_url"] = author_materials_url
+
+        # Колонка root_book_id — NOT NULL без DEFAULT, поэтому заполняем её явно.
+        if has_root_book_id:
+            if parent_id:
+                # Для раздела root_book_id наследуем от родителя
+                cur.execute(
+                    "SELECT root_book_id FROM books WHERE id = %s",
+                    (parent_id,),
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id, title, author_text, creator_user_id,
-                          original_language, visibility, short_description, theme,
-                          parent_id, order_index, author_materials_url, created_at, updated_at
-                """,
-                (
-                    title,
-                    author_text,
-                    creator_user_id,
-                    original_language,
-                    visibility,
-                    short_description,
-                    theme,
-                    parent_id,
-                    order_index,
-                    author_materials_url,
-                ),
-            )
-        else:
-            cur.execute(
-                """
-                INSERT INTO books (
-                    title,
-                    author_text,
-                    creator_user_id,
-                    original_language,
-                    visibility,
-                    short_description,
-                    theme,
-                    parent_id,
-                    order_index,
+                parent_row = cur.fetchone()
+                root_book_id = (
+                    parent_row["root_book_id"]
+                    if parent_row and parent_row.get("root_book_id") is not None
+                    else parent_id
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id, title, author_text, creator_user_id,
-                          original_language, visibility, short_description, theme,
-                          parent_id, order_index, created_at, updated_at
-                """,
-                (
-                    title,
-                    author_text,
-                    creator_user_id,
-                    original_language,
-                    visibility,
-                    short_description,
-                    theme,
-                    parent_id,
-                    order_index,
-                ),
-            )
+            else:
+                # Для книги верхнего уровня root_book_id = её собственному id,
+                # который узнаём заранее через последовательность.
+                new_id = _next_book_id(cur)
+                if new_id is None:
+                    raise RuntimeError(
+                        "Не удалось определить следующий id для таблицы books"
+                    )
+                root_book_id = new_id
+                fields["id"] = new_id
+            fields["root_book_id"] = root_book_id
+
+        columns = list(fields.keys())
+        col_sql = ", ".join(columns)
+        placeholders = ", ".join(["%s"] * len(columns))
+
+        returning_cols = [
+            "id",
+            "title",
+            "author_text",
+            "creator_user_id",
+            "original_language",
+            "visibility",
+            "short_description",
+            "theme",
+            "parent_id",
+            "order_index",
+        ]
+        if has_author_materials_url:
+            returning_cols.append("author_materials_url")
+        returning_cols.extend(["created_at", "updated_at"])
+        returning_sql = ", ".join(returning_cols)
+
+        cur.execute(
+            f"INSERT INTO books ({col_sql}) VALUES ({placeholders}) RETURNING {returning_sql}",
+            tuple(fields[c] for c in columns),
+        )
         row = cur.fetchone()
         conn.commit()
 
-        return {
+        result = {
             "id": row["id"],
             "title": row["title"],
             "cover_url": _calc_book_cover_url(int(row["id"])),
@@ -921,6 +962,9 @@ def create_book(
             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
             "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
         }
+        if has_author_materials_url:
+            result["author_materials_url"] = row.get("author_materials_url")
+        return result
     finally:
         cur.close()
         conn.close()
