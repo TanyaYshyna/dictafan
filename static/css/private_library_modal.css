@@ -129,31 +129,25 @@
 }
 
 .btn-new-book {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+  font-size: 24px;
+  line-height: 1;
   width: 32px;
   height: 32px;
-  padding: 0;
-  border: 0;
-  background: var(--color-button-yellow, #fbbf24);
-  color: var(--color-button-text-yellow, #1f2933);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
 .btn-new-book:hover {
-  background: var(--color-button-yellow-dark, #eab308);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.btn-new-book i {
-  width: 18px;
-  height: 18px;
+  background: var(--color-panel-bg, #fff);
 }
 
 .books-list {
