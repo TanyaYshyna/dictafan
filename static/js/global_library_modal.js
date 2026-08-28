@@ -112,6 +112,32 @@
       });
     }
 
+    const PUBLIC_BOOKS_CACHE_KEY = 'library:public_books';
+
+    async function readPublicBooksCache() {
+      try {
+        const idb = window.IdbManager;
+        if (!idb || typeof idb.idbGet !== 'function') return null;
+        const row = await idb.idbGet('book_view', PUBLIC_BOOKS_CACHE_KEY);
+        return (row && Array.isArray(row.data)) ? row.data : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function writePublicBooksCache(books) {
+      try {
+        const idb = window.IdbManager;
+        if (!idb || typeof idb.idbPut !== 'function') return;
+        await idb.idbPut('book_view', {
+          key: PUBLIC_BOOKS_CACHE_KEY,
+          data: books,
+          updatedAt: Date.now(),
+        });
+      } catch (e) {
+      }
+    }
+
     function createMiniBookCard(book) {
       const isOwn = !!(book && (book.isOwn === true || book.is_own === true));
       const foreignClass = isOwn ? '' : 'foreign';
@@ -263,17 +289,22 @@
       });
     }
 
-    async function loadPublicBooks() {
+    async function loadPublicBooks(options) {
+      const opts = options && typeof options === 'object' ? options : {};
+      const silent = opts.silent === true;
       const list = document.getElementById('publicBooksList');
       if (!list) return;
 
       try {
-        list.innerHTML = '<div style="padding: 20px; text-align: center;">Загрузка...</div>';
+        if (!silent) {
+          list.innerHTML = '<div style="padding: 20px; text-align: center;">Загрузка...</div>';
+        }
 
         const data = await apiRequest('/library/api/public-books?limit=200');
         if (data && data.success && data.books) {
           state.publicBooks = data.books;
           state.publicBooksLoadedAt = Date.now();
+          await writePublicBooksCache(data.books);
 
           if (!state.currentPublicBooksFilterLanguage) {
             state.currentPublicBooksFilterLanguage = window.USER_LANGUAGE_DATA?.currentLearning || null;
@@ -283,9 +314,13 @@
           return;
         }
 
-        list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки публичных книг</div>';
+        if (!silent) {
+          list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки публичных книг</div>';
+        }
       } catch (e) {
-        list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки публичных книг</div>';
+        if (!silent) {
+          list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки публичных книг</div>';
+        }
       }
     }
 
@@ -302,7 +337,15 @@
       if (Array.isArray(state.publicBooks) && state.publicBooks.length > 0 && (Date.now() - state.publicBooksLoadedAt) < 5 * 60 * 1000) {
         renderPublicBooksList();
       } else {
-        await loadPublicBooks();
+        const cached = await readPublicBooksCache();
+        if (Array.isArray(cached) && cached.length > 0) {
+          state.publicBooks = cached;
+          state.publicBooksLoadedAt = Date.now();
+          renderPublicBooksList();
+          loadPublicBooks({ silent: true }).catch(() => { });
+        } else {
+          await loadPublicBooks();
+        }
       }
 
       try {
@@ -326,6 +369,16 @@
           e.preventDefault();
           e.stopPropagation();
           close();
+        });
+      }
+
+      const reloadBtn = document.getElementById('public-library-reload');
+      if (reloadBtn && reloadBtn.dataset.bound !== '1') {
+        reloadBtn.dataset.bound = '1';
+        reloadBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          loadPublicBooks().catch(() => { });
         });
       }
 
