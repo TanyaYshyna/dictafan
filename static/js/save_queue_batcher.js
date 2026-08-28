@@ -56,31 +56,63 @@
         return null;
       }
 
-      // Генерируем уникальный ключ
-      var key = 'save:' + dictId + ':' + Date.now();
-
-      // Очищаем saveData от функций и циклических ссылок
-      var cleanPayload = JSON.parse(JSON.stringify(saveData || {}));
-
-      var item = {
-        key: key,
-        type: 'draft_save',
-        dictationId: dictId,
-        payload: cleanPayload,
-        status: 'pending',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        retryCount: 0,
-        lastError: null,
-      };
-
       if (!window.IdbManager || typeof window.IdbManager.idbPut !== 'function') {
         console.warn(TAG, '[enqueueSave] IdbManager не доступен');
         return null;
       }
 
+      // Очищаем saveData от функций и циклических ссылок
+      var cleanPayload = JSON.parse(JSON.stringify(saveData || {}));
+
+      // Не плодим дубликаты: если для этого dictationId уже есть pending/sending запись
+      // (например, пользователь сохранил офлайн несколько раз подряд), обновляем её,
+      // а не создаём новую. Иначе при восстановлении сети сервер создаст два диктанта
+      // из одного dict_<id>.
+      var existing = null;
+      if (typeof window.IdbManager.idbGetAll === 'function') {
+        var rows = await window.IdbManager.idbGetAll('draft_save_queue') || [];
+        for (var ri = 0; ri < rows.length; ri++) {
+          var r = rows[ri];
+          if (r && r.type === 'draft_save' && r.dictationId === dictId &&
+              (r.status === 'pending' || r.status === 'sending')) {
+            existing = r;
+            break;
+          }
+        }
+      }
+
+      var key;
+      var item;
+      if (existing) {
+        key = existing.key;
+        item = {
+          key: existing.key,
+          type: 'draft_save',
+          dictationId: dictId,
+          payload: cleanPayload,
+          status: 'pending',
+          createdAt: existing.createdAt || Date.now(),
+          updatedAt: Date.now(),
+          retryCount: existing.retryCount || 0,
+          lastError: existing.lastError || null,
+        };
+      } else {
+        key = 'save:' + dictId + ':' + Date.now();
+        item = {
+          key: key,
+          type: 'draft_save',
+          dictationId: dictId,
+          payload: cleanPayload,
+          status: 'pending',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          retryCount: 0,
+          lastError: null,
+        };
+      }
+
       await window.IdbManager.idbPut('draft_save_queue', item);
-      console.log(TAG, '[enqueueSave] сохранено в очередь:', key, 'dictationId:', dictId);
+      console.log(TAG, '[enqueueSave] сохранено в очередь:', key, 'dictationId:', dictId, existing ? '(обновлена существующая запись)' : '(новая запись)');
 
       // Запускаем отправку
       _scheduleFlush();
@@ -98,37 +130,45 @@
   async function _flushQueue() {
     if (state.flushing) {
       state._retryFlush = true;
-      return;
+      return [];
     }
     state.flushing = true;
+
+    // Метданные успешно сохранённых записей (key → { dictation_id, db_id }).
+    // Возвращаются наружу, чтобы _handleSave() мог обновить реальный ID нового диктанта.
+    var results = [];
 
     try {
       if (!_hasToken()) {
         console.log(TAG, '[flushQueue] нет токена — пропускаем');
-        return;
+        return results;
       }
 
       if (!window.IdbManager || typeof window.IdbManager.idbGetAll !== 'function') {
-        return;
+        return results;
       }
 
       var rows = await window.IdbManager.idbGetAll('draft_save_queue');
       if (!rows || !Array.isArray(rows) || rows.length === 0) {
-        return;
+        return results;
       }
 
+      // Повторно отправляем и 'pending', и застрявшие 'sending'.
+      // Запись может остаться в статусе 'sending', если предыдущий flush
+      // упал в момент обновления записи (например, из-за ReferenceError) —
+      // такие записи нельзя терять, иначе диктант никогда не попадёт на сервер.
       var pendingRows = rows.filter(function (r) {
-        return r.type === 'draft_save' && r.status === 'pending';
+        return r.type === 'draft_save' && (r.status === 'pending' || r.status === 'sending');
       });
 
       if (pendingRows.length === 0) {
-        return;
+        return results;
       }
 
       console.log(TAG, '[flushQueue] отправляю ' + pendingRows.length + ' записей');
 
       var token = _getToken();
-      if (!token) return;
+      if (!token) return results;
 
       for (var i = 0; i < pendingRows.length; i++) {
         var item = pendingRows[i];
@@ -155,6 +195,8 @@
         }
 
         var success = false;
+        var errorMessage = 'unknown';
+        var savedMeta = null;
 
         try {
           // Этап 1: отправляем текст/БД
@@ -185,15 +227,24 @@
           // Аудио не шлём из очереди — оно уже обрабатывается через _uploadDraftAudioToB2
           // когда пользователь онлайн.
 
+          // Запоминаем реальные ID (для новых диктантов сервер вернул dict_<id>).
+          savedMeta = {
+            key: item.key,
+            dictation_id: dbResult.dictation_id || null,
+            db_id: dbResult.db_id != null ? dbResult.db_id : (dbResult.id != null ? dbResult.id : null),
+          };
+
           // Успех — удаляем из очереди
           success = true;
         } catch (e) {
-          console.warn(TAG, '[flushQueue] ошибка для', item.key, String(e));
+          errorMessage = String(e && e.message ? e.message : e);
+          console.warn(TAG, '[flushQueue] ошибка для', item.key, errorMessage);
         }
 
         try {
           if (success) {
             await window.IdbManager.idbDelete('draft_save_queue', item.key);
+            if (savedMeta) results.push(savedMeta);
             console.log(TAG, '[flushQueue] запись удалена из очереди:', item.key);
           } else {
             // Возвращаем в pending
@@ -201,7 +252,7 @@
             if (current) {
               current.status = 'pending';
               current.retryCount = (current.retryCount || 0) + 1;
-              current.lastError = String(e || 'unknown');
+              current.lastError = errorMessage;
               current.updatedAt = Date.now();
               await window.IdbManager.idbPut('draft_save_queue', current);
             }
@@ -216,9 +267,13 @@
       state.flushing = false;
       if (state._retryFlush) {
         state._retryFlush = false;
-        _flushQueue();
+        // Повторный flush (если он был запрошен во время текущего) — результаты склеиваем.
+        var nested = await _flushQueue();
+        if (Array.isArray(nested)) results = results.concat(nested);
       }
     }
+
+    return results;
   }
 
   /** Запланировать периодическую проверку очереди */
@@ -244,7 +299,9 @@
         var r = rows[i];
         if (r.type === 'draft_save') {
           total++;
-          if (r.status === 'pending') pending++;
+          // 'sending' считаем как pending: запись ещё не подтверждена сервером.
+          // Иначе _handleSave() увидит pending===0 и ошибочно решит, что всё сохранено.
+          if (r.status === 'pending' || r.status === 'sending') pending++;
           if (r.status === 'failed') failed++;
         }
       }
@@ -256,7 +313,7 @@
 
   /** Принудительно запустить отправку */
   async function flushAll() {
-    await _flushQueue();
+    return await _flushQueue();
   }
 
   // Экспортируем

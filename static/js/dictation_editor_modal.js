@@ -2763,8 +2763,23 @@ function _initVoiceModeRadios() {
         }
         // Показываем/скрываем кнопку "Перезаполнить все авто" в шапке таблицы
         _updateAutoRegenerateAllBtnVisibility();
-        // Изменение режима голоса — это изменение в БД (voice_mode), зажигаем звезду
-        _setDirtyFlags({ db: true });
+        // Изменение режима голоса — это изменение в БД (voice_mode), зажигаем звезду.
+        // НО только для реальных кликов пользователя: программный dispatchEvent('change')
+        // (например, из _updateEditorFromFillConfig после заполнения формы или из _refillAndApply)
+        // не должен помечать редактор "грязным".
+        if (this.__userClickedVoiceMode) {
+          _setDirtyFlags({ db: true });
+        }
+      }
+    });
+    // Ловим именно действия пользователя (мышь/клавиатура), а не программные dispatchEvent.
+    radio.addEventListener('click', function () {
+      radio.__userClickedVoiceMode = true;
+    });
+    radio.addEventListener('keydown', function (e) {
+      if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
+          e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        radio.__userClickedVoiceMode = true;
       }
     });
   });
@@ -3750,6 +3765,28 @@ function _setupTabs() {
 
 /* ===== SAVE SYSTEM ===== */
 
+function _applySavedDictationIds(savedMeta, prevId) {
+  if (!savedMeta || !state.config) return;
+  var newDictationId = savedMeta.dictation_id;
+  if (!newDictationId) return;
+  var prev = prevId || '';
+  if (prev !== newDictationId) {
+    console.log('[dictationEditorModal] Обновляю ID диктанта:', prev, '->', newDictationId);
+    state.config.dictationId = newDictationId;
+    if (state.content) {
+      state.content.dictationId = newDictationId;
+    }
+    var idSpan = document.getElementById('dictation-editor-modal-id');
+    if (idSpan) {
+      var displayId = String(newDictationId).replace('dict_', '');
+      idSpan.textContent = '#' + displayId;
+    }
+  }
+  if (savedMeta.db_id && (!state.config.dbId || state.config.dictationId !== prev)) {
+    state.config.dbId = savedMeta.db_id;
+  }
+}
+
 async function _handleSave() {
   var saveBtn = document.getElementById('dictationEditorModalSaveBtn');
   if (!saveBtn) return false;
@@ -3802,6 +3839,7 @@ async function _handleSave() {
 
     // Собираем данные для сохранения
     var dictationId = state.config ? state.config.dictationId : null;
+    var prevDictationId = String(dictationId || '');
     if (!dictationId) {
       console.warn('[dictationEditorModal] Нет ID диктанта для сохранения');
       return false;
@@ -3872,9 +3910,21 @@ async function _handleSave() {
     try {
       targetBookStr = sessionStorage.getItem('dictationTargetBook');
       if (targetBookStr) {
-        var parsed = JSON.parse(targetBookStr);
-        if (parsed && parsed.book_id != null) {
+        var parsed = null;
+        try {
+          parsed = JSON.parse(targetBookStr);
+        } catch (e) {
+          parsed = null;
+        }
+        if (parsed && typeof parsed === 'object' && parsed.book_id != null) {
+          // Формат desktop.js / book_modal.js: { book_id: <number> }
           targetBookId = Number(parsed.book_id);
+        } else {
+          // Обратная совместимость: старый формат — голая строка/число "123".
+          var legacyId = Number(targetBookStr);
+          if (!isNaN(legacyId) && legacyId > 0) {
+            targetBookId = legacyId;
+          }
         }
       }
     } catch (e) {
@@ -3968,17 +4018,35 @@ async function _handleSave() {
         var queueKey = await window.SaveQueueBatcher.enqueueSave(normalizedId, saveData);
 
         if (queueKey) {
-          // Пытаемся сразу отправить
-          await window.SaveQueueBatcher.flushAll();
+          // Пытаемся сразу отправить.
+          // flushAll() возвращает метаданные успешно отправленных записей:
+          // [{ key, dictation_id, db_id }] — для новых диктантов это реальный ID.
+          var flushResults = await window.SaveQueueBatcher.flushAll();
+          if (!Array.isArray(flushResults)) flushResults = [];
 
           // Проверяем осталась ли запись в очереди
           var queueInfo = await window.SaveQueueBatcher.getQueueInfo();
+
+          // Находим результат для нашего ключа (ID диктанта уже зарезервирован,
+          // но сервер может вернуть актуальные dictation_id/db_id в метаданных).
+          var savedMeta = null;
+          for (var mi = 0; mi < flushResults.length; mi++) {
+            if (flushResults[mi] && flushResults[mi].key === queueKey) {
+              savedMeta = flushResults[mi];
+              break;
+            }
+          }
 
           if (queueInfo.pending === 0) {
             // Отправлено успешно
             saved = true;
             _setDirtyFlags({ db: false, audio: false, cover: false });
             console.log('[dictationEditorModal] Данные сохранены через очередь');
+
+            // Обновляем реальный ID диктанта из ответа сервера (на случай, если он изменился).
+            if (savedMeta) {
+              _applySavedDictationIds(savedMeta, prevDictationId);
+            }
 
             // Добавляем диктант на рабочий стол
             try {
@@ -4027,10 +4095,13 @@ async function _handleSave() {
           // Загружаем аудио на B2, если флаг audio был установлен ДО сброса dirtyFlags.
           // Используем hasDirtyAudio (скопирован ДО _setDirtyFlags), а НЕ flags.audio,
           // потому что _setDirtyFlags() мутирует тот же объект state.dirtyFlags.
+          // Важно: используем актуальный (уже обновлённый) ID диктанта, чтобы аудио
+          // загрузилось под реальным dict_<id>.
+          var effectiveDictationIdForB2 = state.config ? (state.config.dictationId || normalizedId) : normalizedId;
           if (hasDirtyAudio && navigator.onLine) {
-            console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Загружаем аудио на B2: dictationId=' + normalizedId);
+            console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Загружаем аудио на B2: dictationId=' + effectiveDictationIdForB2);
             try {
-              var b2Result = await _uploadDraftAudioToB2(normalizedId, token, dirtySetSnapshot);
+              var b2Result = await _uploadDraftAudioToB2(effectiveDictationIdForB2, token, dirtySetSnapshot);
               if (b2Result && b2Result.ok) {
                 _setDirtyFlags({ audio: false });
                 console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио загружено на B2 успешно: uploaded=' + b2Result.uploaded + ' skipped=' + b2Result.skipped + ' failed=' + (b2Result.failed ? b2Result.failed.length : 0) + ' cacheMiss=' + b2Result.cacheMiss);
@@ -5629,18 +5700,15 @@ window.NewDictationFillModal = {
       // Определяем, нужно ли генерировать аудио (только для voiceMode === 'auto')
       var shouldGenerateAudio = (voiceMode === 'auto');
 
-      // Получаем dictationId из конфига (для генерации аудио)
-      // Для нового диктанта ID уже должен быть зарезервирован на сервере (desktop.js вызывает /api/dictation/reserve_id)
-      // Если по какой-то причине ID нет — генерируем временный
+      // Получаем dictationId из конфига (для генерации аудио).
+      // ID нового диктанта должен быть зарезервирован на сервере заранее
+      // (desktop.js и book_modal.js вызывают /api/dictation/reserve_id перед открытием).
+      // Устаревшая генерация dict_temp_* полностью удалена.
       var dictationId = this._editorConfig ? this._editorConfig.dictationId : '';
       if (!dictationId) {
-        dictationId = 'dict_temp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
-        console.log('[NewDictationFillModal] generated temp dictationId:', dictationId);
-        // Сохраняем временный ID в конфиг, чтобы _updateEditorFromFillConfig и _renderTable
-        // могли использовать его для построения URL аудио
-        if (this._editorConfig) {
-          this._editorConfig.dictationId = dictationId;
-        }
+        console.error('[NewDictationFillModal] Ошибка: dictationId не зарезервирован, создание невозможно');
+        alert('Помилка: не вдалося зарезервувати ID диктанта. Спробуйте ще раз.');
+        return;
       }
 
       // Получаем safe_email для API запросов

@@ -587,7 +587,7 @@ window.Desktop = window.Desktop || {
               } catch (e1) {}
             }
 
-            // Резервируем ID диктанта на сервере
+            // Резервируем ID диктанта на сервере (тот же порядок, что и в book_modal.js)
             var reservedId = '';
             var reservedDbId = null;
             try {
@@ -605,6 +605,11 @@ window.Desktop = window.Desktop || {
               }
             } catch (e2) {
               console.warn('[desktop] Ошибка резервирования ID диктанта:', e2);
+            }
+
+            if (!reservedId) {
+              console.error('[desktop] Не удалось зарезервировать ID диктанта');
+              return;
             }
 
             // Відкрити редактор для нового диктанта
