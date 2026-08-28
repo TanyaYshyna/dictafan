@@ -818,16 +818,32 @@ def _next_book_id(cur) -> Optional[int]:
     Возвращает следующий id для таблицы books, используя её последовательность.
     Нужно для явного задания root_book_id = id при создании книги верхнего уровня
     (колонка root_book_id — NOT NULL без DEFAULT).
+
+    ВАЖНО: cur — RealDictCursor, поэтому fetchone() возвращает dict, а не tuple.
+    Доставать значение нужно по ключу / итератору значений, а не по индексу [0].
     """
+    def _first_value(row):
+        if row is None:
+            return None
+        # RealDictRow — подкласс dict; для обычного cursor — tuple
+        if isinstance(row, dict):
+            if not row:
+                return None
+            return next(iter(row.values()))
+        try:
+            return row[0]
+        except (TypeError, IndexError, KeyError):
+            return None
+
     try:
         cur.execute("SELECT pg_get_serial_sequence('books', 'id') AS seq")
         seq_row = cur.fetchone()
         seq = seq_row["seq"] if seq_row else None
         if seq:
             cur.execute("SELECT nextval(%s)", (seq,))
-            nxt = cur.fetchone()
-            if nxt:
-                return int(nxt[0])
+            val = _first_value(cur.fetchone())
+            if val is not None:
+                return int(val)
 
         # Фолбэк для IDENTITY-колонок, где pg_get_serial_sequence может вернуть NULL
         cur.execute("""
@@ -841,9 +857,9 @@ def _next_book_id(cur) -> Optional[int]:
             m = re.search(r"nextval\('([^']+)'", str(default))
             if m:
                 cur.execute("SELECT nextval(%s)", (m.group(1),))
-                nxt = cur.fetchone()
-                if nxt:
-                    return int(nxt[0])
+                val = _first_value(cur.fetchone())
+                if val is not None:
+                    return int(val)
     except Exception:
         pass
     return None
