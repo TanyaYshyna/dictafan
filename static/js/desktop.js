@@ -1212,6 +1212,77 @@ window.Desktop = window.Desktop || {
     this.applyDeskLayoutIfNeeded();
   },
 
+  /**
+   * Убирает ОДНУ карточку со стола без полной перерисовки.
+   * Используется после «Убрать с рабочего стола», чтобы не дёргать
+   * /desk/api/items (и, как следствие, платные B2-проверки всех обложек).
+   */
+  removeDeskCard(itemId, dictationId) {
+    const container = document.getElementById('deskCardsContainer');
+    if (!container) return;
+
+    const sItemId = itemId == null ? '' : String(itemId);
+    const sDictationId = dictationId == null ? '' : String(dictationId);
+
+    // Удаляем карточку из DOM (по desk-item-id, затем fallback по dictation-id).
+    try {
+      const grid = container.querySelector('.shorts-grid');
+      if (grid) {
+        let card = null;
+        if (sItemId) {
+          card = grid.querySelector(`.desk-card[data-desk-item-id="${sItemId}"]`);
+        }
+        if (!card && sDictationId) {
+          card = grid.querySelector(`.desk-card[data-dictation-id="${sDictationId}"]`);
+        }
+        if (card) card.remove();
+      }
+    } catch (e) {
+    }
+
+    // Удаляем элемент из памяти всех items (для переключения языка без запроса).
+    try {
+      if (Array.isArray(this._allDeskItems)) {
+        this._allDeskItems = this._allDeskItems.filter(function (x) {
+          if (!x) return false;
+          if (sItemId && Number(x.id) === Number(itemId)) return false;
+          if (sDictationId && Number(x.dictation_id) === Number(dictationId)) return false;
+          return true;
+        });
+      }
+    } catch (e) {
+    }
+
+    // Если отрисованных карточек не осталось — возвращаем плейсхолдер,
+    // повторяя логику renderDeskCards (пустой стол vs. фильтр по языку).
+    try {
+      const grid = container.querySelector('.shorts-grid');
+      if (grid && grid.querySelectorAll('.desk-card').length === 0) {
+        const remaining = Array.isArray(this._allDeskItems)
+          ? this._allDeskItems.filter(Boolean)
+          : [];
+        if (remaining.length === 0) {
+          container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
+        } else {
+          const activeLang = this._activeLanguage;
+          const hasVisible = !activeLang || remaining.some(function (item) {
+            try {
+              return item.language_code && String(item.language_code).toLowerCase() === String(activeLang).toLowerCase();
+            } catch (e) {
+              return true;
+            }
+          });
+          if (!hasVisible) {
+            container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Немає диктантів для цієї мови</div>';
+          }
+        }
+      }
+    } catch (e) {
+    }
+
+    this.applyDeskLayoutIfNeeded();
+  },
+
   async loadDeskItems() {
     const token = (() => {
       try { return localStorage.getItem('jwt_token'); } catch (e) { return null; }

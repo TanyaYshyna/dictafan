@@ -1012,9 +1012,11 @@ def api_get_avatar():
         avatar_filename = 'avatar.webp' if size == 'large' else 'avatar_min.webp'
         avatar_path = os.path.join(user_folder, avatar_filename)
         
-        # B2 - основное хранилище! Сначала проверяем B2
+        # Принцип «сначала кеш, потом хранилище»:
+        # аватар отдаём из локального кеша, если он уже есть. B2 (платный file_exists +
+        # download) дёргаем ТОЛЬКО когда локального файла нет.
         from helpers.b2_storage import b2_storage
-        if b2_storage.enabled:
+        if not os.path.exists(avatar_path) and b2_storage.enabled:
             remote_path = f"avatars/user_{user_id}/{avatar_filename}"
             try:
                 if b2_storage.file_exists(remote_path):
