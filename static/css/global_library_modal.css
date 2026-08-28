@@ -1,9 +1,9 @@
 #public-library-modal {
   position: fixed !important;
-  top: var(--topbar-height, 56px) !important;
+  top: calc(var(--topbar-height, 56px) + 5mm) !important;
   left: 0 !important;
   width: 100% !important;
-  height: calc(100% - var(--topbar-height, 56px)) !important;
+  height: calc(100% - var(--topbar-height, 56px) - 5mm) !important;
   z-index: 100160 !important;
   background-color: rgba(0, 0, 0, 0.7);
   display: flex;
@@ -42,6 +42,7 @@
   font-size: 18px;
   font-weight: 600;
   color: var(--color-text, #1f2933);
+  flex: 1;
 }
 
 .public-library-modal-content .modal-close {
@@ -63,6 +64,48 @@
 
 .public-library-modal-content .modal-close:hover {
   background: var(--color-panel-bg, #fff);
+}
+
+.public-library-modal-content .library-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.public-library-modal-content .library-modal-icon {
+  width: 30px;
+  height: 30px;
+  color: #d6d2c4;
+  flex-shrink: 0;
+}
+
+.public-library-modal-content .btn-new-book {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: var(--color-button-yellow, #fbbf24);
+  color: var(--color-button-text-yellow, #1f2933);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.public-library-modal-content .btn-new-book:hover {
+  background: var(--color-button-yellow-dark, #eab308);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.public-library-modal-content .btn-new-book i {
+  width: 18px;
+  height: 18px;
 }
 
 .public-library-modal-body {

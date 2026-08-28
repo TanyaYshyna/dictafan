@@ -1,9 +1,9 @@
 #home-library-modal {
   position: fixed !important;
-  top: var(--topbar-height, 56px) !important;
+  top: calc(var(--topbar-height, 56px) + 5mm) !important;
   left: 0 !important;
   width: 100% !important;
-  height: calc(100% - var(--topbar-height, 56px)) !important;
+  height: calc(100% - var(--topbar-height, 56px) - 5mm) !important;
   z-index: 100180 !important;
   background-color: rgba(0, 0, 0, 0.7);
   display: flex;
@@ -40,6 +40,7 @@
   font-size: 18px;
   font-weight: 600;
   color: var(--color-text, #1f2933);
+  flex: 1;
 }
 
 .home-library-modal-content .modal-close {
@@ -61,6 +62,20 @@
 
 .home-library-modal-content .modal-close:hover {
   background: var(--color-panel-bg, #fff);
+}
+
+.home-library-modal-content .library-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.home-library-modal-content .library-modal-icon {
+  width: 30px;
+  height: 30px;
+  color: #d6d2c4;
+  flex-shrink: 0;
 }
 
 .home-library-modal-content .modal-body {
