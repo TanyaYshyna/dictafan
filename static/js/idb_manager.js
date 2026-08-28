@@ -3,7 +3,7 @@
     return;
   }
 
-  const DB_VERSION = 3;
+  const DB_VERSION = 4;
 
   async function openDraftDb() {
     return await new Promise((resolve, reject) => {
@@ -69,6 +69,12 @@
         try {
           if (!db.objectStoreNames.contains('draft_save_queue')) {
             db.createObjectStore('draft_save_queue', { keyPath: 'key' });
+          }
+        } catch (e) {
+        }
+        try {
+          if (!db.objectStoreNames.contains('book_view')) {
+            db.createObjectStore('book_view', { keyPath: 'key' });
           }
         } catch (e) {
         }

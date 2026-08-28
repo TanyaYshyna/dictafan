@@ -144,6 +144,62 @@
       }
     }
 
+    function getBookViewCacheKey(bookId, isWorkbook) {
+      return `book_view:${Number(bookId)}:${isWorkbook ? 'wb' : 'book'}`;
+    }
+
+    function getSectionDictationsCacheKey(sectionId) {
+      return `book_view:section:${Number(sectionId)}`;
+    }
+
+    async function readBookViewCache(bookId, isWorkbook) {
+      try {
+        const idb = window.IdbManager;
+        if (!idb || typeof idb.idbGet !== 'function') return null;
+        const row = await idb.idbGet('book_view', getBookViewCacheKey(bookId, isWorkbook));
+        return (row && row.data) ? row.data : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function writeBookViewCache(bookId, isWorkbook, data) {
+      try {
+        const idb = window.IdbManager;
+        if (!idb || typeof idb.idbPut !== 'function') return;
+        await idb.idbPut('book_view', {
+          key: getBookViewCacheKey(bookId, isWorkbook),
+          data,
+          updatedAt: Date.now(),
+        });
+      } catch (e) {
+      }
+    }
+
+    async function readSectionDictationsCache(sectionId) {
+      try {
+        const idb = window.IdbManager;
+        if (!idb || typeof idb.idbGet !== 'function') return null;
+        const row = await idb.idbGet('book_view', getSectionDictationsCacheKey(sectionId));
+        return (row && Array.isArray(row.data)) ? row.data : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function writeSectionDictationsCache(sectionId, dictations) {
+      try {
+        const idb = window.IdbManager;
+        if (!idb || typeof idb.idbPut !== 'function') return;
+        await idb.idbPut('book_view', {
+          key: getSectionDictationsCacheKey(sectionId),
+          data: dictations,
+          updatedAt: Date.now(),
+        });
+      } catch (e) {
+      }
+    }
+
     const state = {
       activeBookId: null,
       activeBookIsWorkbook: false,
@@ -1550,12 +1606,36 @@
 
             if (dictationsContainer.dataset.loaded === '1') return;
             dictationsContainer.dataset.loaded = '1';
+
+            // Принцип «сначала кеш»: показываем диктанты раздела из IndexedDB мгновенно,
+            // а свежие данные подтягиваем в фоне и обновляем DOM только при изменениях.
+            try {
+              const cachedSection = await readSectionDictationsCache(id);
+              if (cachedSection && cachedSection.length) {
+                renderBookContentTo(dictationsContainer, [], cachedSection, true);
+                (async () => {
+                  try {
+                    const dictationsData = await apiRequest(`/library/api/book/${encodeURIComponent(String(id))}/dictations`);
+                    const freshDictations = dictationsData && dictationsData.success ? (dictationsData.dictations || []) : [];
+                    if (JSON.stringify(freshDictations) !== JSON.stringify(cachedSection)) {
+                      renderBookContentTo(dictationsContainer, [], freshDictations, true);
+                    }
+                    await writeSectionDictationsCache(id, freshDictations);
+                  } catch (err) {
+                  }
+                })();
+                return;
+              }
+            } catch (e) {
+            }
+
             dictationsContainer.innerHTML = '<div class="section-dictations-loading" style="padding: 10px; text-align: center; color: var(--color-text-secondary);">Загрузка...</div>';
 
             try {
               const dictationsData = await apiRequest(`/library/api/book/${encodeURIComponent(String(id))}/dictations`);
               const dictations = dictationsData && dictationsData.success ? (dictationsData.dictations || []) : [];
               renderBookContentTo(dictationsContainer, [], dictations, true);
+              await writeSectionDictationsCache(id, dictations);
             } catch (err) {
               dictationsContainer.innerHTML = '<div style="padding: 10px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки</div>';
             }
@@ -1584,18 +1664,35 @@
         return;
       }
 
-      showLoadingIndicator('Загрузка книги...');
+      const wbFlag = !!isWorkbook;
+
+      // Принцип «сначала кеш»: если данные книги уже есть в IndexedDB —
+      // отрисовываем мгновенно БЕЗ спиннера, а свежие данные подтягиваем в фоне.
+      const cached = await readBookViewCache(idNum, wbFlag);
+      let renderedFromCache = false;
+      if (cached && cached.book) {
+        try {
+          const titleEl = document.getElementById('book-view-title');
+          if (titleEl) titleEl.textContent = cached.book.title || 'Книга';
+          renderActiveBookCard(cached.book, card, { onClose: closeBookViewModal });
+          renderBookContentTo(structure, cached.sections || [], cached.dictations || [], wbFlag);
+          renderedFromCache = true;
+        } catch (e) {
+          renderedFromCache = false;
+        }
+      }
+
+      if (!renderedFromCache) {
+        showLoadingIndicator('Загрузка книги...');
+      }
+
       try {
         const bookData = await apiRequest(`/library/api/book/${idNum}`);
-        if (bookData && bookData.success && bookData.book) {
-          const titleEl = document.getElementById('book-view-title');
-          if (titleEl) titleEl.textContent = bookData.book.title || 'Книга';
-          renderActiveBookCard(bookData.book, card, { onClose: closeBookViewModal });
-        }
+        const freshBook = (bookData && bookData.success && bookData.book) ? bookData.book : null;
 
         let sections = [];
         let dictations = [];
-        if (isWorkbook) {
+        if (wbFlag) {
           const dictationsData = await apiRequest(`/library/api/book/${idNum}/dictations`);
           dictations = dictationsData && dictationsData.success ? (dictationsData.dictations || []) : [];
         } else {
@@ -1605,7 +1702,25 @@
           dictations = dictationsData && dictationsData.success ? (dictationsData.dictations || []) : [];
         }
 
-        renderBookContentTo(structure, sections, dictations, !!isWorkbook);
+        const fresh = { book: freshBook, sections, dictations };
+        const cachedStr = cached
+          ? JSON.stringify({ book: cached.book, sections: cached.sections || [], dictations: cached.dictations || [] })
+          : '';
+        const freshStr = JSON.stringify(fresh);
+
+        // Перерисовываем DOM только если данных ещё нет на экране или они изменились.
+        if (!renderedFromCache || freshStr !== cachedStr) {
+          if (freshBook) {
+            const titleEl = document.getElementById('book-view-title');
+            if (titleEl) titleEl.textContent = freshBook.title || 'Книга';
+            renderActiveBookCard(freshBook, card, { onClose: closeBookViewModal });
+          }
+          renderBookContentTo(structure, sections, dictations, wbFlag);
+        }
+
+        if (freshBook || dictations.length || sections.length) {
+          await writeBookViewCache(idNum, wbFlag, fresh);
+        }
       } finally {
         hideLoadingIndicator();
       }

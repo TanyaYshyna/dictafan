@@ -1985,9 +1985,12 @@ window.DictationKart = window.DictationKart || {
     } catch (e) {
     }
 
-    // Обновляем UI десктопа
+    // Обновляем UI десктопа: убираем только одну карточку без полной перерисовки
+    // (полная перерисовка дёргает /desk/api/items → платные B2-проверки всех обложек)
     try {
-      if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
+      if (window.Desktop && typeof window.Desktop.removeDeskCard === 'function') {
+        window.Desktop.removeDeskCard(itemId, dictationId);
+      } else if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
         window.Desktop.loadDeskItems();
       }
     } catch (e) {

@@ -212,18 +212,27 @@ def api_book_dictations(book_id: int):
 
 @library_bp.route("/api/book-cover")
 def api_get_book_cover():
-    """Получение обложки книги (Option A: только B2)."""
+    """
+    Получение обложки книги.
+
+    Принцип «сначала кеш, потом хранилище»:
+    1) Если обложка уже лежит в локальном кеше (static/data/books_covers/) — отдаём её,
+       БЕЗ обращения к B2.
+    2) Иначе один раз скачиваем из B2 в локальный кеш и отдаём.
+    3) Если в B2 нет — дефолтная обложка.
+
+    Отдаём Cache-Control: public, max-age — чтобы SW (staleWhileRevalidateImage) и браузер
+    могли кешировать обложку, а не качать её снова при каждом открытии книги.
+    """
     from helpers.b2_storage import b2_storage
 
     try:
         from flask import after_this_request
 
         @after_this_request
-        def _no_cache_headers(response):
+        def _cache_headers(response):
             try:
-                response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-                response.headers["Pragma"] = "no-cache"
-                response.headers["Expires"] = "0"
+                response.headers["Cache-Control"] = "public, max-age=86400"
             except Exception:
                 pass
             return response
@@ -235,43 +244,70 @@ def api_get_book_cover():
         if not book_id:
             return jsonify({"error": "book_id parameter required"}), 400
 
+        data_base = os.getenv("STATIC_DATA_FOLDER") or os.path.join(current_app.root_path, "static", "data")
+        covers_cache_dir = os.path.join(data_base, "books_covers")
+        local_path = os.path.join(covers_cache_dir, f"{book_id}.webp")
+
+        # 1) Локальный кеш — без сети и B2.
+        if os.path.exists(local_path):
+            return send_from_directory(covers_cache_dir, f"{book_id}.webp")
+
         if not b2_storage.enabled:
-            return jsonify({"error": "B2 storage is disabled"}), 503
+            # fallback: дефолтная обложка
+            default_path = os.path.join(data_base, "covers", "cover_en.webp")
+            if os.path.exists(default_path):
+                return send_from_directory(os.path.dirname(default_path), os.path.basename(default_path))
+            return jsonify({"error": "Cover not found"}), 404
 
         remote_path_new = f"books_covers/{book_id}.webp"
-        if b2_storage.file_exists(remote_path_new):
-            import tempfile
-            from flask import after_this_request
 
-            tmp = tempfile.NamedTemporaryFile(prefix="book_cover_", suffix=".webp", delete=False)
-            tmp_path = tmp.name
-            tmp.close()
+        try:
+            os.makedirs(covers_cache_dir, exist_ok=True)
+        except OSError:
+            pass
 
+        import tempfile
+        from flask import after_this_request
+
+        tmp = tempfile.NamedTemporaryFile(prefix="book_cover_", suffix=".webp", delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+
+        ok = False
+        try:
             ok = b2_storage.download_file(remote_path_new, tmp_path)
-            if not ok:
-                try:
+        except Exception:
+            ok = False
+
+        if not ok:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            # fallback: дефолтная обложка
+            default_path = os.path.join(data_base, "covers", "cover_en.webp")
+            if os.path.exists(default_path):
+                return send_from_directory(os.path.dirname(default_path), os.path.basename(default_path))
+            return jsonify({"error": "Cover not found"}), 404
+
+        # Атомарно перемещаем скачанный файл в локальный кеш.
+        try:
+            import shutil
+            shutil.move(tmp_path, local_path)
+            served_path = local_path
+        except Exception:
+            served_path = tmp_path
+
+        @after_this_request
+        def _cleanup_tmp(response):
+            try:
+                if os.path.exists(tmp_path):
                     os.remove(tmp_path)
-                except OSError:
-                    pass
-                return jsonify({"error": "Failed to download cover from B2"}), 502
+            except OSError:
+                pass
+            return response
 
-            @after_this_request
-            def _cleanup_tmp(response):
-                try:
-                    os.remove(tmp_path)
-                except OSError:
-                    pass
-                return response
-
-            return send_from_directory(os.path.dirname(tmp_path), os.path.basename(tmp_path))
-
-        # fallback: дефолтная обложка
-        data_base = os.getenv("STATIC_DATA_FOLDER") or os.path.join(current_app.root_path, "static", "data")
-        default_path = os.path.join(data_base, "covers", "cover_en.webp")
-        if os.path.exists(default_path):
-            return send_from_directory(os.path.dirname(default_path), os.path.basename(default_path))
-
-        return jsonify({"error": "Cover not found"}), 404
+        return send_from_directory(os.path.dirname(served_path), os.path.basename(served_path))
     except Exception as exc:
         logger.error("❌ Ошибка получения обложки книги: %s", exc, exc_info=True)
         return jsonify({"error": str(exc)}), 500

@@ -867,20 +867,21 @@ def dictations_list():
 
 def get_cover_url_for_id(dictation_id, language=None):
     """
-    Получает URL обложки для диктанта.
-    Поддерживает новый формат dict_<id> и старый dicta_XXX (для обратной совместимости).
-    
-    1) Сначала ищем индивидуальную обложку в папке диктанта:
-       static/data/dictations/{dictation_id}/cover.(webp|png|jpg|jpeg)
-    2) Если нет — смотрим стандартные обложки по языку:
-       static/data/covers/cover_<lang>.(webp|png|...)
-    3) Если и их нет — пробуем global fallback:
-       static/data/covers/cover.webp
-    4) Если и этого нет — возвращаем окончательный плейсхолдер:
-       /static/images/cover_en.webp
-    """
-    from helpers.b2_storage import b2_storage
+    Возвращает URL обложки диктанта БЕЗ обращений к B2.
 
+    Пользовательские обложки диктантов отдаются каноническим URL
+    /api/dictations_covers/<id>.webp. Существование файла НЕ проверяется здесь:
+    file_exists() — это платный синхронный вызов B2, который на горячем пути
+    (загрузка стола, список диктантов книги) выполняется на каждый диктант и
+    нарушает принцип «сначала кеш, потом хранилище».
+
+    Кеширование выполняют другие слои:
+    - Service Worker кеширует байты /api/dictations_covers/* cache-first
+      (MEDIA_CACHE_PERSIST), поэтому повторный показ идёт из кеша без сети.
+    - Фронт подставляет fallback через onerror, если файла нет.
+    - Эндпоинт api_get_dictation_cover_webp сам решает: отдать локальный файл,
+      скачать из B2 или вернуть 404.
+    """
     # нормализуем id (иногда с фронта/из БД прилетает числовой id)
     raw_id = "" if dictation_id is None else str(dictation_id).strip()
     if raw_id and not raw_id.startswith("dict_") and not raw_id.startswith("dicta_"):
@@ -890,25 +891,16 @@ def get_cover_url_for_id(dictation_id, language=None):
 
     dictation_id = raw_id
 
+    # Пользовательская обложка диктанта: канонический URL без проверки существования.
+    if dictation_id and dictation_id.startswith("dict_"):
+        numeric_id = dictation_id.split("_", 1)[1]
+        if numeric_id:
+            return f"/api/dictations_covers/{numeric_id}.webp"
+
     data_base = _get_static_data_base_dir()
     covers_folder = os.path.join(data_base, "covers")
 
-    # Option A: пользовательские обложки диктантов живут только в B2.
-    if b2_storage.enabled and dictation_id and dictation_id.startswith('dict_'):
-        numeric_id = dictation_id.split('_', 1)[1]
-        remote_path_new = f"dictations_covers/{numeric_id}.webp"
-        try:
-            if b2_storage.file_exists(remote_path_new, raise_on_error=True):
-                return f"/api/dictations_covers/{numeric_id}.webp"
-        except Exception:
-            logger.error("B2 cover check failed for %s", remote_path_new, exc_info=True)
-            # Важно: при временной недоступности B2 не «залипаем» на дефолтной обложке.
-            # Возвращаем канонический URL, чтобы фронт:
-            # - во время outage показал дефолт через onerror
-            # - после восстановления хранилища загрузил реальную обложку без ручной очистки кеша.
-            return f"/api/dictations_covers/{numeric_id}.webp"
-
-    # --- 2) языковая обложка в /static/data/covers/ ---
+    # --- языковая обложка в /static/data/covers/ ---
     if language:
         lang = str(language).lower()
         # опционально: маппинг для разных кодов (если у тебя 'ua' вместо 'uk' и т.п.)
@@ -922,60 +914,90 @@ def get_cover_url_for_id(dictation_id, language=None):
             if os.path.exists(p):
                 return f"/static/data/covers/{name}"
 
-    # --- 3) глобальная заглушка в /static/data/covers/ ---
+    # --- глобальная заглушка в /static/data/covers/ ---
     fallback_global = os.path.join(covers_folder, "cover.webp")
     if os.path.exists(fallback_global):
         return "/static/data/covers/cover.webp"
 
-    # --- 4) последний-resort плейсхолдер в /static/data/covers/ ---
+    # --- последний-resort плейсхолдер в /static/data/covers/ ---
     return "/static/data/covers/cover_en.webp"
 
 
 @index_bp.route('/api/dictations_covers/<int:numeric_id>.webp')
 def api_get_dictation_cover_webp(numeric_id: int):
-    """Получение обложки диктанта по каноническому URL (Option A: только B2)"""
+    """
+    Получение обложки диктанта по каноническому URL.
+
+    Принцип «сначала кеш, потом хранилище»:
+    1) Если файл уже лежит в локальном кеше (static/data/dictations_covers/) — отдаём его,
+       БЕЗ обращения к B2.
+    2) Иначе один раз скачиваем из B2 в локальный кеш и отдаём.
+    3) Если в B2 нет — 404 (фронт подставит fallback через onerror).
+    """
     from helpers.b2_storage import b2_storage
 
     try:
-        if not b2_storage.enabled:
-            return jsonify({'error': 'B2 storage is disabled'}), 503
-
         if not numeric_id or numeric_id <= 0:
             return jsonify({'error': 'numeric_id parameter required'}), 400
 
+        # Локальный кеш обложек диктантов (создаётся при первом скачивании).
+        data_base = _get_static_data_base_dir()
+        covers_cache_dir = os.path.join(data_base, "dictations_covers")
+        local_path = os.path.join(covers_cache_dir, f"{numeric_id}.webp")
+
+        # 1) Сначала локальный кеш — без сети и B2.
+        if os.path.exists(local_path):
+            return send_from_directory(covers_cache_dir, f"{numeric_id}.webp")
+
+        if not b2_storage.enabled:
+            return jsonify({'error': 'B2 storage is disabled'}), 503
+
         remote_path_new = f"dictations_covers/{numeric_id}.webp"
+
+        # 2) Скачиваем из B2 один раз и сохраняем в локальный кеш.
         try:
-            exists = b2_storage.file_exists(remote_path_new, raise_on_error=True)
-        except Exception:
-            return jsonify({'error': 'B2 storage unavailable'}), 503
+            os.makedirs(covers_cache_dir, exist_ok=True)
+        except OSError:
+            pass
 
-        if exists:
-            import tempfile
-            from flask import after_this_request
+        import tempfile
+        from flask import after_this_request
 
-            tmp = tempfile.NamedTemporaryFile(prefix="dict_cover_", suffix=".webp", delete=False)
-            tmp_path = tmp.name
-            tmp.close()
+        tmp = tempfile.NamedTemporaryFile(prefix="dict_cover_", suffix=".webp", delete=False)
+        tmp_path = tmp.name
+        tmp.close()
 
+        ok = False
+        try:
             ok = b2_storage.download_file(remote_path_new, tmp_path)
-            if not ok:
-                try:
+        except Exception:
+            ok = False
+
+        if not ok:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+            return jsonify({'error': 'Cover not found'}), 404
+
+        # Атомарно перемещаем скачанный файл в локальный кеш.
+        try:
+            import shutil
+            shutil.move(tmp_path, local_path)
+            served_path = local_path
+        except Exception:
+            served_path = tmp_path
+
+        @after_this_request
+        def _cleanup_tmp(response):
+            try:
+                if os.path.exists(tmp_path):
                     os.remove(tmp_path)
-                except OSError:
-                    pass
-                return jsonify({'error': 'Failed to download cover from B2'}), 502
+            except OSError:
+                pass
+            return response
 
-            @after_this_request
-            def _cleanup_tmp(response):
-                try:
-                    os.remove(tmp_path)
-                except OSError:
-                    pass
-                return response
-
-            return send_from_directory(os.path.dirname(tmp_path), os.path.basename(tmp_path))
-
-        return jsonify({'error': 'Cover not found'}), 404
+        return send_from_directory(os.path.dirname(served_path), os.path.basename(served_path))
     except Exception as e:
         logger.error("api_get_dictation_cover_webp error: %s", e, exc_info=True)
         return jsonify({'error': 'Internal error'}), 500
