@@ -768,8 +768,66 @@
 
     function setDictationTargetBook(bookId) {
       try {
-        sessionStorage.setItem('dictationTargetBook', String(bookId));
+        // Формат должен совпадать с desktop.js и ожиданиями _handleSave():
+        // JSON-объект { book_id: <number> }, а не голая строка "123".
+        var id = Number(bookId);
+        if (id > 0) {
+          sessionStorage.setItem('dictationTargetBook', JSON.stringify({ book_id: id }));
+        }
       } catch (e) {
+      }
+    }
+
+    /**
+     * Открыть редактор нового диктанта с зарезервированным на сервере ID.
+     * Устаревшая схема dict_temp_* больше не используется: при создании
+     * диктанта сразу резервируется реальный dict_<id> через /api/dictation/reserve_id
+     * (точно так же, как это делает desktop.js для рабочей тетради).
+     */
+    async function openNewDictationWithReservedId(targetBookId) {
+      var reservedId = '';
+      var reservedDbId = null;
+      try {
+        var token = getToken();
+        if (token) {
+          var reserveResp = await fetch('/api/dictation/reserve_id', {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          var reserveData = await reserveResp.json();
+          if (reserveData.success && reserveData.dictation_id) {
+            reservedId = reserveData.dictation_id;
+            reservedDbId = reserveData.id;
+            console.log('[bookModal] Зарезервирован ID диктанта:', reservedId);
+          }
+        }
+      } catch (e2) {
+        console.warn('[bookModal] Ошибка резервирования ID диктанта:', e2);
+      }
+
+      if (!reservedId) {
+        console.error('[bookModal] Не удалось зарезервировать ID диктанта');
+        showToast('Не вдалося створити диктант. Перевірте з\'єднання і спробуйте ще раз.', { durationMs: 4000 });
+        return;
+      }
+
+      if (typeof setDictationTargetBook === 'function' && targetBookId) {
+        setDictationTargetBook(targetBookId);
+      }
+
+      if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
+        window.DictationEditorModal.open({
+          isNewDictation: true,
+          dictationId: reservedId,
+          dbId: reservedDbId,
+          originalLanguage: '',
+          translationLanguage: '',
+          title: '',
+          level: '',
+          coverUrl: '',
+          sentences: [],
+          audio_user_shared: null,
+          audio_order: '',
+        });
       }
     }
 
@@ -1321,26 +1379,9 @@
             return;
           }
           if (action === 'add-dictation') {
-            try {
-              const id = (book && book.id != null) ? Number(book.id) : state.bookViewActiveBookId;
-              if (id) setDictationTargetBook(id);
-            } catch (e2) {
-            }
-            // Відкрити редактор для нового диктанта
-            if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
-              window.DictationEditorModal.open({
-                isNewDictation: true,
-                dictationId: '',
-                originalLanguage: '',
-                translationLanguage: '',
-                title: '',
-                level: '',
-                coverUrl: '',
-                sentences: [],
-                audio_user_shared: null,
-                audio_order: '',
-              });
-            }
+            // Резервируем dict_<id> на сервере и открываем редактор
+            const id = (book && book.id != null) ? Number(book.id) : state.bookViewActiveBookId;
+            openNewDictationWithReservedId(id);
             return;
           }
           if (action === 'edit-book') {
@@ -1508,28 +1549,8 @@
                 return;
               }
               if (action === 'section-add-dictation') {
-                // Новий диктант
-                try {
-                  if (bookId) {
-                    if (typeof setDictationTargetBook === 'function') {
-                      setDictationTargetBook(sectionId);
-                    }
-                  }
-                } catch (e2) {}
-                if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
-                  window.DictationEditorModal.open({
-                    isNewDictation: true,
-                    dictationId: '',
-                    originalLanguage: '',
-                    translationLanguage: '',
-                    title: '',
-                    level: '',
-                    coverUrl: '',
-                    sentences: [],
-                    audio_user_shared: null,
-                    audio_order: '',
-                  });
-                }
+                // Новий диктант в розділі/групі: привязываем к секции
+                openNewDictationWithReservedId(sectionId);
                 return;
               }
               if (action === 'section-edit') {

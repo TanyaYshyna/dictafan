@@ -967,7 +967,7 @@ class AudioManagerClass {
             // Это гарантирует, что ключи CacheStorage всегда совпадают,
             // независимо от того, кто вызывает метод (редактор передаёт "3",
             // а карточка/модалка — уже "dict_3").
-            if (id && !id.startsWith('dict_') && !id.startsWith('dict_temp_')) {
+            if (id && !id.startsWith('dict_')) {
                 id = 'dict_' + id;
             }
             const lang = String(language || '').trim();
