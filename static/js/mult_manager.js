@@ -288,7 +288,6 @@
 
     async play(wins, cfg) {
       this.stop(true);
-      this.isPlaying = true;
       this.currentFrame = 0;
 
       const multIndex = this.getMultIndex(wins);
@@ -413,19 +412,24 @@
     async getMultConfig(number) {
       const cfg = await this.loadConfig();
       const n = toInt(number, MIN_INDEX);
-      const mults = Array.isArray(cfg && cfg.mults) ? cfg.mults : [];
-      const found = mults.find((m) => Number(m && m.number) === n);
-      if (found) return found;
-      // Конфига для текущего номера нет — отдаём первый настроенный мультфильм,
-      // чтобы play() не строил несуществующий путь вида 026.png (404).
-      if (mults.length > 0) return mults[0];
-      return null;
+      const found = (cfg.mults || []).find((m) => Number(m && m.number) === n);
+      return found || null;
+    },
+
+    // Первый настроенный мультфильм из конфига (fallback, когда для текущего
+    // номера победы нет собственной записи). Возвращает null, если мультфильмов нет.
+    async _getFirstConfiguredMult() {
+      const all = await this.loadConfig();
+      const mults = (all && Array.isArray(all.mults)) ? all.mults : [];
+      return mults.length > 0 ? mults[0] : null;
     },
 
     // --- Воспроизведение в модальном окне победы ---
     async play(canvasId, wins) {
       const player = getPlayer(canvasId);
-      const cfg = await this.getMultConfig(player.getMultIndex(wins));
+      const idx = player.getMultIndex(wins);
+      let cfg = await this.getMultConfig(idx);
+      if (!cfg) cfg = await this._getFirstConfiguredMult();
       return player.play(wins, cfg);
     },
 
@@ -442,7 +446,8 @@
       try {
         const player = getPlayer('multCanvas');
         const multIndex = player.getMultIndex(wins);
-        const cfg = await this.getMultConfig(multIndex);
+        let cfg = await this.getMultConfig(multIndex);
+        if (!cfg) cfg = await this._getFirstConfiguredMult();
         const png = cfg && cfg.png ? cfg.png : null;
         const cols = cfg && cfg.frames_w ? cfg.frames_w : player.cols;
         const rows = cfg && cfg.frames_h ? cfg.frames_h : player.rows;
@@ -585,9 +590,7 @@
 
     _readPreviewPng() {
       const input = document.getElementById('multPreviewPng');
-      const idx = this._readPreviewIndex();
-      const raw = input ? String(input.textContent || '').trim() : '';
-      return raw || (padIndex(idx) + '.png');
+      return input ? String(input.textContent || '').trim() : '';
     },
 
     _readPreviewCols() {
@@ -625,18 +628,18 @@
       const conf = await this.getMultConfig(idx);
 
       const png = document.getElementById('multPreviewPng');
-      if (png) png.textContent = (conf && conf.png) ? conf.png : (padIndex(idx) + '.png');
+      if (png) png.textContent = (conf && conf.png) ? conf.png : '';
 
       const framesW = document.getElementById('multPreviewFramesW');
-      if (framesW && conf) framesW.value = toInt(conf.frames_w, DEFAULT_COLS);
+      if (framesW) framesW.value = conf ? toInt(conf.frames_w, DEFAULT_COLS) : DEFAULT_COLS;
       const framesH = document.getElementById('multPreviewFramesH');
-      if (framesH && conf) framesH.value = toInt(conf.frames_h, DEFAULT_ROWS);
+      if (framesH) framesH.value = conf ? toInt(conf.frames_h, DEFAULT_ROWS) : DEFAULT_ROWS;
 
       const speed = document.getElementById('multPreviewSpeed');
-      if (speed && conf) speed.value = toFloat(conf.speed, DEFAULT_SPEED);
+      if (speed) speed.value = conf ? toFloat(conf.speed, DEFAULT_SPEED) : DEFAULT_SPEED;
 
       const audio = document.getElementById('multPreviewAudio');
-      if (audio && conf) audio.textContent = conf.audio || 'не выбран';
+      if (audio) audio.textContent = (conf && conf.audio) ? conf.audio : 'не выбран';
 
       this._updatePreviewSpeedLabel();
       await this._renderPreview();
@@ -660,9 +663,16 @@
         } catch (e) {
           path = null;
         }
+      } else {
+        const pngName = this._readPreviewPng();
+        path = pngName ? player.getImagePath(idx, pngName) : null;
       }
+
       if (!path) {
-        path = player.getImagePath(idx, this._readPreviewPng());
+        player._image = null;
+        player._frames = null;
+        player.drawPlaceholder();
+        return;
       }
 
       let image = null;
@@ -670,6 +680,8 @@
         image = await player.loadImage(path);
       } catch (e) {
         console.error('Ошибка загрузки мультфильма:', e);
+        player._image = null;
+        player._frames = null;
         player.drawPlaceholder();
         return;
       }
@@ -688,29 +700,45 @@
 
     async _playPreview() {
       const player = this._getPreviewPlayer();
-      if (!player._image) {
-        await this._renderPreview();
-      }
-      if (!player._image) return;
-      this._setPreviewPlaying(true);
-      player.currentFrame = 0;
-      player.drawFrame(0);
-      player.startLoop();
+      const idx = this._readPreviewIndex();
 
-      // Запускаем аудио: локальный выбранный файл или имя из конфига.
-      player.stopAudio();
-      let audioUrl = null;
-      if (this._previewAudioFile) {
-        try {
-          audioUrl = URL.createObjectURL(this._previewAudioFile);
-        } catch (e) {
-          audioUrl = null;
+      // Локально выбранный PNG/аудио (ещё не загружены на сервер) —
+      // проигрываем напрямую через object URL.
+      if (this._previewPngFile || this._previewAudioFile) {
+        if (!player._image) await this._renderPreview();
+        if (!player._image) return;
+        this._setPreviewPlaying(true);
+        player.currentFrame = 0;
+        player.drawFrame(0);
+        player.startLoop();
+        player.stopAudio();
+        if (this._previewAudioFile) {
+          try {
+            player.playAudioUrl(URL.createObjectURL(this._previewAudioFile));
+          } catch (e) {
+          }
         }
-      } else {
-        const name = this._readPreviewAudio();
-        if (name) audioUrl = player.getAudioPath(name);
+        return;
       }
-      if (audioUrl) player.playAudioUrl(audioUrl);
+
+      // Единая процедура воспроизведения через MultPlayer.play() —
+      // та же, что используется в модальном окне завершения диктанта.
+      const conf = await this.getMultConfig(idx);
+      const pngName = this._readPreviewPng();
+      if (!conf && !pngName) {
+        player.stop(true);
+        this._setPreviewPlaying(false);
+        return;
+      }
+      const cfg = {
+        png: pngName || null,
+        frames_w: this._readPreviewCols(),
+        frames_h: this._readPreviewRows(),
+        speed: this._readPreviewSpeed(),
+        audio: this._readPreviewAudio() || null,
+      };
+      this._setPreviewPlaying(true);
+      await player.play(idx, cfg);
     },
 
     _stopPreview() {
