@@ -4988,6 +4988,16 @@ function _closeEditorModal(wasSaved) {
   }
 
   document.body.style.overflow = '';
+
+  // Если диктант был сохранён — просим книжную модалку обновить список,
+  // чтобы новый диктант сразу появился в открытом списке (без переоткрытия модалки).
+  if (wasSaved && window.BookModal && typeof window.BookModal.onNewDictationSaved === 'function') {
+    try {
+      window.BookModal.onNewDictationSaved();
+    } catch (e) {
+      console.warn('[dictationEditorModal] Ошибка обновления списка книги после сохранения:', e);
+    }
+  }
 }
 
 /* ===== ВКЛАДКА "ОЗВУЧКА ОРИГІНАЛУ (САМ)" (voice-original-self) ===== */
