@@ -49,6 +49,11 @@ const state = {
 
   /** Флаг: волна на закладке "have" уже инициализирована */
   _waveformInitialized: false,
+
+  /** true, если во время текущей сессии редактирования диктант был успешно сохранён.
+   *  Нужно, чтобы при закрытии через крестик (когда грязные флаги уже сброшены)
+   *  книжная модалка всё равно обновила список новым диктантом. */
+  _savedInSession: false,
 };
 
 /* ===== Хранилище контента через DictationSessionsStore ===== */
@@ -4286,6 +4291,9 @@ async function _handleSave() {
     console.error('[dictationEditorModal] Ошибка сохранения:', error);
   } finally {
     console.log('[dictationEditorModal] _handleSave finally');
+    if (saved) {
+      state._savedInSession = true;
+    }
     window.__DICTATION_EDITOR_SAVE_IN_PROGRESS = false;
     saveBtn.innerHTML = originalHTML;
     if (typeof lucide !== 'undefined' && lucide.createIcons) {
@@ -4307,6 +4315,10 @@ async function _handleSave() {
 /* ===== OPEN / CLOSE ===== */
 
 function open(config) {
+  // Сбрасываем флаг "сохранено в этой сессии" ДО возможного _closeEditorModal(),
+  // чтобы не было ложного обновления списка книги при переоткрытии редактора.
+  state._savedInSession = false;
+
   // Если модалка уже открыта — сначала закрываем (чистим состояние),
   // чтобы при повторном открытии для другого диктанта не осталось данных от предыдущего.
   if (state.isOpen) {
@@ -4991,13 +5003,17 @@ function _closeEditorModal(wasSaved) {
 
   // Если диктант был сохранён — просим книжную модалку обновить список,
   // чтобы новый диктант сразу появился в открытом списке (без переоткрытия модалки).
-  if (wasSaved && window.BookModal && typeof window.BookModal.onNewDictationSaved === 'function') {
+  // Учитываем и случай "сохранил через дискету, потом закрыл через крестик":
+  // в этом случае wasSaved не передаётся (изменений уже нет), но мы помним, что сессия была сохранена.
+  var savedThisSession = !!wasSaved || !!state._savedInSession;
+  if (savedThisSession && window.BookModal && typeof window.BookModal.onNewDictationSaved === 'function') {
     try {
       window.BookModal.onNewDictationSaved();
     } catch (e) {
       console.warn('[dictationEditorModal] Ошибка обновления списка книги после сохранения:', e);
     }
   }
+  state._savedInSession = false;
 }
 
 /* ===== ВКЛАДКА "ОЗВУЧКА ОРИГІНАЛУ (САМ)" (voice-original-self) ===== */
