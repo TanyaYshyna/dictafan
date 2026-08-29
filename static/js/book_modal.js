@@ -205,6 +205,9 @@
       activeBookIsWorkbook: false,
       bookViewActiveBookId: null,
       selectedDictationCard: null,
+      /** Запоминаем, что редактор нового диктанта открыт из этой книги/раздела,
+       *  чтобы после сохранения сразу обновить список в уже открытой модалке книги. */
+      pendingNewDictation: null,
 
       bookEditDirty: false,
       bookLanguageSelector: null,
@@ -814,6 +817,15 @@
         setDictationTargetBook(targetBookId);
       }
 
+      // Запоминаем, что редактор нового диктанта открыт из этой книги/раздела,
+      // чтобы после сохранения сразу обновить список в уже открытой модалке книги.
+      state.pendingNewDictation = {
+        bookId: targetBookId ? parseInt(String(targetBookId), 10) : null,
+        dictationId: reservedId,
+        dbId: reservedDbId,
+        openedAt: Date.now(),
+      };
+
       if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
         window.DictationEditorModal.open({
           isNewDictation: true,
@@ -933,6 +945,25 @@
       if (!modal) return;
       modal.style.display = 'none';
       modal.classList.remove('show');
+    }
+
+    /**
+     * После сохранения нового диктанта перечитываем список в уже открытой модалке книги,
+     * чтобы свежесозданный диктант появился без переоткрытия модалки.
+     */
+    function refreshOpenBookViewForNewDictation() {
+      var pending = state.pendingNewDictation;
+      state.pendingNewDictation = null;
+      if (!pending) return;
+
+      var modal = document.getElementById('book-view-modal');
+      if (!modal || modal.style.display === 'none') return;
+
+      // Пока редактор открыт, модалка книги остаётся открытой позади него,
+      // поэтому обновляем именно её — новый диктант появится сразу в списке.
+      if (state.bookViewActiveBookId && isFinite(state.bookViewActiveBookId)) {
+        openBookViewBook(state.bookViewActiveBookId, state.activeBookIsWorkbook);
+      }
     }
 
     function openBookModal(book) {
@@ -1965,6 +1996,7 @@
       openMoveDictation: (dictationId) => openMoveDictationModal(dictationId),
       closeView: () => closeBookViewModal(),
       closeEdit: () => closeBookModal(),
+      onNewDictationSaved: () => refreshOpenBookViewForNewDictation(),
     };
   } catch (e) {
   }
