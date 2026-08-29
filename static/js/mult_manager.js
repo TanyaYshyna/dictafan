@@ -413,8 +413,13 @@
     async getMultConfig(number) {
       const cfg = await this.loadConfig();
       const n = toInt(number, MIN_INDEX);
-      const found = (cfg.mults || []).find((m) => Number(m && m.number) === n);
-      return found || null;
+      const mults = Array.isArray(cfg && cfg.mults) ? cfg.mults : [];
+      const found = mults.find((m) => Number(m && m.number) === n);
+      if (found) return found;
+      // Конфига для текущего номера нет — отдаём первый настроенный мультфильм,
+      // чтобы play() не строил несуществующий путь вида 026.png (404).
+      if (mults.length > 0) return mults[0];
+      return null;
     },
 
     // --- Воспроизведение в модальном окне победы ---
