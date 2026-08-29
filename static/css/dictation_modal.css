@@ -493,14 +493,15 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 }
 
 #dictationModal #completionModal #multContainer {
-  position: absolute;
-  top: 20px;
-  left: 20px;
+  flex: 0 0 200px;
   width: 200px;
   height: 200px;
   background: transparent;
   pointer-events: none;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #dictationModal #completionModal #multCanvas {
@@ -525,11 +526,30 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   border-radius: 16px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
   padding: 24px;
-  max-width: 460px;
+  max-width: 700px;
   width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 24px;
+}
+
+#dictationModal #completionModal .completion-main {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  #dictationModal #completionModal .modal-content {
+    flex-direction: column;
+  }
+  #dictationModal #completionModal #multContainer {
+    flex: 0 0 auto;
+    align-self: center;
+  }
 }
 
 #dictationModal #completionModal .completion-buttons {
