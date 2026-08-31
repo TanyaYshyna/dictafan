@@ -417,6 +417,55 @@ class ПроверкаНаОшибки {
     return result ? result.split(' ') : [];
   }
 
+  /**
+   * Строит массив display-слов, выровненный по simplifyText(original).
+   *
+   * Проблема: splitWordsForDisplay оставляет одиночные знаки препинания
+   * отдельными токенами (например "..."), а simplifyText их полностью убирает.
+   * Из-за этого длина simplOriginal и originalWords не совпадает, и в checkWords
+   * индекс i указывал не на то display-слово (последнее слово "обрезалось").
+   *
+   * Здесь каждый display-токен упрощается отдельно:
+   *  - токен без букв ("...") прикрепляется к предыдущему display-слову
+   *    (чтобы он всё же отображался: "But ...");
+   *  - токен с "=" раскрывается в несколько упрощённых токенов, поэтому
+   *    на каждый такой токен возвращаем один и тот же display-токен.
+   *
+   * @param {string[]} originalWords
+   * @returns {string[]} массив display-слов, параллельный simplifyText(original)
+   */
+  _alignOriginalDisplayWords(originalWords) {
+    const aligned = [];
+    let pending = '';
+
+    for (const disp of originalWords || []) {
+      const simpTokens = this.simplifyText(disp);
+      if (!simpTokens.length) {
+        // Чистые знаки препинания (например "...") — прикрепляем к предыдущему слову.
+        if (aligned.length) {
+          aligned[aligned.length - 1] = aligned[aligned.length - 1] + ' ' + disp;
+        } else {
+          pending += (pending ? ' ' : '') + disp;
+        }
+        continue;
+      }
+      for (let k = 0; k < simpTokens.length; k++) {
+        if (k === 0 && pending) {
+          aligned.push(pending + ' ' + disp);
+          pending = '';
+        } else {
+          aligned.push(disp);
+        }
+      }
+    }
+
+    if (pending && aligned.length) {
+      aligned[aligned.length - 1] = aligned[aligned.length - 1] + ' ' + pending;
+    }
+
+    return aligned;
+  }
+
   areWordsEquivalent(word1, word2, langCode) {
     if (!word1 || !word2) return false;
     if (word1 === word2) return true;
@@ -456,6 +505,24 @@ class ПроверкаНаОшибки {
     const originalWords = this.splitWordsForDisplay(original);
     const userWords = this.splitUserWords(userInput);
 
+    // Выровненный по simplifyText массив display-слов.
+    // Без него originalWords[i] может указывать не на то слово
+    // (например, когда в предложении есть отдельные знаки "...").
+    const displayOrig = this._alignOriginalDisplayWords(originalWords);
+
+    try {
+      console.log('[ПроверкаНаОшибки] checkWords start', {
+        original,
+        userInput,
+        langCode,
+        simplOriginal,
+        simplUser,
+        originalWords,
+        userWords,
+        displayOrig,
+      });
+    } catch (eLog) {}
+
     const userVerified = [];
     let i = 0;
     let j = 0;
@@ -464,7 +531,7 @@ class ПроверкаНаОшибки {
     while (i < simplOriginal.length || j < simplUser.length) {
       const wordOrig = simplOriginal[i];
       const wordUser = simplUser[j];
-      const fullWordOrig = originalWords[i] || '';
+      const fullWordOrig = displayOrig[i] || originalWords[i] || '';
       const fullWordUser = userWords[j] || '';
 
       if (wordOrig === wordUser) {
@@ -513,7 +580,7 @@ class ПроверкаНаОшибки {
               break;
             }
             // Иначе — ASR потерял это слово, пропускаем
-            userVerified.push({ type: 'missing', text: originalWords[i] || '' });
+            userVerified.push({ type: 'missing', text: displayOrig[i] || originalWords[i] || '' });
             errorCount++;
             i++;
           }
@@ -552,7 +619,7 @@ class ПроверкаНаОшибки {
             let fullText = '';
             for (let k = 0; k < expansionUser.length; k++) {
               if (k > 0) fullText += ' ';
-              fullText += originalWords[i + k] || '';
+              fullText += displayOrig[i + k] || originalWords[i + k] || '';
             }
             userVerified.push({ type: 'correct', text: fullText });
             for (let k = 0; k < expansionUser.length; k++) i++;
@@ -582,6 +649,13 @@ class ПроверкаНаОшибки {
         j++;
       }
     }
+
+    try {
+      console.log('[ПроверкаНаОшибки] checkWords result', {
+        verified: userVerified,
+        errorCount,
+      });
+    } catch (eLog) {}
 
     return { verified: userVerified, errorCount };
   }
