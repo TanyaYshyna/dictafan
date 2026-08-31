@@ -712,15 +712,32 @@ class ПроверкаНаОшибки {
     }
 
     const { verified, errorCount } = this.checkWords(originalText, userText, langOriginal);
-    const allCorrect = verified.every(w => w && w.type === 'correct');
+    const allCorrectWords = verified.every(w => w && w.type === 'correct');
+
+    // Сравнение всей строки без пробелов (normalizeForMinLength уже убирает
+    // пробелы, знаки препинания и приводит к нижнему регистру).
+    // Если без пробелов строки совпадают, а по словам есть ошибки — значит
+    // различия только в лишних/недостающих пробелах.
+    const spacingOnlyErrors = !allCorrectWords && userNorm === origNorm;
 
     let nextPerfect = Number(prevPerfect) || 0;
     let nextCorrected = Number(prevCorrected) || 0;
     let starOutcome = null;
+    const attemptCount = Number(textAttemptCount) || 0;
 
-    if (allCorrect) {
-      const attemptCount = Number(textAttemptCount) || 0;
-      if (attemptCount === 0) {
+    if (allCorrectWords || spacingOnlyErrors) {
+      if (spacingOnlyErrors) {
+        // Ошибки только в пробелах — не заставляем пользователя их исправлять.
+        if (attemptCount >= 2) {
+          // Пользователю грозила активность (кружочек) — выдаём её сразу.
+          starOutcome = null;
+        } else {
+          // Пользователь претендовал на целую звезду или полузвезду —
+          // даём зелёную полузвезду.
+          nextCorrected = nextCorrected + 1;
+          starOutcome = 'half';
+        }
+      } else if (attemptCount === 0) {
         // Первая проверка — всё правильно с первого раза → звезда
         nextPerfect = 1;
         starOutcome = 'perfect';
@@ -733,6 +750,24 @@ class ПроверкаНаОшибки {
         starOutcome = null;
       }
     }
+
+    const allCorrect = allCorrectWords || spacingOnlyErrors;
+
+    try {
+      console.log('[ПроверкаНаОшибки] analyze result', {
+        originalText,
+        userText,
+        userNorm,
+        origNorm,
+        allCorrectWords,
+        spacingOnlyErrors,
+        allCorrect,
+        errorCount,
+        starOutcome,
+        nextPerfect,
+        nextCorrected,
+      });
+    } catch (eLog) {}
 
     return {
       okToCheck: true,
