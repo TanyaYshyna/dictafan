@@ -26,6 +26,11 @@
   const MIN_INDEX = 1;
   const MAX_INDEX = 100;
   const LS_CONFIG_KEY = 'dictafan_mult_config_v1';
+  // Максимальное время ожидания сетевого ответа конфига. Дальше отдаём
+  // кеш/localStorage, чтобы загрузка мультика никогда не блокировалась сетью.
+  const CONFIG_FETCH_TIMEOUT_MS = 4000;
+  // Временные замеры (console.time) для диагностики медленной загрузки.
+  const DEBUG_TIMING = true;
 
   const DEFAULT_CONFIG = {
     version: 1,
@@ -44,6 +49,22 @@
 
   function padIndex(idx) {
     return String(idx).padStart(3, '0');
+  }
+
+  function timeStart(label) {
+    if (!DEBUG_TIMING) return;
+    try {
+      console.time('[mult] ' + label);
+    } catch (e) {
+    }
+  }
+
+  function timeEnd(label) {
+    if (!DEBUG_TIMING) return;
+    try {
+      console.timeEnd('[mult] ' + label);
+    } catch (e) {
+    }
   }
 
   // Общий кеш загруженных изображений (ключ — путь к файлу).
@@ -298,6 +319,7 @@
 
       let image = null;
       let resolvedPath = null;
+      timeStart('play:image');
       try {
         resolvedPath = this.getImagePath(multIndex, png);
         image = await this.loadImage(resolvedPath);
@@ -323,16 +345,20 @@
           console.error('Ошибка загрузки мультфильма:', e3);
           this.drawPlaceholder();
           this.isPlaying = false;
+          timeEnd('play:image');
           return;
         }
       }
+      timeEnd('play:image');
 
       this._image = image;
       // Декодируем кадры спрайта в offscreen-канвасы, чтобы цикл анимации
       // только переносил готовый кадр на основной canvas (быстрее и плавнее).
+      timeStart('play:decode');
       if (resolvedPath) {
         this._frames = await decodeFramesCached(resolvedPath, this.cols, this.rows).catch(() => null);
       }
+      timeEnd('play:decode');
       this.drawFrame(0);
       this.startLoop();
 
@@ -370,8 +396,24 @@
 
       this._configPromise = (async () => {
         let cfg = null;
+        timeStart('loadConfig:fetch');
         try {
-          const res = await fetch(CONFIG_URL + '?v=' + Date.now(), { cache: 'no-store' });
+          // Без уникального ?v=: Service Worker network-first запоминает конфиг
+          // под стабильным ключом, и повторные запросы мгновенно отдают кеш.
+          // Таймаут страхует от зависшего запроса (например, медленный B2).
+          const controller = new AbortController();
+          const timer = setTimeout(() => {
+            try {
+              controller.abort();
+            } catch (e) {
+            }
+          }, CONFIG_FETCH_TIMEOUT_MS);
+          let res = null;
+          try {
+            res = await fetch(CONFIG_URL, { signal: controller.signal });
+          } finally {
+            clearTimeout(timer);
+          }
           if (res && res.ok) {
             const data = await res.json();
             const body = data && data.config ? data.config : data;
@@ -382,7 +424,9 @@
             }
           }
         } catch (e) {
+          console.warn('[mult] loadConfig: сеть/таймаут, берём localStorage:', (e && e.message) ? e.message : e);
         }
+        timeEnd('loadConfig:fetch');
 
         if (cfg) {
           try {
@@ -428,8 +472,10 @@
     async play(canvasId, wins) {
       const player = getPlayer(canvasId);
       const idx = player.getMultIndex(wins);
+      timeStart('play:config');
       let cfg = await this.getMultConfig(idx);
       if (!cfg) cfg = await this._getFirstConfiguredMult();
+      timeEnd('play:config');
       return player.play(wins, cfg);
     },
 
@@ -439,12 +485,23 @@
     },
 
     // Предзагрузка мультфильма для будущей победы (номер = wins).
-    // Вызывается заранее (в начале диктанта, когда номер будущей победы уже
-    // известен), чтобы изображение попало в imageCache и в момент победы
-    // показывалось мгновенно — без сетевой задержки.
+    // Вызывается заранее (в начале диктанта), чтобы изображение попало в
+    // imageCache/frameCache и в момент победы показывалось мгновенно.
     async preload(wins) {
+      timeStart('preload(' + wins + ')');
       try {
         const player = getPlayer('multCanvas');
+
+        // ВАЖНО: запасной мультфильм 001.png греем ПЕРВЫМ и синхронно,
+        // БЕЗ ожидания конфига/сети. Именно на него play() падает, если
+        // файла текущего номера нет (например, 2-я победа при настроенном
+        // только 001). Это гарантирует, что кеш заполнится в начале диктанта
+        // независимо от того, что вернёт /api/mult/config.
+        const fallbackPath = player.getImagePath(MIN_INDEX, null);
+        loadImageCached(fallbackPath).catch(() => {});
+        decodeFramesCached(fallbackPath, DEFAULT_COLS, DEFAULT_ROWS).catch(() => {});
+
+        // Дальше по конфигу греем конкретный мультик будущей победы + аудио.
         const multIndex = player.getMultIndex(wins);
         let cfg = await this.getMultConfig(multIndex);
         if (!cfg) cfg = await this._getFirstConfiguredMult();
@@ -463,14 +520,6 @@
           loadImageCached(player.getImagePath(multIndex, null)).catch(() => {});
         }
 
-        // Всегда прогреваем запасной мультфильм 001.png: именно на него
-        // play() падает, если файла текущего номера нет (например, 2-я победа
-        // при настроенном только 001). Это гарантирует мгновенный показ в
-        // момент победы даже без конфига для текущего номера.
-        const fallbackPath = player.getImagePath(MIN_INDEX, null);
-        loadImageCached(fallbackPath).catch(() => {});
-        decodeFramesCached(fallbackPath, DEFAULT_COLS, DEFAULT_ROWS).catch(() => {});
-
         // Прогреваем аудио-файл (декодируем Audio-элемент + греем кеш SW).
         if (cfg && cfg.audio) {
           preloadAudio(cfg.audio);
@@ -478,6 +527,7 @@
       } catch (e) {
         // Не критично: в момент победы play() повторит попытку загрузки.
       }
+      timeEnd('preload(' + wins + ')');
     },
 
     // --- Модальное окно предпросмотра ---

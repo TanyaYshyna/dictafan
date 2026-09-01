@@ -197,23 +197,32 @@ def _migrate_local_to_b2() -> None:
 
 
 def _read_config() -> dict:
-    """B2-first: если B2 включён и там есть конфиг — берём его.
-    Иначе используем локальный конфиг (при этом мигрируем локальные файлы в B2).
+    """Локальный кеш-first для мгновенного чтения.
+
+    Раньше конфиг на каждый GET /api/mult/config читался из B2 (network-first),
+    из-за чего при медленном/недоступном B2 запрос «висел» десятки секунд —
+    именно это вызывало задержку показа мультика после победы.
+
+    Теперь авторитетным источником является локальный кеш
+    (static/data/mult/mults.json), который обновляется при каждом сохранении
+    (см. _write_config_local). B2 используется ТОЛЬКО как источник, когда
+    локального конфига ещё нет (например, после деплоя на новый инстанс).
     """
+    local_cfg = _read_config_local()
+    if local_cfg.get("mults"):
+        return local_cfg
+
     b2 = _get_b2()
     if b2.enabled:
         cfg = _read_config_from_b2()
-        if cfg.get("mults") or _has_config_in_b2(b2):
+        if cfg.get("mults"):
+            try:
+                _write_config_local(cfg)
+            except Exception:
+                pass
             return cfg
-        # В B2 конфига нет — пробуем локальный и мигрируем.
-        local_cfg = _read_config_local()
-        if local_cfg.get("mults"):
-            _migrate_local_to_b2()
-            _write_config_to_b2(local_cfg)
-            return local_cfg
-        return cfg
 
-    return _read_config_local()
+    return local_cfg
 
 
 def _has_config_in_b2(b2) -> bool:

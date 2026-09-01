@@ -820,7 +820,21 @@
 
     try {
       const resultsBtn = document.getElementById('completionResultsBtn');
-      if (resultsBtn && typeof resultsBtn.focus === 'function') resultsBtn.focus();
+      if (resultsBtn && typeof resultsBtn.focus === 'function') {
+        // Фокусируем кнопку "Посмотреть результаты" отложенно (setTimeout),
+        // чтобы фокус гарантированно установился ПОСЛЕ всех синхронных операций,
+        // которые могут сработать после showCompletionModal (например,
+        // updateNavigatorFromSession из checkText или фокус из onRecognitionComplete)
+        // и перехватить фокус.
+        setTimeout(function () {
+          try {
+            const cm = document.getElementById('completionModal');
+            if (cm && cm.style.display === 'none') return;
+            if (typeof resultsBtn.focus === 'function') resultsBtn.focus();
+          } catch (eFocus) {
+          }
+        }, 0);
+      }
     } catch (e5) {
     }
 
@@ -1824,7 +1838,7 @@
                 }
                 checkBtn.focus();
               }
-            } else if (textOk && corrected > 0 && perfect < 1) {
+            } else if (textOk && corrected > 0 && perfect < 1 && !dictationModalState._completionShown) {
               // Полузвезда — фокус на checkBtn (кнопка повтора в режиме half)
               const checkBtn = document.getElementById('checkBtn');
               if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
@@ -3871,7 +3885,11 @@
             }
 
             try {
-              if (ok) {
+              // Если победное окно уже показано (showCompletionModal был вызван из
+              // updateTaskProgressFromSession выше) — не перебиваем фокус кнопками диктанта.
+              const completionModalEl = document.getElementById('completionModal');
+              const completionShown = !!(completionModalEl && completionModalEl.style.display !== 'none');
+              if (!completionShown && ok) {
                 const checkBtn = document.getElementById('checkBtn');
                 const nextBtn = document.getElementById('resultNextBtn');
 
@@ -3882,7 +3900,7 @@
                 } else if (checkBtn && typeof checkBtn.focus === 'function') {
                   checkBtn.focus();
                 }
-              } else {
+              } else if (!completionShown) {
                 const rb = document.getElementById('recordButton');
                 if (rb && typeof rb.focus === 'function') rb.focus();
               }
@@ -5490,6 +5508,17 @@
 
     try {
       if (dictationModalState.dictationStarted && !isPauseModalOpen() && !isStartModalOpen()) {
+        // Если показано победное окно — фокус уже на его кнопках
+        // (showCompletionModal фокусирует completionResultsBtn).
+        // Не перебиваем его фокусом на поле ввода / кнопки диктанта.
+        try {
+          const cm = document.getElementById('completionModal');
+          if (cm && cm.style.display !== 'none') {
+            return;
+          }
+        } catch (e0cm) {
+        }
+
         try {
           if (dictationModalState._skipNavigatorFocusOnce) {
             dictationModalState._skipNavigatorFocusOnce = false;
