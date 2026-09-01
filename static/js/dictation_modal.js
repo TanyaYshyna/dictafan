@@ -990,6 +990,40 @@
     const resultsBtn = document.getElementById('completionResultsBtn');
     if (!completionModal || !exitBtn) return;
 
+    // Фокус-ловушка: Tab перемещает фокус между "Посмотреть результаты" и "Выйти"
+    // и обратно, не уходя на элементы под модальным окном.
+    try {
+      if (completionModal.dataset.boundFocusTrap !== '1') {
+        completionModal.dataset.boundFocusTrap = '1';
+        completionModal.addEventListener('keydown', (e) => {
+          try {
+            if (completionModal.style.display === 'none') return;
+            if (!e || e.key !== 'Tab') return;
+            const rBtn = document.getElementById('completionResultsBtn');
+            const eBtn = document.getElementById('completionExitBtn');
+            const focusables = [rBtn, eBtn].filter(Boolean);
+            if (!focusables.length) return;
+            const active = document.activeElement;
+            const idx = focusables.indexOf(active);
+
+            if (e.shiftKey) {
+              if (idx <= 0) {
+                e.preventDefault();
+                focusables[focusables.length - 1].focus();
+              }
+            } else {
+              if (idx === focusables.length - 1 || idx === -1) {
+                e.preventDefault();
+                focusables[0].focus();
+              }
+            }
+          } catch (eTrap) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+
     try {
       if (completionModal.dataset.boundDictafanCompletionModal !== '1') {
         completionModal.dataset.boundDictafanCompletionModal = '1';
@@ -1490,14 +1524,20 @@
 
         try {
           const inputField = document.getElementById('userInput');
-          if (
-            renderer &&
-            typeof renderer.renderToEditable === 'function' &&
-            inputField &&
-            Array.isArray(res.verified) &&
-            res.verified.length
-          ) {
-            renderer.renderToEditable(res.verified, inputField);
+          if (inputField) {
+            if (res && res.allCorrect) {
+              // Идеальное состояние: показываем эталонный текст без подсветки ошибок.
+              // Это покрывает и случай, когда различия были только в пробелах —
+              // ввод переводится в "идеальное состояние", как при звезде/полузвезде/активности.
+              inputField.textContent = originalText;
+            } else if (
+              renderer &&
+              typeof renderer.renderToEditable === 'function' &&
+              Array.isArray(res.verified) &&
+              res.verified.length
+            ) {
+              renderer.renderToEditable(res.verified, inputField);
+            }
           }
         } catch (e12) {
         }
@@ -1808,13 +1848,19 @@
                 rb.focus();
               }
             } else if (textOk && audioOk) {
-              const nb = document.getElementById('resultNextBtn');
-              if (nb && !nb.disabled && typeof nb.focus === 'function') {
-                try {
-                  dictationModalState._skipNavigatorFocusOnce = true;
-                } catch (e0y) {
+              // Если диктант завершён и показано победное окно — фокус уже
+              // переведён на completionResultsBtn, не перебиваем его фокусом
+              // на кнопку "Далее" модального окна диктанта.
+              const completionShown = !!dictationModalState._completionShown;
+              if (!completionShown) {
+                const nb = document.getElementById('resultNextBtn');
+                if (nb && !nb.disabled && typeof nb.focus === 'function') {
+                  try {
+                    dictationModalState._skipNavigatorFocusOnce = true;
+                  } catch (e0y) {
+                  }
+                  nb.focus();
                 }
-                nb.focus();
               }
             }
           }
