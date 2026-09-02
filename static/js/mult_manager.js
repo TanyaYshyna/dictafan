@@ -125,23 +125,36 @@
     return promise;
   }
 
-  // Кеш прогретых аудио-элементов (ключ — URL).
+  // Кеш прогретых аудио-элементов (ключ — URL, в т.ч. blob URL).
   const audioCache = new Map();
+  // Кеш аудио, скачанных в Blob: ключ — имя файла из конфига (cfg.audio).
+  // Значение — { blobUrl, audio }. Блоб готовится заранее (в preload), чтобы
+  // в момент победы не было сетевого запроса и декодирование не затягивало старт.
+  const audioBlobCache = new Map();
 
-  // Прогрев аудио-файла мультика: создаём Audio-элемент с preload="auto",
-  // чтобы файл был скачан и декодирован заранее (а не в момент победы),
-  // и дополнительно греем файл в кеш Service Worker.
-  function preloadAudio(name) {
+  // Скачивает аудио-файл мультика в Blob и готовит Audio-элемент с preload="auto"
+  // на blob URL. Возвращает { blobUrl, audio } или null (файла нет / ошибка).
+  // Результат кешируется по имени файла, чтобы повторные вызовы не качали заново.
+  async function loadAudioBlob(name) {
+    if (!name) return null;
+    const existing = audioBlobCache.get(name);
+    if (existing) return existing;
+    const url = MULT_ASSET_URL + encodeURIComponent(name);
     try {
-      const url = MULT_ASSET_URL + encodeURIComponent(name);
-      if (!url || audioCache.has(url)) return;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Аудио мультика не найдено: ' + name);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const audio = new Audio();
       audio.preload = 'auto';
-      audio.src = url;
+      audio.src = blobUrl;
       audio.load();
-      audioCache.set(url, audio);
-      fetch(url, { method: 'GET' }).catch(() => {});
+      const entry = { blobUrl, audio };
+      audioCache.set(blobUrl, audio);
+      audioBlobCache.set(name, entry);
+      return entry;
     } catch (e) {
+      return null;
     }
   }
 
@@ -207,9 +220,16 @@
     }
 
     // Воспроизвести аудио мультика по имени файла из конфига.
+    // Если блоб уже прогрет (preload) — используем blob URL (мгновенно),
+    // иначе fallback на прямой URL /api/mult/asset/.
     playAudio(name) {
       if (!name) return;
-      this.playAudioUrl(this.getAudioPath(name));
+      const cached = audioBlobCache.get(name);
+      if (cached && cached.blobUrl) {
+        this.playAudioUrl(cached.blobUrl);
+      } else {
+        this.playAudioUrl(this.getAudioPath(name));
+      }
     }
 
     stopAudio() {
@@ -520,9 +540,10 @@
           loadImageCached(player.getImagePath(multIndex, null)).catch(() => {});
         }
 
-        // Прогреваем аудио-файл (декодируем Audio-элемент + греем кеш SW).
+        // Прогреваем аудио-файл: скачиваем в Blob и готовим Audio-элемент,
+        // чтобы в момент победы звук стартовал мгновенно без сетевого запроса.
         if (cfg && cfg.audio) {
-          preloadAudio(cfg.audio);
+          await loadAudioBlob(cfg.audio);
         }
       } catch (e) {
         // Не критично: в момент победы play() повторит попытку загрузки.

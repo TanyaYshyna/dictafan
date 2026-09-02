@@ -967,18 +967,8 @@
     } catch (e9) {
     }
 
-    // Success уже отправлен в последнем activity (звезда/полузвезда/аудио)
-    // с параметрами completionCount=1 и successNumber.
-    // Здесь только принудительно отправляем всё накопленное (flushAll).
-    try {
-      const ob = window.OutboxBatcher;
-      if (ob && typeof ob.flushAll === 'function') {
-        try { await ob.flushAll(); } catch (eFlush) { console.warn('[DM] flushAll error:', eFlush); }
-      }
-    } catch (e7) {
-    }
-
-    // Запуск мультфильма победы.
+    // Запуск мультфильма победы ПЕРВЫМ — без ожидания сетевых запросов,
+    // чтобы не было задержки между появлением окна и стартом анимации.
     // Номер мультфильма определяется количеством побед, которое уже подсчитано
     // выше (completionCountAfter) до показа окна победы.
     try {
@@ -988,6 +978,18 @@
       }
     } catch (eMult) {
       console.error('[DM] Не удалось запустить мультфильм победы:', eMult);
+    }
+
+    // Success уже отправлен в последнем activity (звезда/полузвезда/аудио)
+    // с параметрами completionCount=1 и successNumber.
+    // Здесь принудительно отправляем всё накопленное (flushAll) в фоне,
+    // НЕ блокируя показ мультфильма (запущен выше).
+    try {
+      const ob = window.OutboxBatcher;
+      if (ob && typeof ob.flushAll === 'function') {
+        ob.flushAll().catch((eFlush) => { console.warn('[DM] flushAll error:', eFlush); });
+      }
+    } catch (e7) {
     }
 
     // Уведомляем панель статистики «Время / Деньги» об обновлении
