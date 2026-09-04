@@ -388,31 +388,158 @@ def add_book_to_user_shelf(
         conn.close()
 
 
-def delete_book(book_id: int) -> bool:
+def delete_book(book_id: int) -> Dict[str, Any]:
     """
-    Удаляет книгу/раздел из базы данных.
-    ВНИМАНИЕ: Это каскадное удаление - удаляются все связанные записи.
+    Полное удаление книги (или раздела) вместе со всем её деревом.
+
+    Возвращает словарь с ключами:
+      deleted: bool
+      book_ids: list[int]      — id всех удалённых книг/разделов
+      dictation_ids: list[int] — id диктантов, привязанных к этим книгам
     """
     conn, cur = get_db_cursor()
     try:
-        # Сначала удаляем все связи с диктантами
-        cur.execute("DELETE FROM book_dictations WHERE book_id = %s", (book_id,))
-        
-        # Удаляем все дочерние разделы (рекурсивно)
-        # Получаем все дочерние разделы
-        cur.execute("SELECT id FROM books WHERE parent_id = %s", (book_id,))
-        child_sections = cur.fetchall()
-        for child in child_sections:
-            delete_book(child["id"])  # Рекурсивное удаление
-        
-        # Удаляем связи с полками пользователей
-        cur.execute("DELETE FROM user_books WHERE book_id = %s", (book_id,))
-        
-        # Удаляем саму книгу
-        cur.execute("DELETE FROM books WHERE id = %s", (book_id,))
-        
+        # 1. Определяем корень книги.
+        cur.execute(
+            "SELECT id, parent_id, root_book_id FROM books WHERE id = %s",
+            (book_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            conn.commit()
+            return {"deleted": False, "book_ids": [], "dictation_ids": []}
+
+        root_id = row.get("root_book_id")
+        if root_id is None:
+            root_id = int(row["id"])
+        else:
+            root_id = int(root_id)
+
+        # 2. Собираем все книги дерева (корень + разделы).
+        cur.execute(
+            "SELECT id, parent_id FROM books WHERE id = %s OR root_book_id = %s",
+            (root_id, root_id),
+        )
+        rows = cur.fetchall()
+        book_ids = sorted({int(r["id"]) for r in rows})
+        if int(book_id) not in book_ids:
+            book_ids.append(int(book_id))
+            book_ids = sorted(set(book_ids))
+
+        parent_map: Dict[int, Optional[int]] = {}
+        for r in rows:
+            pid = r.get("parent_id")
+            parent_map[int(r["id"])] = int(pid) if pid is not None else None
+
+        # 3. Собираем id диктантов, привязанных к этим книгам.
+        dictation_ids: List[int] = []
+        if book_ids:
+            cur.execute(
+                "SELECT DISTINCT dictation_id FROM book_dictations WHERE book_id = ANY(%s)",
+                (book_ids,),
+            )
+            dictation_ids = sorted({int(r["dictation_id"]) for r in cur.fetchall()})
+
+        # 4. Удаляем ссылки и диктанты (только для существующих таблиц).
+        cur.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+        )
+        existing_tables = {r["table_name"] for r in cur.fetchall()}
+
+        def _delete_if_exists(table_name: str, sql: str, params) -> None:
+            if table_name not in existing_tables:
+                return
+            cur.execute(sql, params)
+
+        if dictation_ids:
+            _delete_if_exists(
+                "history_by_day",
+                "DELETE FROM history_by_day WHERE dictation_id = ANY(%s)",
+                (dictation_ids,),
+            )
+            _delete_if_exists(
+                "plan_tasks",
+                "DELETE FROM plan_tasks WHERE dictation_id = ANY(%s)",
+                (dictation_ids,),
+            )
+            _delete_if_exists(
+                "desk_items",
+                "DELETE FROM desk_items WHERE dictation_id = ANY(%s)",
+                (dictation_ids,),
+            )
+            _delete_if_exists(
+                "dictation_sentences",
+                "DELETE FROM dictation_sentences WHERE dictation_id = ANY(%s)",
+                (dictation_ids,),
+            )
+            _delete_if_exists(
+                "dictation_exercises",
+                "DELETE FROM dictation_exercises WHERE dictation_id = ANY(%s)",
+                (dictation_ids,),
+            )
+            _delete_if_exists(
+                "history_activity",
+                "DELETE FROM history_activity WHERE dictation_id = ANY(%s)",
+                (dictation_ids,),
+            )
+            _delete_if_exists(
+                "history_successes",
+                "DELETE FROM history_successes WHERE dictation_id = ANY(%s)",
+                (dictation_ids,),
+            )
+            _delete_if_exists(
+                "book_dictations",
+                "DELETE FROM book_dictations WHERE dictation_id = ANY(%s)",
+                (dictation_ids,),
+            )
+            _delete_if_exists(
+                "dictations",
+                "DELETE FROM dictations WHERE id = ANY(%s)",
+                (dictation_ids,),
+            )
+
+        if book_ids:
+            _delete_if_exists(
+                "book_dictations",
+                "DELETE FROM book_dictations WHERE book_id = ANY(%s)",
+                (book_ids,),
+            )
+            _delete_if_exists(
+                "user_books",
+                "DELETE FROM user_books WHERE book_id = ANY(%s)",
+                (book_ids,),
+            )
+
+        # 5. Удаляем книги от листьев к корню
+        #    (FK books_root_book_id_fk создан без ON DELETE CASCADE).
+        remaining = set(book_ids)
+        while remaining:
+            progressed = False
+            for bid in sorted(remaining):
+                parent_id = parent_map.get(bid)
+                if parent_id is not None and parent_id in remaining:
+                    continue
+                cur.execute("DELETE FROM books WHERE id = %s", (bid,))
+                remaining.discard(bid)
+                progressed = True
+            if not progressed:
+                # Защита от циклов в parent_id: удаляем остатки в произвольном порядке.
+                for bid in sorted(remaining):
+                    try:
+                        cur.execute("DELETE FROM books WHERE id = %s", (bid,))
+                    except Exception:
+                        pass
+                remaining.clear()
+
         conn.commit()
-        return cur.rowcount > 0
+        return {
+            "deleted": True,
+            "book_ids": book_ids,
+            "dictation_ids": dictation_ids,
+        }
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         cur.close()
         conn.close()
@@ -458,36 +585,6 @@ def add_dictation_to_desk(
         conn.close()
 
 
-def delete_book(book_id: int) -> bool:
-    """
-    Удаляет книгу/раздел из базы данных.
-    ВНИМАНИЕ: Это каскадное удаление - удаляются все связанные записи.
-    """
-    conn, cur = get_db_cursor()
-    try:
-        # Сначала удаляем все связи с диктантами
-        cur.execute("DELETE FROM book_dictations WHERE book_id = %s", (book_id,))
-        
-        # Удаляем все дочерние разделы (рекурсивно)
-        # Получаем все дочерние разделы
-        cur.execute("SELECT id FROM books WHERE parent_id = %s", (book_id,))
-        child_sections = cur.fetchall()
-        for child in child_sections:
-            delete_book(child["id"])  # Рекурсивное удаление
-        
-        # Удаляем связи с полками пользователей
-        cur.execute("DELETE FROM user_books WHERE book_id = %s", (book_id,))
-        
-        # Удаляем саму книгу
-        cur.execute("DELETE FROM books WHERE id = %s", (book_id,))
-        
-        conn.commit()
-        return cur.rowcount > 0
-    finally:
-        cur.close()
-        conn.close()
-
-
 def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     Возвращает две коллекции книг пользователя:
@@ -519,6 +616,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
             LEFT JOIN users u ON u.id = b.creator_user_id
             LEFT JOIN book_dictations bd ON bd.book_id = b.id
             WHERE b.creator_user_id = %s AND b.parent_id IS NULL
+              AND b.title IS NOT NULL AND b.title <> ''
             GROUP BY
                 b.id,
                 b.title,
@@ -863,6 +961,29 @@ def _next_book_id(cur) -> Optional[int]:
     except Exception:
         pass
     return None
+
+
+def reserve_book_id(creator_user_id: int) -> Dict[str, Any]:
+    """
+    Резервирует id новой книги в БД в момент начала редактирования.
+
+    Создаёт книгу верхнего уровня с пустым названием (visibility='private'),
+    чтобы у неё уже был реальный id/root_book_id. Пустые названия скрываются
+    из списка «своих книг» в get_user_library_books, поэтому «призрачная» книга
+    не появляется в библиотеке до сохранения.
+    """
+    return create_book(
+        creator_user_id=creator_user_id,
+        title="",
+        original_language=None,
+        visibility="private",
+        short_description=None,
+        author_text=None,
+        theme=None,
+        parent_id=None,
+        order_index=0,
+        author_materials_url=None,
+    )
 
 
 def create_book(
@@ -1275,36 +1396,5 @@ def remove_book_from_user_shelf(user_id: int, book_id: int) -> bool:
     finally:
         cur.close()
         conn.close()
-
-
-def delete_book(book_id: int) -> bool:
-    """
-    Удаляет книгу/раздел из базы данных.
-    ВНИМАНИЕ: Это каскадное удаление - удаляются все связанные записи.
-    """
-    conn, cur = get_db_cursor()
-    try:
-        # Сначала удаляем все связи с диктантами
-        cur.execute("DELETE FROM book_dictations WHERE book_id = %s", (book_id,))
-        
-        # Удаляем все дочерние разделы (рекурсивно)
-        # Получаем все дочерние разделы
-        cur.execute("SELECT id FROM books WHERE parent_id = %s", (book_id,))
-        child_sections = cur.fetchall()
-        for child in child_sections:
-            delete_book(child["id"])  # Рекурсивное удаление
-        
-        # Удаляем связи с полками пользователей
-        cur.execute("DELETE FROM user_books WHERE book_id = %s", (book_id,))
-        
-        # Удаляем саму книгу
-        cur.execute("DELETE FROM books WHERE id = %s", (book_id,))
-        
-        conn.commit()
-        return cur.rowcount > 0
-    finally:
-        cur.close()
-        conn.close()
-
 
 

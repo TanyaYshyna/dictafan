@@ -171,6 +171,13 @@
         coverHtml = `<div class="book-card-mini-cover-placeholder"><i data-lucide="book"></i></div>`;
       }
 
+      const menuHtml = isOwn
+        ? `<button type="button" class="book-card-mini-menu-btn" data-book-menu-btn="${book && book.id != null ? book.id : ''}" title="Действия"><i data-lucide="more-horizontal"></i></button>
+           <div class="book-card-mini-menu" role="menu">
+             <button type="button" class="book-card-mini-menu-item book-card-mini-menu-item-danger" data-book-menu-action="delete" role="menuitem"><i data-lucide="trash-2"></i><span>Удалить книгу</span></button>
+           </div>`
+        : '';
+
       return `
         <div class="book-card-mini ${foreignClass} ${activeClass}" data-book-id="${book && book.id != null ? book.id : ''}">
           <div class="book-card-mini-cover-wrapper">
@@ -179,6 +186,7 @@
               <div class="book-card-mini-creator">${creatorAvatarHtml}</div>
               <div class="book-card-mini-creator-name">${String(creatorName)}</div>
             </div>
+            ${menuHtml}
           </div>
           <div class="book-card-mini-title">${String(book && book.title != null ? book.title : '')}</div>
         </div>
@@ -191,6 +199,96 @@
         if (parseInt(card.getAttribute('data-book-id')) === bookId) card.classList.add('active');
         else card.classList.remove('active');
       });
+    }
+
+    function closeOpenMenu(exceptCard = null) {
+      document.querySelectorAll('.book-card-mini-menu.open').forEach(menu => {
+        if (exceptCard && menu.closest('.book-card-mini') === exceptCard) return;
+        menu.classList.remove('open');
+      });
+      document.querySelectorAll('.book-card-mini.menu-open').forEach(card => {
+        if (exceptCard && card === exceptCard) return;
+        card.classList.remove('menu-open');
+      });
+    }
+
+    function bindMiniCard(card, book, container) {
+      if (!card || !book) return;
+      const bookId = Number(book.id);
+
+      card.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveBook(bookId, container);
+      });
+
+      card.addEventListener('dblclick', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          setActiveBook(bookId, container);
+          if (window.BookModal && typeof window.BookModal.openBook === 'function') {
+            await window.BookModal.openBook(bookId, !!(book && book.is_workbook));
+          }
+        } catch (e2) {
+        }
+      });
+
+      const menuBtn = card.querySelector('.book-card-mini-menu-btn');
+      if (menuBtn) {
+        menuBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const wasOpen = card.classList.contains('menu-open');
+          closeOpenMenu();
+          if (wasOpen) {
+            return;
+          }
+          card.classList.add('menu-open');
+          const menu = card.querySelector('.book-card-mini-menu');
+          if (menu) menu.classList.add('open');
+        });
+      }
+
+      const deleteItem = card.querySelector('[data-book-menu-action="delete"]');
+      if (deleteItem) {
+        deleteItem.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeOpenMenu();
+          const title = String(book && book.title ? book.title : 'книгу');
+          try {
+            if (window.DesktopConfirmModal && typeof window.DesktopConfirmModal.confirm === 'function') {
+              window.DesktopConfirmModal.confirm({
+                title: 'Удалить книгу',
+                message: `Вы уверены, что хотите удалить книгу "${title}"?`,
+                confirmText: 'Удалить',
+                cancelText: 'Отмена',
+                confirmButtonClass: 'btn-danger',
+                onConfirm: () => {
+                  try {
+                    if (window.BookModal && typeof window.BookModal.deleteBook === 'function') {
+                      window.BookModal.deleteBook(bookId);
+                    }
+                  } catch (e3) {
+                  }
+                },
+              });
+              return;
+            }
+          } catch (e3) {
+          }
+
+          if (window.confirm(`Вы уверены, что хотите удалить книгу "${title}"?`)) {
+            try {
+              if (window.BookModal && typeof window.BookModal.deleteBook === 'function') {
+                window.BookModal.deleteBook(bookId);
+              }
+            } catch (e3) {
+            }
+          }
+        });
+      }
     }
 
     function renderBooksList(ownBooks, shelfBooks) {
@@ -247,24 +345,7 @@
       container.querySelectorAll('.book-card-mini').forEach(card => {
         const bookId = parseInt(card.getAttribute('data-book-id'));
         const book = allBooks.find(b => Number(b.id) === Number(bookId));
-
-        card.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setActiveBook(bookId, container);
-        });
-
-        card.addEventListener('dblclick', async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          try {
-            setActiveBook(bookId, container);
-            if (window.BookModal && typeof window.BookModal.openBook === 'function') {
-              await window.BookModal.openBook(bookId, !!(book && book.is_workbook));
-            }
-          } catch (e2) {
-          }
-        });
+        bindMiniCard(card, book, container);
       });
 
       try {
@@ -366,6 +447,32 @@
       }
     }
 
+    function addBook(book) {
+      if (!book || book.id == null) return;
+      const idNum = Number(book.id);
+      if (!isFinite(idNum)) return;
+
+      const existingOwn = state.lastOwnBooks.find(b => Number(b.id) === idNum);
+      if (!existingOwn) {
+        state.lastOwnBooks.unshift(book);
+      }
+
+      state.lastShelfBooks = (state.lastShelfBooks || []).filter(b => Number(b.id) !== idNum);
+      writeBooksCache(state.lastOwnBooks, state.lastShelfBooks).catch(() => { });
+      renderBooksList(state.lastOwnBooks, state.lastShelfBooks);
+    }
+
+    function removeBook(bookId) {
+      const idNum = Number(bookId);
+      if (!isFinite(idNum)) return;
+
+      state.lastOwnBooks = (state.lastOwnBooks || []).filter(b => Number(b.id) !== idNum);
+      state.lastShelfBooks = (state.lastShelfBooks || []).filter(b => Number(b.id) !== idNum);
+      if (Number(state.activeBookId) === idNum) state.activeBookId = null;
+      writeBooksCache(state.lastOwnBooks, state.lastShelfBooks).catch(() => { });
+      renderBooksList(state.lastOwnBooks, state.lastShelfBooks);
+    }
+
     function open() {
       const modal = document.getElementById('home-library-modal');
       if (!modal) {
@@ -461,6 +568,8 @@
       open,
       close,
       reload: () => loadBooksFromAPI(),
+      addBook,
+      removeBook,
     };
   } catch (e) {
   }

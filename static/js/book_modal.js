@@ -213,6 +213,9 @@
       bookLanguageSelector: null,
 
       lastLoadedBook: null,
+
+      /** true, когда в модалке редактируется новая книга с уже зарезервированным id */
+      bookEditIsNewReserved: false,
     };
 
     function initStaticTexts() {
@@ -756,9 +759,34 @@
         try { closeBookViewModal(); } catch (e) { }
         showToast('Книга удалена', { durationMs: 1800 });
 
+        // 1. Удаляем карточку из списка приватной библиотеки без полной перерисовки.
         try {
-          if (window.PrivateLibraryModal && typeof window.PrivateLibraryModal.reload === 'function') {
+          if (window.PrivateLibraryModal && typeof window.PrivateLibraryModal.removeBook === 'function') {
+            window.PrivateLibraryModal.removeBook(idNum);
+          } else if (window.PrivateLibraryModal && typeof window.PrivateLibraryModal.reload === 'function') {
             window.PrivateLibraryModal.reload().catch(() => { });
+          }
+        } catch (e2) {
+        }
+
+        // 2. Чистим кеш книг и диктантов в IndexedDB.
+        try {
+          const idb = window.IdbManager;
+          const deletedBookIds = Array.isArray(data.deleted_book_ids) ? data.deleted_book_ids : [idNum];
+          const deletedDictationIds = Array.isArray(data.deleted_dictation_ids) ? data.deleted_dictation_ids : [];
+          if (idb && typeof idb.idbDelete === 'function') {
+            for (const bid of deletedBookIds) {
+              const b = Number(bid);
+              if (!Number.isFinite(b)) continue;
+              await idb.idbDelete('book_view', getBookViewCacheKey(b, false));
+              await idb.idbDelete('book_view', getBookViewCacheKey(b, true));
+              await idb.idbDelete('book_view', getSectionDictationsCacheKey(b));
+            }
+          }
+          if (idb && typeof idb.idbDeleteDictationCache === 'function') {
+            for (const did of deletedDictationIds) {
+              await idb.idbDeleteDictationCache(`dict_${did}`);
+            }
           }
         } catch (e2) {
         }
@@ -966,9 +994,50 @@
       }
     }
 
+    async function openNewBookWithReservedId() {
+      let reservedBookId = null;
+      try {
+        const token = getToken();
+        if (!token) {
+          showToast('Требуется авторизация', { durationMs: 2500 });
+          return;
+        }
+        const reserveResp = await fetch('/library/api/book/reserve_id', {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer ' + token },
+          cache: 'no-store',
+        });
+        const reserveData = await reserveResp.json().catch(() => null);
+        if (reserveData && reserveData.success && reserveData.id != null) {
+          reservedBookId = Number(reserveData.id);
+        }
+      } catch (e) {
+        console.warn('[BookModal] Ошибка резервирования id книги:', e);
+      }
+
+      if (!reservedBookId) {
+        showToast('Не удалось создать книгу. Проверьте соединение и попробуйте ещё раз.', { durationMs: 4000 });
+        return;
+      }
+
+      openBookModal({
+        __isNewReserved: true,
+        id: reservedBookId,
+        title: '',
+        author_text: '',
+        theme: '',
+        visibility: 'private',
+        short_description: '',
+        author_materials_url: '',
+        cover_url: '',
+        original_language: null,
+      });
+    }
+
     function openBookModal(book) {
       try {
         setBookEditDirty(false);
+        state.bookEditIsNewReserved = !!(book && book.__isNewReserved);
 
         const modal = document.getElementById('book-edit-modal');
         const titleEl = document.getElementById('book-edit-title');
@@ -1015,14 +1084,14 @@
           }
         } else {
           if (titleEl) titleEl.textContent = 'Новая книга';
-          if (idInput) idInput.value = '';
-          if (devIdEl) devIdEl.textContent = '';
-          if (titleInput) titleInput.value = '';
-          if (authorInput) authorInput.value = '';
-          if (themeInput) themeInput.value = '';
-          if (visibilityInput) visibilityInput.value = 'private';
-          if (descInput) descInput.value = '';
-          if (authorMaterialsUrlInput) authorMaterialsUrlInput.value = '';
+          if (idInput) idInput.value = book && book.id != null ? String(book.id) : '';
+          if (devIdEl) devIdEl.textContent = book && book.id != null ? `ID: ${String(book.id)}` : '';
+          if (titleInput) titleInput.value = book ? (book.title || '') : '';
+          if (authorInput) authorInput.value = book ? (book.author_text || '') : '';
+          if (themeInput) themeInput.value = book ? (book.theme || '') : '';
+          if (visibilityInput) visibilityInput.value = book ? (book.visibility || 'private') : 'private';
+          if (descInput) descInput.value = book ? (book.short_description || '') : '';
+          if (authorMaterialsUrlInput) authorMaterialsUrlInput.value = book ? (book.author_materials_url || '') : '';
           if (coverPreview && coverPlaceholder) {
             coverPreview.style.display = 'none';
             coverPlaceholder.style.display = 'flex';
@@ -1255,11 +1324,26 @@
         setBookEditDirty(false);
         clearBookCroppedCoverBlob();
 
+        const wasNewReserved = !!state.bookEditIsNewReserved;
+        state.bookEditIsNewReserved = false;
+
         try {
           if (bookId && state.bookViewActiveBookId && Number(bookId) === Number(state.bookViewActiveBookId)) {
             await openBookViewBook(state.bookViewActiveBookId, state.activeBookIsWorkbook);
           }
         } catch (e) {
+        }
+
+        // Новая книга: добавляем карточку в приватную библиотеку без полной перерисовки.
+        if (wasNewReserved && data && data.book) {
+          try {
+            if (window.PrivateLibraryModal && typeof window.PrivateLibraryModal.addBook === 'function') {
+              window.PrivateLibraryModal.addBook(data.book);
+            } else if (window.PrivateLibraryModal && typeof window.PrivateLibraryModal.reload === 'function') {
+              window.PrivateLibraryModal.reload().catch(() => { });
+            }
+          } catch (e2) {
+          }
         }
 
         hideLoadingIndicator();
@@ -1992,11 +2076,18 @@
     window.BookModal = {
       openBook: (bookId, isWorkbook) => openBookViewBook(bookId, !!isWorkbook),
       showDictationInBook: (dictationId) => showDeskDictationInBook(dictationId),
-      openEdit: (book) => openBookModal(book),
+      openEdit: (book) => {
+        if (book && book.id != null) {
+          openBookModal(book);
+        } else {
+          openNewBookWithReservedId();
+        }
+      },
       openMoveDictation: (dictationId) => openMoveDictationModal(dictationId),
       closeView: () => closeBookViewModal(),
       closeEdit: () => closeBookModal(),
       onNewDictationSaved: () => refreshOpenBookViewForNewDictation(),
+      deleteBook: (bookId) => deleteBook(bookId),
     };
   } catch (e) {
   }
