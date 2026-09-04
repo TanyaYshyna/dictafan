@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 from flask import Blueprint, render_template, jsonify, request, current_app, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from PIL import Image
@@ -15,6 +16,9 @@ from helpers.db_books import (
     get_user_library_books,
     create_book,
     update_book,
+    get_book_by_id,
+    delete_book,
+    reserve_book_id,
     remove_book_from_user_shelf,
     get_or_create_workbook,
     get_orphan_dictations,
@@ -436,6 +440,30 @@ def api_add_dictation_to_group_desks(dictation_id: int):
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
+@library_bp.route("/api/book/reserve_id", methods=["GET"])
+@jwt_required()
+def api_reserve_book_id():
+    """
+    Резервирует id новой книги в БД в момент начала редактирования.
+    Возвращает {success, id, book_id}.
+    """
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    try:
+        book = reserve_book_id(user["id"])
+        return jsonify({
+            "success": True,
+            "id": book["id"],
+            "book_id": book["id"],
+        })
+    except Exception as exc:
+        logger.error("Ошибка резервирования id книги: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 @library_bp.route("/api/book", methods=["POST"])
 @jwt_required()
 def api_create_book():
@@ -835,7 +863,9 @@ def api_get_book(book_id: int):
 @jwt_required()
 def api_delete_book(book_id: int):
     """
-    Удаление книги/раздела.
+    Удаление книги/раздела с полной очисткой:
+    разделы, диктанты, аудио диктантов, обложки диктантов и книги
+    (из БД + B2 + локальные файлы + categories.json).
     Разрешено только создателю.
     """
     current_email = get_jwt_identity()
@@ -851,13 +881,80 @@ def api_delete_book(book_id: int):
     if book["creator_user_id"] != user["id"]:
         return jsonify({"success": False, "error": "You don't have permission to delete this book"}), 403
 
+    from helpers.b2_storage import b2_storage
+    from routes.index import (
+        _get_static_data_base_dir,
+        load_categories,
+        save_categories,
+        remove_dictation_from_categories,
+    )
+
     try:
-        from helpers.db_books import delete_book as db_delete_book
-        db_delete_book(book_id)
-        return jsonify({"success": True})
+        result = delete_book(book_id)
     except Exception as exc:
-        logger.error("Ошибка удаления книги %s: %s", book_id, exc)
+        logger.error("Ошибка удаления книги %s из БД: %s", book_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
+
+    deleted_book_ids = list(result.get("book_ids") or [])
+    dictation_ids = list(result.get("dictation_ids") or [])
+
+    data_base = _get_static_data_base_dir()
+
+    # 1. Очистка categories.json от ссылок на удалённые диктанты.
+    if dictation_ids:
+        try:
+            categories_data = load_categories()
+            changed = False
+            for did in dictation_ids:
+                dictation_id_str = f"dict_{did}"
+                if remove_dictation_from_categories(categories_data, dictation_id_str):
+                    changed = True
+                if remove_dictation_from_categories(categories_data, str(did)):
+                    changed = True
+            if changed:
+                save_categories(categories_data)
+        except Exception as exc:
+            logger.warning("Не удалось почистить categories.json при удалении книги: %s", exc)
+
+    # 2. Очистка B2: обложки книг, аудио диктантов, обложки диктантов.
+    for bid in deleted_book_ids:
+        try:
+            if b2_storage.enabled:
+                b2_storage.delete_file(f"books_covers/{bid}.webp")
+        except Exception as exc:
+            logger.warning("Не удалось удалить обложку книги %s из B2: %s", bid, exc)
+
+    for did in dictation_ids:
+        dictation_id_str = f"dict_{did}"
+        try:
+            if b2_storage.enabled:
+                b2_storage.delete_prefix(f"dictations/{dictation_id_str}/")
+        except Exception as exc:
+            logger.warning("Не удалось удалить аудио диктанта %s из B2: %s", dictation_id_str, exc)
+        try:
+            if b2_storage.enabled:
+                cover_path = f"dictations_covers/{did}.webp"
+                if b2_storage.file_exists(cover_path):
+                    b2_storage.delete_file(cover_path)
+        except Exception as exc:
+            logger.warning("Не удалось удалить обложку диктанта %s из B2: %s", did, exc)
+
+    # 3. Очистка локальных файлов диктантов.
+    for did in dictation_ids:
+        dictation_id_str = f"dict_{did}"
+        for sub in ("dictations", "temp"):
+            try:
+                local_path = os.path.join(data_base, sub, dictation_id_str)
+                if os.path.exists(local_path):
+                    shutil.rmtree(local_path)
+            except Exception as exc:
+                logger.warning("Не удалось удалить локальные файлы %s: %s", local_path, exc)
+
+    return jsonify({
+        "success": True,
+        "deleted_book_ids": deleted_book_ids,
+        "deleted_dictation_ids": dictation_ids,
+    })
 
 
 @library_bp.route("/api/user-book/<int:book_id>", methods=["DELETE"])
