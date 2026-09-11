@@ -2291,7 +2291,37 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   }
 
   #dictationModal #sentences-table {
+    display: table !important;
+    height: auto !important;
+    overflow: visible !important;
     margin: 8px 0 0 0 !important;
+  }
+
+  /* Восстанавливаем обычную структуру таблицы и убираем полосу прокрутки,
+     чтобы все строки печатались подряд и переносились на следующие страницы */
+  #dictationModal #sentences-table thead {
+    display: table-header-group !important;
+    width: 100% !important;
+  }
+
+  #dictationModal #sentences-table tbody {
+    display: table-row-group !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  #dictationModal #sentences-table tbody tr {
+    display: table-row !important;
+    width: 100% !important;
+  }
+
+  /* Убираем колонку с галочками из PDF */
+  #dictationModal #sentences-table col.col-choice,
+  #dictationModal #sentences-table th#thSentenceChoice,
+  #dictationModal #sentences-table td.col-choice {
+    display: none !important;
   }
 
   /* Разрешаем перенос строк в таблице на несколько страниц */

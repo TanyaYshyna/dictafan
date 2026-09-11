@@ -5203,6 +5203,7 @@
         tdNum.textContent = position ? ((idx + 1) === position ? String(idx + 1) : (String(idx + 1) + '/' + String(position))) : String(idx + 1);
 
         const tdChoice = document.createElement('td');
+        tdChoice.className = 'col-choice';
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'all-checkbox-btn';
