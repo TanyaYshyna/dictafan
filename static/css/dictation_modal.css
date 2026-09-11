@@ -2220,3 +2220,86 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   margin-right: 6px;
   color: #ffc107;
 }
+
+/* ===== ПЕЧАТЬ / СОХРАНЕНИЕ В PDF (кнопка "Создать PDF" в start-modal) ===== */
+/* При печати показываем только модальное окно выбора предложений (start-modal),
+   скрывая весь остальной интерфейс. Видимость колонок уже задаётся через
+   классы hide-* (флаги видимости), поэтому таблица печатается "как на экране". */
+@media print {
+  /* Скрываем всё, кроме контейнера модалки диктанта */
+  body * {
+    visibility: hidden !important;
+  }
+
+  #dictationModal,
+  #dictationModal * {
+    visibility: visible !important;
+  }
+
+  /* Показываем модалку как обычный блок без затемнения */
+  #dictationModal.dictation-modal {
+    position: absolute !important;
+    inset: 0 !important;
+    display: block !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    z-index: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Основное окно диктанта скрываем при печати — печатаем только start-modal */
+  #dictationModal .dictation-modal__content {
+    display: none !important;
+  }
+
+  #dictationModal #start-modal.modal {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  #dictationModal #start-modal .modal-content {
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Заголовок: прячем кнопки действий (PDF, Telegram, настройки, выход, закрыть) */
+  #dictationModal #start-modal .start-modal-header-actions {
+    display: none !important;
+  }
+
+  /* Скрываем управляющие кнопки и START-строку */
+  #dictationModal #start-modal .start-progress-wrap,
+  #dictationModal #start-modal .start-modal-controls {
+    display: none !important;
+  }
+
+  /* Таблица растягивается на всю ширину и не прокручивается */
+  #dictationModal #start-modal .table-container {
+    flex: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  #dictationModal #sentences-table {
+    margin: 8px 0 0 0 !important;
+  }
+
+  /* Разрешаем перенос строк в таблице на несколько страниц */
+  #dictationModal #sentences-table tr {
+    page-break-inside: avoid !important;
+  }
+
+  #dictationModal #sentences-table th {
+    position: static !important;
+  }
+}
