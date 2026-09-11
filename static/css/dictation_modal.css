@@ -1242,7 +1242,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   color: var(--color-button-text-gray);
 }
 
-#dictationModal .speaker-tablo-right {
+#dictationModal .speaker-tablo-block {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1261,7 +1261,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 }
 
 #dictationModal .user-input-explanation {
-  margin: 0;
+  margin: 0 0 0 auto;
   padding: 0;
   font-size: 14px;
   line-height: 1.4;
@@ -1272,6 +1272,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   white-space: pre-wrap;
   word-break: break-word;
   max-width: 55%;
+  text-align: right;
 }
 
 #dictationModal .word-correct {
