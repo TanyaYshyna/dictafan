@@ -6753,6 +6753,51 @@
     } catch (e) {
     }
 
+    // Кнопка "Создать PDF": печать содержимого start-modal (таблица предложений + итоги)
+    // с учётом текущих флагов видимости колонок. Имя PDF задаётся через document.title,
+    // который браузер использует как имя файла в диалоге печати.
+    try {
+      const pdfBtn = document.getElementById('startModalCreatePdfBtn');
+      if (pdfBtn && pdfBtn.dataset.boundDictationModal !== '1') {
+        pdfBtn.dataset.boundDictationModal = '1';
+        pdfBtn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          try {
+            // dict_<id>_YYYYMMDD_HHMMSS.pdf
+            const now = new Date();
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mi = String(now.getMinutes()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+            const dictationId = getCurrentDictationIdForDb() || 'dictation';
+            const pdfFileName = `dict_${dictationId}_${yyyy}${mm}${dd}_${hh}${mi}${ss}.pdf`;
+
+            const prevTitle = document.title;
+            document.title = pdfFileName;
+            try {
+              window.print();
+            } finally {
+              // Восстанавливаем заголовок после закрытия диалога печати.
+              // В Chrome window.print() блокирует выполнение, поэтому восстановление
+              // сработает сразу после закрытия диалога.
+              setTimeout(() => {
+                try { document.title = prevTitle; } catch (eRestore) {}
+              }, 500);
+            }
+          } catch (eHandler) {
+            console.log('🖨 [PDF] error:', eHandler);
+          }
+        });
+      }
+    } catch (e) {
+    }
+
     try {
       const settingsBtn = document.getElementById('startModalOpenSettingsBtn');
       if (settingsBtn && settingsBtn.dataset.boundDictationModal !== '1') {
