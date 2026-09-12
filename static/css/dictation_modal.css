@@ -1367,6 +1367,16 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   max-width: calc(100vw - 40px);
   margin-left: 0;
   margin-right: auto;
+  margin-top: 8px;
+}
+
+#dictationModal .audio-user-actions-row #userAudioAnswer {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.4;
+  color: var(--color-button-text-gray);
+  font-size: 14px;
+  word-break: break-word;
 }
 
 #dictationModal .audio-user-actions-row button {
