@@ -2226,29 +2226,42 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
    скрывая весь остальной интерфейс. Видимость колонок уже задаётся через
    классы hide-* (флаги видимости), поэтому таблица печатается "как на экране". */
 @media print {
-  /* Скрываем всё, кроме контейнера модалки диктанта */
-  body * {
-    visibility: hidden !important;
+  /* Сбрасываем высоту и прокрутку корневых элементов, чтобы контент
+     мог свободно переноситься на несколько страниц */
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
 
-  #dictationModal,
-  #dictationModal * {
-    visibility: visible !important;
+  /* Полностью убираем все прямые потомки body, кроме модалки диктанта.
+     display:none (а не visibility:hidden) гарантирует, что скрытый контент
+     не занимает место в потоке и не создаёт пустых страниц перед модалкой,
+     а сама модалка спокойно разбивается на несколько печатных страниц. */
+  body > *:not(#dictationModal) {
+    display: none !important;
   }
 
-  /* Показываем модалку как обычный блок без затемнения */
+  /* Показываем модалку как обычный блок без затемнения.
+     position: static обязателен — фиксированное/абсолютное позиционирование
+     не разбивается браузером на страницы и обрезает контент ниже первой страницы. */
   #dictationModal.dictation-modal {
-    position: absolute !important;
-    inset: 0 !important;
+    position: static !important;
+    inset: auto !important;
     display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
     background: transparent !important;
     backdrop-filter: none !important;
     z-index: auto !important;
     overflow: visible !important;
   }
 
-  /* Основное окно диктанта скрываем при печати — печатаем только start-modal */
-  #dictationModal .dictation-modal__content {
+  /* Основное окно диктанта и остальные модалки (пауза, настройки, завершение
+     и т.д.) скрываем при печати — печатаем только start-modal */
+  #dictationModal .dictation-modal__content,
+  #dictationModal > .modal:not(#start-modal) {
     display: none !important;
   }
 
@@ -2256,14 +2269,18 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
     position: static !important;
     inset: auto !important;
     display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
     box-sizing: border-box !important;
   }
 
   #dictationModal #start-modal .modal-content {
+    display: block !important;
     width: 100% !important;
     height: auto !important;
+    min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
     padding: 0 !important;
