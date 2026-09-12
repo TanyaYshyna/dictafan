@@ -22,6 +22,7 @@
 import json
 import os
 import tempfile
+import time
 
 from flask import Blueprint, current_app, jsonify, request, send_from_directory
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -113,9 +114,14 @@ def _write_config_local(config: dict) -> None:
     path = _get_mult_config_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
+    # Маркер saved_at отличает «живой» файл, записанный администратором
+    # (авторитетный, отдаётся мгновенно), от запечённого в образ/репозиторий
+    # дефолтного mults.json. Без него локальный кеш-first после рестарта
+    # контейнера откатывался бы к старому дефолту вместо сохранённой версии.
     payload = {
         "version": int(config.get("version") or 1),
         "mults": config.get("mults") or [],
+        "saved_at": time.time(),
     }
 
     fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(path), suffix=".tmp")
@@ -197,19 +203,20 @@ def _migrate_local_to_b2() -> None:
 
 
 def _read_config() -> dict:
-    """Локальный кеш-first для мгновенного чтения.
+    """Локальный кеш-first с приоритетом B2 для «несохранённого» дефолта.
 
-    Раньше конфиг на каждый GET /api/mult/config читался из B2 (network-first),
-    из-за чего при медленном/недоступном B2 запрос «висел» десятки секунд —
-    именно это вызывало задержку показа мультика после победы.
-
-    Теперь авторитетным источником является локальный кеш
-    (static/data/mult/mults.json), который обновляется при каждом сохранении
-    (см. _write_config_local). B2 используется ТОЛЬКО как источник, когда
-    локального конфига ещё нет (например, после деплоя на новый инстанс).
+    Порядок:
+    1. Если локальный файл записан администратором (есть маркер saved_at) —
+       отдаём его мгновенно. Это устраняет задержку в десятки секунд, которая
+       раньше возникала при чтении B2 на каждый GET.
+    2. Если локальный файл — это запечённый дефолт (без saved_at), обращаемся
+       к B2 как к авторитетному источнику сохранённых данных и кешируем его
+       локально (с маркером). Это чинит «откат» мультика/аудио после рестарта
+       контейнера: раньше локальный дефолт из образа всегда выигрывал у B2.
+    3. Если B2 пуст/недоступен — отдаём локальный дефолт как fallback.
     """
     local_cfg = _read_config_local()
-    if local_cfg.get("mults"):
+    if local_cfg.get("saved_at"):
         return local_cfg
 
     b2 = _get_b2()
@@ -301,7 +308,10 @@ def _safe_asset_name(filename: str) -> str:
 def get_mult_config():
     """Вернуть конфигурацию мультфильмов (публично)."""
     try:
-        return jsonify({"success": True, "config": _read_config()})
+        cfg = _read_config()
+        # Не отдаём клиенту служебный маркер saved_at.
+        cfg = {"version": cfg.get("version") or 1, "mults": cfg.get("mults") or []}
+        return jsonify({"success": True, "config": cfg})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

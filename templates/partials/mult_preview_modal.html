@@ -18,9 +18,12 @@
         </button>
       </div>
       <div class="mult-preview-right">
-        <div class="mult-preview-file-row">
-          <label class="mult-preview-label" for="multPreviewFile">Номер мультфильма</label>
-          <input type="number" id="multPreviewFile" class="text-input" min="1" max="100" value="1">
+        <div class="mult-preview-number-row">
+          <div class="mult-preview-file-row mult-preview-number-field">
+            <label class="mult-preview-label" for="multPreviewFile">Номер мультфильма</label>
+            <input type="number" id="multPreviewFile" class="text-input" min="1" max="100" value="1">
+          </div>
+          <pre id="multPreviewJsonView" class="mult-preview-json-view" aria-label="Содержимое JSON">...</pre>
         </div>
 
         <div class="mult-preview-file-row">
@@ -39,6 +42,10 @@
             <label class="mult-preview-label" for="multPreviewFramesH">Кадров в высоту</label>
             <input type="number" id="multPreviewFramesH" class="text-input" min="1" max="100" value="2">
           </div>
+          <button type="button" id="multPreviewCreateBlankBtn" class="button-color-gray mult-preview-create-btn" title="Создать заготовку PNG">
+            <i data-lucide="image-plus"></i>
+            <span>Создать заготовку</span>
+          </button>
         </div>
 
         <div class="mult-preview-speed-row">
