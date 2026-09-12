@@ -50,6 +50,18 @@ class ПроверкаНаОшибки {
     this.PUNCTUATION_REGEX = /[.,!?:;"«»„"'()\[\]{}،؛؟\u201C\u201D\u201E\u201F\u2033\u2036]/g;
     this.ARABIC_DIACRITICS_REGEX = /[\u064B-\u065F\u0670\u0671\u06D6-\u06ED]/g;
     this.ARABIC_ALIF_VARIANTS_REGEX = /[\u0622\u0623\u0625\u0671]/g;
+    // Латинские долгие гласные (макроны): покрываем и готовые (precomposed) формы
+    // ā ē ī ō ū ȳ (и заглавные), и комбинирующий знак U+0304. Precomposed-букву
+    // заменяем на базовую букву, а U+0304 убираем, чтобы "a" совпадало с "ā".
+    this.MACRON_REGEX = /[\u0100\u0101\u0112\u0113\u012A\u012B\u014C\u014D\u016A\u016B\u0232\u0233\u0304]/g;
+    this.MACRON_CHAR_MAP = {
+      'Ā': 'A', 'ā': 'a',
+      'Ē': 'E', 'ē': 'e',
+      'Ī': 'I', 'ī': 'i',
+      'Ō': 'O', 'ō': 'o',
+      'Ū': 'U', 'ū': 'u',
+      'Ȳ': 'Y', 'ȳ': 'y',
+    };
 
     // NUM_WORDS_SET теперь заполняется динамически через NumberTableManager,
     // но оставляем базовый набор для обратной совместимости
@@ -362,6 +374,7 @@ class ПроверкаНаОшибки {
     return String(text || '')
       .normalize('NFKC')
       .replace(/\u0307/g, '')
+      .replace(this.MACRON_REGEX, (ch) => (this.MACRON_CHAR_MAP[ch] !== undefined ? this.MACRON_CHAR_MAP[ch] : ''))
       .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
       .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
       .replace(/\u00AD/g, '')
@@ -374,6 +387,7 @@ class ПроверкаНаОшибки {
     return String(text || '')
       .normalize('NFKC')
       .replace(/\u0307/g, '')
+      .replace(this.MACRON_REGEX, (ch) => (this.MACRON_CHAR_MAP[ch] !== undefined ? this.MACRON_CHAR_MAP[ch] : ''))
       .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
       .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
       .replace(/\u00AD/g, '')
@@ -411,6 +425,7 @@ class ПроверкаНаОшибки {
       .replace(this.DASHES, ' ')
       .replace(this.PUNCTUATION_REGEX, '')
       .replace(this.ARABIC_DIACRITICS_REGEX, '')
+      .replace(this.MACRON_REGEX, (ch) => (this.MACRON_CHAR_MAP[ch] !== undefined ? this.MACRON_CHAR_MAP[ch] : ''))
       .replace(/\s+/g, ' ')
       .trim();
 
@@ -663,10 +678,12 @@ class ПроверкаНаОшибки {
   normalizeForMinLength(raw) {
     try {
       return this.normalizeDictationInvisibleChars(String(raw || ''))
+        .normalize('NFKC')
         .toLowerCase()
         .replace(this.ARABIC_ALIF_VARIANTS_REGEX, 'ا')
         .replace(this.PUNCTUATION_REGEX, '')
         .replace(this.ARABIC_DIACRITICS_REGEX, '')
+        .replace(this.MACRON_REGEX, (ch) => (this.MACRON_CHAR_MAP[ch] !== undefined ? this.MACRON_CHAR_MAP[ch] : ''))
         .replace(/\s+/g, '')
         .trim();
     } catch (e) {
@@ -674,6 +691,7 @@ class ПроверкаНаОшибки {
         .toLowerCase()
         .replace(/[.,!?:;"«»()\[\]{}—–\-]/g, '')
         .replace(this.ARABIC_DIACRITICS_REGEX, '')
+        .replace(this.MACRON_REGEX, (ch) => (this.MACRON_CHAR_MAP[ch] !== undefined ? this.MACRON_CHAR_MAP[ch] : ''))
         .replace(/\s+/g, '')
         .trim();
     }

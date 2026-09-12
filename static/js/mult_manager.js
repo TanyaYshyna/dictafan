@@ -751,16 +751,18 @@
       }
 
       // Скачивание через браузер (интерфейс сохранения файла).
+      // Имя содержит размеры сетки: blank_<ширина>_<высота>.png.
+      const fileName = 'blank_' + cols + '_' + rows + '.png';
       try {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'blank.png';
+        a.download = fileName;
         document.body.appendChild(a);
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        this._toast('Заготовка скачана: blank.png', { durationMs: 2500 });
+        this._toast('Заготовка скачана: ' + fileName, { durationMs: 2500 });
       } catch (e) {
         this._toast('Не удалось сохранить заготовку', { durationMs: 3000 });
       }
