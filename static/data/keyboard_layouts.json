@@ -922,6 +922,83 @@
         { "code": "ControlRight", "label": "Ctrl", "finger": "right-pinky", "size": 1.5 }
       ]
     ]
+  },
+  "la": {
+    "name": "Latina",
+    "variant": "QWERTY",
+    "rows": [
+      [
+        { "code": "Backquote", "label": "`", "shiftLabel": "~", "finger": "left-pinky" },
+        { "code": "Digit1", "label": "1", "shiftLabel": "!", "finger": "left-pinky" },
+        { "code": "Digit2", "label": "2", "shiftLabel": "@", "finger": "left-ring" },
+        { "code": "Digit3", "label": "3", "shiftLabel": "#", "finger": "left-middle" },
+        { "code": "Digit4", "label": "4", "shiftLabel": "$", "finger": "left-index" },
+        { "code": "Digit5", "label": "5", "shiftLabel": "%", "finger": "left-index" },
+        { "code": "Digit6", "label": "6", "shiftLabel": "^", "finger": "right-index" },
+        { "code": "Digit7", "label": "7", "shiftLabel": "&", "finger": "right-index" },
+        { "code": "Digit8", "label": "8", "shiftLabel": "*", "finger": "right-middle" },
+        { "code": "Digit9", "label": "9", "shiftLabel": "(", "finger": "right-ring" },
+        { "code": "Digit0", "label": "0", "shiftLabel": ")", "finger": "right-pinky" },
+        { "code": "Minus", "label": "-", "shiftLabel": "_", "finger": "right-pinky" },
+        { "code": "Equal", "label": "=", "shiftLabel": "+", "finger": "right-pinky" },
+        { "code": "Backspace", "label": "Backspace", "finger": "right-pinky", "size": 2 }
+      ],
+      [
+        { "code": "Tab", "label": "Tab", "finger": "left-pinky", "size": 1.5 },
+        { "code": "KeyQ", "label": "q", "shiftLabel": "Q", "finger": "left-pinky" },
+        { "code": "KeyW", "label": "w", "shiftLabel": "W", "finger": "left-ring" },
+        { "code": "KeyE", "label": "e", "shiftLabel": "E", "finger": "left-middle", "altLabel": "ē" },
+        { "code": "KeyR", "label": "r", "shiftLabel": "R", "finger": "left-index" },
+        { "code": "KeyT", "label": "t", "shiftLabel": "T", "finger": "left-index" },
+        { "code": "KeyY", "label": "y", "shiftLabel": "Y", "finger": "right-index", "altLabel": "ȳ" },
+        { "code": "KeyU", "label": "u", "shiftLabel": "U", "finger": "right-index", "altLabel": "ū" },
+        { "code": "KeyI", "label": "i", "shiftLabel": "I", "finger": "right-middle", "altLabel": "ī" },
+        { "code": "KeyO", "label": "o", "shiftLabel": "O", "finger": "right-ring", "altLabel": "ō" },
+        { "code": "KeyP", "label": "p", "shiftLabel": "P", "finger": "right-pinky" },
+        { "code": "BracketLeft", "label": "[", "shiftLabel": "{", "finger": "right-pinky" },
+        { "code": "BracketRight", "label": "]", "shiftLabel": "}", "finger": "right-pinky" },
+        { "code": "Backslash", "label": "\\", "shiftLabel": "|", "finger": "right-pinky", "size": 1.5 }
+      ],
+      [
+        { "code": "CapsLock", "label": "Caps", "finger": "left-pinky", "size": 1.8 },
+        { "code": "KeyA", "label": "a", "shiftLabel": "A", "finger": "left-pinky", "altLabel": "ā" },
+        { "code": "KeyS", "label": "s", "shiftLabel": "S", "finger": "left-ring" },
+        { "code": "KeyD", "label": "d", "shiftLabel": "D", "finger": "left-middle" },
+        { "code": "KeyF", "label": "f", "shiftLabel": "F", "finger": "left-index" },
+        { "code": "KeyG", "label": "g", "shiftLabel": "G", "finger": "left-index" },
+        { "code": "KeyH", "label": "h", "shiftLabel": "H", "finger": "right-index" },
+        { "code": "KeyJ", "label": "j", "shiftLabel": "J", "finger": "right-index" },
+        { "code": "KeyK", "label": "k", "shiftLabel": "K", "finger": "right-middle" },
+        { "code": "KeyL", "label": "l", "shiftLabel": "L", "finger": "right-ring" },
+        { "code": "Semicolon", "label": ";", "shiftLabel": ":", "finger": "right-pinky" },
+        { "code": "Quote", "label": "'", "shiftLabel": "\"", "finger": "right-pinky" },
+        { "code": "Enter", "label": "Enter", "finger": "right-pinky", "size": 2.2 }
+      ],
+      [
+        { "code": "ShiftLeft", "label": "Shift", "finger": "left-pinky", "size": 2.2 },
+        { "code": "KeyZ", "label": "z", "shiftLabel": "Z", "finger": "left-pinky" },
+        { "code": "KeyX", "label": "x", "shiftLabel": "X", "finger": "left-ring" },
+        { "code": "KeyC", "label": "c", "shiftLabel": "C", "finger": "left-middle" },
+        { "code": "KeyV", "label": "v", "shiftLabel": "V", "finger": "left-index" },
+        { "code": "KeyB", "label": "b", "shiftLabel": "B", "finger": "left-index" },
+        { "code": "KeyN", "label": "n", "shiftLabel": "N", "finger": "right-index" },
+        { "code": "KeyM", "label": "m", "shiftLabel": "M", "finger": "right-index" },
+        { "code": "Comma", "label": ",", "shiftLabel": "<", "finger": "right-middle" },
+        { "code": "Period", "label": ".", "shiftLabel": ">", "finger": "right-ring" },
+        { "code": "Slash", "label": "/", "shiftLabel": "?", "finger": "right-pinky" },
+        { "code": "ShiftRight", "label": "Shift", "finger": "right-pinky", "size": 2.6 }
+      ],
+      [
+        { "code": "ControlLeft", "label": "Ctrl", "finger": "left-pinky", "size": 1.5 },
+        { "code": "MetaLeft", "label": "Win", "finger": "left-thumb", "size": 1.3 },
+        { "code": "AltLeft", "label": "Alt", "finger": "left-thumb", "size": 1.3 },
+        { "code": "Space", "label": "Space", "finger": "thumbs", "size": 6 },
+        { "code": "AltRight", "label": "AltGr", "finger": "right-thumb", "size": 1.3 },
+        { "code": "MetaRight", "label": "Win", "finger": "right-thumb", "size": 1.3 },
+        { "code": "ContextMenu", "label": "Menu", "finger": "right-thumb", "size": 1.3 },
+        { "code": "ControlRight", "label": "Ctrl", "finger": "right-pinky", "size": 1.5 }
+      ]
+    ]
   }
 }
 

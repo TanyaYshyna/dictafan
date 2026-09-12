@@ -148,5 +148,16 @@
       "whisper:Xenova/whisper-base",
       "whisper:Xenova/whisper-small"
     ]
+  },
+  "la": {
+    "country_cod": "va",
+    "country_cod_url": "la-VA",
+    "language_ru": "Латинский",
+    "language_en": "Latin",
+    "applicable_model_keys": [
+      "whisper:Xenova/whisper-tiny",
+      "whisper:Xenova/whisper-base",
+      "whisper:Xenova/whisper-small"
+    ]
   }
 }

@@ -2820,6 +2820,19 @@
       // Arabic: remove harakat/diacritics
       s = s.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '');
 
+      // Latin: strip macrons (long-vowel marks), so typed "a" matches ideal "ā"
+      s = s.replace(/[\u0100\u0101\u0112\u0113\u012A\u012B\u014C\u014D\u016A\u016B\u0232\u0233\u0304]/g, (ch) => {
+        const map = {
+          'Ā': 'A', 'ā': 'a',
+          'Ē': 'E', 'ē': 'e',
+          'Ī': 'I', 'ī': 'i',
+          'Ō': 'O', 'ō': 'o',
+          'Ū': 'U', 'ū': 'u',
+          'Ȳ': 'Y', 'ȳ': 'y',
+        };
+        return map[ch] !== undefined ? map[ch] : '';
+      });
+
       // Remove common punctuation (keep spaces)
       s = s.replace(/[.,!?:;"«»()\[\]{}—–\-]/g, '');
 
