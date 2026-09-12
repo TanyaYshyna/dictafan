@@ -568,6 +568,7 @@
         }
       } catch (e) {
       }
+      this._updateJsonView();
       this._syncPreviewFieldsFromConfig();
     },
 
@@ -588,7 +589,10 @@
       // Закрытие ТОЛЬКО по крестику: клик по подложке и Escape не закрывают окно.
 
       const fileInput = document.getElementById('multPreviewFile');
-      if (fileInput) fileInput.addEventListener('change', () => this._syncPreviewFieldsFromConfig());
+      if (fileInput) fileInput.addEventListener('change', () => {
+        this._updateJsonView();
+        this._syncPreviewFieldsFromConfig();
+      });
 
       const pngInput = document.getElementById('multPreviewPng');
       if (pngInput) pngInput.addEventListener('change', () => this._renderPreview());
@@ -641,6 +645,9 @@
       const playBtn = document.getElementById('multPreviewPlayBtn');
       if (playBtn) playBtn.addEventListener('click', () => this._togglePreviewPlay());
 
+      const createBlankBtn = document.getElementById('multPreviewCreateBlankBtn');
+      if (createBlankBtn) createBlankBtn.addEventListener('click', () => this._createBlankPng());
+
       const saveBtn = document.getElementById('multPreviewSaveBtn');
       if (saveBtn) saveBtn.addEventListener('click', () => this._savePreviewConfig());
     },
@@ -686,6 +693,81 @@
       const input = document.getElementById('multPreviewAudio');
       const raw = input ? String(input.textContent || '').trim() : '';
       return raw === 'не выбран' ? '' : raw;
+    },
+
+    // Вывести текущее содержимое JSON-конфига в многострочную лейбу
+    // (полоса прокрутки по горизонтали и вертикали задаётся в CSS).
+    _updateJsonView() {
+      const view = document.getElementById('multPreviewJsonView');
+      if (!view) return;
+      const cfg = this._config || DEFAULT_CONFIG;
+      try {
+        view.textContent = JSON.stringify(cfg, null, 2);
+      } catch (e) {
+        view.textContent = '{}';
+      }
+    },
+
+    // Создать заготовку PNG размером (200*m) x (200*n), где m — кадров в ширину,
+    // n — кадров в высоту. В центре каждого кадра ставится серый кружочек.
+    // Результат превращается в File, попадает в _previewPngFile и превьюится.
+    async _createBlankPng() {
+      const cols = this._readPreviewCols();
+      const rows = this._readPreviewRows();
+      const w = cols * FRAME_SIZE;
+      const h = rows * FRAME_SIZE;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+
+      // Прозрачный/белый фон заготовки.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+
+      const radius = Math.min(FRAME_SIZE, FRAME_SIZE) * 0.12;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const cx = c * FRAME_SIZE + FRAME_SIZE / 2;
+          const cy = r * FRAME_SIZE + FRAME_SIZE / 2;
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+          ctx.fillStyle = '#9aa0a6';
+          ctx.fill();
+        }
+      }
+
+      let blob = null;
+      try {
+        blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      } catch (e) {
+        blob = null;
+      }
+      if (!blob) {
+        this._toast('Не удалось создать заготовку PNG', { durationMs: 3000 });
+        return;
+      }
+
+      const idx = this._readPreviewIndex();
+      const name = padIndex(idx) + '.png';
+      const file = new File([blob], name, { type: 'image/png' });
+      this._previewPngFile = file;
+
+      const pngInput = document.getElementById('multPreviewPng');
+      if (pngInput) pngInput.textContent = name;
+      const pngFile = document.getElementById('multPreviewPngFile');
+      if (pngFile) {
+        try {
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          pngFile.files = dt.files;
+        } catch (e) {
+        }
+      }
+
+      this._renderPreview();
+      this._toast('Заготовка создана: ' + name, { durationMs: 2500 });
     },
 
     _updatePreviewSpeedLabel() {
@@ -1000,6 +1082,7 @@
             } catch (e) {
             }
           }
+          this._updateJsonView();
           this._toast('Параметры мультфильма сохранены', { durationMs: 2200 });
         } else {
           this._toast((data && data.error) ? String(data.error) : 'Ошибка сохранения на сервере', { durationMs: 3500 });
