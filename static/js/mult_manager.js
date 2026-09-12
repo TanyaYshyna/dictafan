@@ -710,7 +710,9 @@
 
     // Создать заготовку PNG размером (200*m) x (200*n), где m — кадров в ширину,
     // n — кадров в высоту. В центре каждого кадра ставится серый кружочек.
-    // Результат превращается в File, попадает в _previewPngFile и превьюится.
+    // Фон прозрачный. Результат отдаётся браузеру как скачивание (Save As),
+    // чтобы человек сохранил файл себе и доработал его. В структуру конфига
+    // файл не попадает и на сервер не загружается.
     async _createBlankPng() {
       const cols = this._readPreviewCols();
       const rows = this._readPreviewRows();
@@ -722,9 +724,8 @@
       canvas.height = h;
       const ctx = canvas.getContext('2d');
 
-      // Прозрачный/белый фон заготовки.
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, w, h);
+      // Прозрачный фон — ничего не заливаем, сразу рисуем метки кадров.
+      ctx.clearRect(0, 0, w, h);
 
       const radius = Math.min(FRAME_SIZE, FRAME_SIZE) * 0.12;
       for (let r = 0; r < rows; r++) {
@@ -749,25 +750,20 @@
         return;
       }
 
-      const idx = this._readPreviewIndex();
-      const name = padIndex(idx) + '.png';
-      const file = new File([blob], name, { type: 'image/png' });
-      this._previewPngFile = file;
-
-      const pngInput = document.getElementById('multPreviewPng');
-      if (pngInput) pngInput.textContent = name;
-      const pngFile = document.getElementById('multPreviewPngFile');
-      if (pngFile) {
-        try {
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          pngFile.files = dt.files;
-        } catch (e) {
-        }
+      // Скачивание через браузер (интерфейс сохранения файла).
+      try {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'blank.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        this._toast('Заготовка скачана: blank.png', { durationMs: 2500 });
+      } catch (e) {
+        this._toast('Не удалось сохранить заготовку', { durationMs: 3000 });
       }
-
-      this._renderPreview();
-      this._toast('Заготовка создана: ' + name, { durationMs: 2500 });
     },
 
     _updatePreviewSpeedLabel() {
