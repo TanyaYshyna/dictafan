@@ -43,6 +43,11 @@
     // Хранится в state, а не в замыкании панели, т.к. панель переиспользуется
     // между диктантами (см. ensureSpeechPanel).
     _recordingSentenceKey: null,
+    // Blob и object URL последней записи пользователя.
+    // Храним ровно один blob (последнюю запись) — при новой записи старый URL
+    // отзывается, при смене предложения blob очищается.
+    _userAudioBlob: null,
+    _userAudioObjectUrl: null,
   };
 
   /**
@@ -581,6 +586,158 @@
     }
   }
 
+  /**
+   * Освобождает blob-URL и очищает последнюю запись пользователя.
+   * Кнопки проигрывания и сохранения становятся серыми/недоступными.
+   */
+  function clearUserAudioBlob() {
+    try {
+      if (dictationModalState._userAudioObjectUrl) {
+        URL.revokeObjectURL(dictationModalState._userAudioObjectUrl);
+      }
+    } catch (e) {
+    }
+    dictationModalState._userAudioObjectUrl = null;
+    dictationModalState._userAudioBlob = null;
+    updateUserAudioButtonsFromState();
+  }
+
+  /**
+   * Сохраняет последнюю запись пользователя как единственный blob.
+   * Старый blob-URL отзывается, чтобы не накапливать blob'ы.
+   */
+  function setUserAudioBlob(blob) {
+    try {
+      if (dictationModalState._userAudioObjectUrl) {
+        URL.revokeObjectURL(dictationModalState._userAudioObjectUrl);
+      }
+    } catch (e) {
+    }
+    dictationModalState._userAudioBlob = blob || null;
+    dictationModalState._userAudioObjectUrl = null;
+    if (blob) {
+      try {
+        dictationModalState._userAudioObjectUrl = URL.createObjectURL(blob);
+      } catch (e) {
+        dictationModalState._userAudioObjectUrl = null;
+      }
+    }
+    updateUserAudioButtonsFromState();
+  }
+
+  /**
+   * Обновляет состояние кнопок проигрывания/сохранения аудио юзера:
+   * пока нет аудио — серые и недоступные (как кнопка "Далее"), иначе фиолетовые.
+   */
+  function updateUserAudioButtonsFromState() {
+    const hasAudio = !!(dictationModalState._userAudioObjectUrl);
+    try {
+      const playBtn = document.getElementById('userAudioPlayButton');
+      if (playBtn) {
+        playBtn.disabled = !hasAudio;
+        playBtn.classList.remove('button-color-purple', 'button-color-gray');
+        playBtn.classList.add(hasAudio ? 'button-color-purple' : 'button-color-gray');
+      }
+    } catch (e) {
+    }
+    try {
+      const saveBtn = document.getElementById('userAudioSaveButton');
+      if (saveBtn) {
+        saveBtn.disabled = !hasAudio;
+        saveBtn.classList.remove('button-color-purple', 'button-color-gray');
+        saveBtn.classList.add(hasAudio ? 'button-color-purple' : 'button-color-gray');
+      }
+    } catch (e) {
+    }
+  }
+
+  /**
+   * Строит имя файла для сохранения записи пользователя:
+   * dict_<id>_<код строки диктанта>_<дата и время>
+   */
+  function buildUserAudioFilename(session) {
+    let dictId = '';
+    try {
+      const dictationData = document.getElementById('dictation-data');
+      dictId = dictationData ? String(dictationData.getAttribute('data-dictation-id') || '').trim() : '';
+    } catch (e) {
+    }
+    if (!dictId) {
+      try {
+        const parsed = parseDictationHref(dictationModalState.currentUrl);
+        if (parsed) dictId = parsed.dictationIdFormatted;
+      } catch (e) {
+      }
+    }
+    if (!dictId) dictId = 'dict';
+
+    let sentenceKey = '';
+    try {
+      const view = getCurrentSentenceViewFromSession(session);
+      if (view && view.key != null) sentenceKey = String(view.key);
+    } catch (e) {
+    }
+    if (!sentenceKey) sentenceKey = '000';
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+
+    return `${dictId}_${sentenceKey}_${stamp}.webm`;
+  }
+
+  /**
+   * Привязывает кнопки проигрывания и сохранения аудио пользователя.
+   */
+  function bindUserAudioButtons() {
+    const playBtn = document.getElementById('userAudioPlayButton');
+    if (playBtn && playBtn.dataset.boundDictationModal !== '1') {
+      playBtn.dataset.boundDictationModal = '1';
+      playBtn.addEventListener('click', (e) => {
+        try {
+          e.preventDefault();
+          e.stopPropagation();
+        } catch (e0) {
+        }
+        try {
+          if (!dictationModalState.dictationStarted) return;
+          const u = dictationModalState._userAudioObjectUrl;
+          if (!u) return;
+          if (window.AudioManager && typeof window.AudioManager.play === 'function') {
+            window.AudioManager.play(playBtn, u);
+          }
+        } catch (e1) {
+        }
+      });
+    }
+
+    const saveBtn = document.getElementById('userAudioSaveButton');
+    if (saveBtn && saveBtn.dataset.boundDictationModal !== '1') {
+      saveBtn.dataset.boundDictationModal = '1';
+      saveBtn.addEventListener('click', (e) => {
+        try {
+          e.preventDefault();
+          e.stopPropagation();
+        } catch (e0) {
+        }
+        try {
+          if (!dictationModalState.dictationStarted) return;
+          const u = dictationModalState._userAudioObjectUrl;
+          if (!u) return;
+          const session = window.__dictationModalActiveSession;
+          const filename = buildUserAudioFilename(session);
+          const a = document.createElement('a');
+          a.href = u;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          try { document.body.removeChild(a); } catch (e1) {}
+        } catch (e1) {
+        }
+      });
+    }
+  }
+
   function hideCompletionModal() {
     try {
       const completionModal = document.getElementById('completionModal');
@@ -1115,6 +1272,12 @@
   }
 
   function resetSentenceUiFromSession(session) {
+    // При переходе на другое предложение очищаем последнюю запись пользователя:
+    // blob больше недоступен (кнопки становятся серыми), чтобы не накапливать blob'ы.
+    try {
+      clearUserAudioBlob();
+    } catch (eClearAudio) {
+    }
     try {
       // Пояснение к предложению показываем над полем ввода (если оно задано)
       try {
@@ -3826,7 +3989,12 @@
           startAudioCheckTimer();
           resetInactivityTimer();
         },
-        onRecognitionComplete: async ({ ok, percent, cause }) => {
+        onRecognitionComplete: async ({ ok, percent, cause, audioBlob }) => {
+          // Сохраняем последнюю запись пользователя (единственный blob).
+          try {
+            setUserAudioBlob(audioBlob || null);
+          } catch (eBlob) {
+          }
           // При завершении распознавания очищаем таймер аудио (он одноразовый).
           // Таймер бездействия НЕ сбрасываем — он был запущен при старте записи
           // и должен сработать через 60с после старта (если пользователь не активен).
@@ -7500,6 +7668,12 @@
     } catch (e) {
     }
 
+    // Освобождаем blob-URL последней записи пользователя при закрытии модалки.
+    try {
+      clearUserAudioBlob();
+    } catch (eBlob) {
+    }
+
     try {
       const p = getProgressPanelInstance();
       if (p && typeof p.stopTimer === 'function') {
@@ -7659,6 +7833,8 @@
     bindEnterToCheck();
     bindCheckButtonAsRepeat();
     bindNextButton();
+    bindUserAudioButtons();
+    updateUserAudioButtonsFromState();
   }
 
   try {
