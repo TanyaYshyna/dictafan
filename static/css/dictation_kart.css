@@ -42,6 +42,17 @@
   width: 180px;
   min-width: 180px;
   flex: 0 0 120px;
+  /* Базовый уровень карточки стола. В режиме свободного стола карточки
+     абсолютно позиционируются и могут перекрываться; чтобы выпадающие меню
+     «старой» карточки не прятались под «молодую» (которая позже в DOM),
+     карточка с открытым меню поднимается классом .short-card--menu-open
+     (z-index: 100). См. docs/dictafan_architecture.md — «Уровни карточек». */
+  position: relative;
+  z-index: 50;
+}
+
+.page-index .short-card.dictation-kart.short-card--menu-open {
+  z-index: 100;
 }
 
 .page-index .desk-card .short-thumb {

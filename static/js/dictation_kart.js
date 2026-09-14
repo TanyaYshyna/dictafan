@@ -749,6 +749,7 @@ window.DictationKart = window.DictationKart || {
           if (!launchMenu) return;
           launchMenu.classList.remove('show');
           launchMenu.style.display = 'none';
+          cardEl.classList.remove('short-card--menu-open');
         } catch (e) {
         }
       };
@@ -774,7 +775,7 @@ window.DictationKart = window.DictationKart || {
               actionsMenu.style.display = 'none';
             } catch (e0) {}
           }
-          cardEl.classList.remove('short-card--menu-open');
+          cardEl.classList.add('short-card--menu-open');
           launchMenu.classList.add('show');
           launchMenu.style.display = 'block';
           this._renderLucide(launchMenu);
@@ -1934,7 +1935,19 @@ window.DictationKart = window.DictationKart || {
       body: JSON.stringify({ dictation_id: Number(dbId) })
     });
     var data = await resp.json();
-    if (!data.success) throw new Error(data.error || 'Failed to add to desk');
+    if (!data.success) {
+      if (data.error === 'desk_limit_reached') {
+        var limitMsg = data.message
+          ? String(data.message)
+          : 'Достигнут лимит карточек на рабочем столе';
+        try {
+          this._showToast(limitMsg, { durationMs: 6000 });
+        } catch (e) {
+        }
+        throw new Error('desk_limit_reached');
+      }
+      throw new Error(data.error || 'Failed to add to desk');
+    }
 
     // Обновляем кеш ID диктантов на столе
     try {

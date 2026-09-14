@@ -35,7 +35,9 @@
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        const err = new Error(errorData.message || errorData.error || `HTTP ${response.status}`);
+        err.data = errorData || {};
+        throw err;
       }
 
       return response.json();
@@ -208,7 +210,9 @@
 
         closeModal();
       } catch (err) {
-        showToast(err && err.message ? String(err.message) : 'Ошибка добавления', { durationMs: 3500 });
+        const isLimit = !!(err && err.data && err.data.error === 'desk_limit_reached');
+        const message = err && err.message ? String(err.message) : 'Ошибка добавления';
+        showToast(message, { durationMs: isLimit ? 6000 : 3500 });
       } finally {
         try {
           if (saveBtn) saveBtn.disabled = false;

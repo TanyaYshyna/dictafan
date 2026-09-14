@@ -422,6 +422,9 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - Слои (иерархия `z-index`) должны быть собраны рядом и централизованы в `static/css/desktop.css`, чтобы в одном месте было видно «кто над кем» на странице `/desktop`.
 - Визуальные стили конкретных модалок (размеры, отступы, цвета, overflow/scroll и т.п.) должны оставаться в их профильных файлах (например `static/css/book_modal.css`).
 
+- `50` — `.page-index .short-card.dictation-kart` / `.desk-card` (карточка диктанта на рабочем столе, базовый уровень; задаётся в `static/css/dictation_kart.css`)
+- `100` — `.page-index .short-card.dictation-kart.short-card--menu-open` (карточка с открытым выпадающим меню «...» или «перо» поднимается над соседними карточками, чтобы меню не пряталось под «молодую» карточку, которая позже в DOM)
+- `200600` — выпадающие меню карточки (`.dictation-kart-launch-menu`, `.short-card-actions-menu`) — действуют внутри stacking context карточки (`z-index: 50/100`)
 - `10000` — `#login-modal` (логин/регистрация)
 - `10080` — `#user-profile-modal` (профиль пользователя, группа `user_profile_modal.*`)
 - `10100` — `#user-profile-modal #groupModal`, `#user-profile-modal #groupRestoreModal`, `#user-profile-modal #groupEmailInviteModal` (внутренние модалки групп внутри профиля)

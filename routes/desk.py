@@ -4,6 +4,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from helpers.db_users import get_user_by_email
 from helpers.db import get_db_cursor
+from helpers.db_books import DESK_MAX_CARDS
 from routes.index import get_cover_url_for_id
 
 
@@ -259,6 +260,25 @@ def api_add_desk_item():
         existing = cur.fetchone()
         if existing:
             return jsonify({"success": True, "message": "Already on desk", "id": existing["id"]})
+
+        # Лимит рабочего стола: проверяем количество уже добавленных карточек.
+        cur.execute(
+            "SELECT COUNT(*)::int AS cnt FROM desk_items WHERE user_id = %s",
+            (user["id"],),
+        )
+        cnt = int((cur.fetchone() or {}).get("cnt") or 0)
+        if cnt >= DESK_MAX_CARDS:
+            return jsonify(
+                {
+                    "success": False,
+                    "error": "desk_limit_reached",
+                    "limit": DESK_MAX_CARDS,
+                    "message": (
+                        f"На рабочем столе уже {DESK_MAX_CARDS} диктантов. "
+                        "Уберите лишние, которыми не пользуетесь, и попробуйте снова."
+                    ),
+                }
+            ), 409
 
         cur.execute(
             "INSERT INTO desk_items (dictation_id, user_id) VALUES (%s, %s) RETURNING id",

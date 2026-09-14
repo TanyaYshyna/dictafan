@@ -9,6 +9,35 @@ from typing import List, Optional, Dict, Any, Tuple
 from .db import get_db_cursor
 
 
+# Максимальное количество диктантов, которое пользователь может держать
+# на своём рабочем столе. Согласовано с уровнями карточек в
+# docs/dictafan_architecture.md (раздел «Модальные окна на новом рабочем столе»).
+DESK_MAX_CARDS = 25
+
+
+class DeskLimitError(Exception):
+    """Превышен лимит количества карточек на рабочем столе пользователя."""
+
+    def __init__(self, limit: int = DESK_MAX_CARDS):
+        self.limit = limit
+        super().__init__(f"Desk card limit reached: {limit}")
+
+
+def _count_desk_items(user_id: int) -> int:
+    """Возвращает текущее количество карточек на столе пользователя."""
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            "SELECT COUNT(*)::int AS cnt FROM desk_items WHERE user_id = %s",
+            (user_id,),
+        )
+        row = cur.fetchone() or {}
+        return int(row.get("cnt") or 0)
+    finally:
+        cur.close()
+        conn.close()
+
+
 def _calc_book_cover_url(book_id: int) -> str:
     return f"/library/api/book-cover?book_id={book_id}&filename=cover.webp"
 
@@ -556,12 +585,34 @@ def add_dictation_to_desk(
     Добавляет диктант на «Стол» пользователя (desk_items).
     planned_date может быть строкой в формате YYYY-MM-DD или None.
 
+    Если диктант ещё не на столе и количество карточек достигло
+    DESK_MAX_CARDS — бросает DeskLimitError (лимит рабочего стола).
+
     Returns:
         int | None: id записи desk_items (новой или уже существующей),
         либо None, если не удалось определить.
     """
     conn, cur = get_db_cursor()
     try:
+        # Если диктант уже на столе — повторное добавление не меняет счётчик,
+        # поэтому лимит не применяем.
+        cur.execute(
+            "SELECT id FROM desk_items WHERE user_id = %s AND dictation_id = %s",
+            (user_id, dictation_id),
+        )
+        existing = cur.fetchone()
+        if existing:
+            return existing["id"]
+
+        # Лимит: считаем только при фактическом добавлении новой карточки.
+        cur.execute(
+            "SELECT COUNT(*)::int AS cnt FROM desk_items WHERE user_id = %s",
+            (user_id,),
+        )
+        cnt = int((cur.fetchone() or {}).get("cnt") or 0)
+        if cnt >= DESK_MAX_CARDS:
+            raise DeskLimitError(DESK_MAX_CARDS)
+
         query = """
             INSERT INTO desk_items (user_id, dictation_id, planned_date)
             VALUES (%s, %s, %s)
@@ -575,7 +626,7 @@ def add_dictation_to_desk(
         if row is not None:
             return row["id"]
 
-        # Конфликт: запись уже существовала — вернём её id.
+        # Конфликт (гонка): запись создалась между проверкой и INSERT.
         cur.execute(
             "SELECT id FROM desk_items WHERE user_id = %s AND dictation_id = %s",
             (user_id, dictation_id),

@@ -13,6 +13,8 @@ from helpers.db_books import (
     get_book_sections,
     add_book_to_user_shelf,
     add_dictation_to_desk,
+    DESK_MAX_CARDS,
+    DeskLimitError,
     get_user_library_books,
     create_book,
     update_book,
@@ -408,6 +410,18 @@ def api_add_dictation_to_desk(dictation_id: int):
                     exc_info=True,
                 )
         return jsonify({"success": True, "added": desk_item_id is not None, "item": item})
+    except DeskLimitError as exc:
+        return jsonify(
+            {
+                "success": False,
+                "error": "desk_limit_reached",
+                "limit": exc.limit,
+                "message": (
+                    f"На рабочем столе уже {exc.limit} диктантов. "
+                    "Уберите лишние, которыми не пользуетесь, и попробуйте снова."
+                ),
+            }
+        ), 409
     except Exception as exc:
         logger.error("Ошибка добавления диктанта %s на стол: %s", dictation_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
