@@ -229,7 +229,11 @@
       existing.money_earned = (Number(existing.money_earned) || 0) + (Number(moneyCount) || 0);
       existing.mistake_count = (Number(existing.mistake_count) || 0) + (Number(mistakeCount) || 0);
       existing.monenumber_of_characters = (Number(existing.monenumber_of_characters) || 0) + (Number(numberOfCharacters) || 0);
-      existing.lead_time_ms_total = (Number(existing.lead_time_ms_total) || 0) + (Number(leadTimeMs) || 0);
+      // lead_time_ms_total — это ИТОГОВОЕ время сессии (кумулятивный elapsed).
+      // handleActivity передаёт ПОЛНОЕ накопленное время сессии, поэтому здесь
+      // берём максимум, а НЕ суммируем (раньше сумма раздувала today_lead_time,
+      // из-за чего жёлтый круг времени показывался заполненным).
+      existing.lead_time_ms_total = Math.max((Number(existing.lead_time_ms_total) || 0), (Number(leadTimeMs) || 0));
       existing.dictation_language_code = dictationLanguageCode || existing.dictation_language_code;
 
       // Если это последнее действие, завершающее диктант — добавляем completionCount и successNumber

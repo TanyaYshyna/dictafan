@@ -44,12 +44,12 @@ window.DesktopStatsPanel = {
             // --- Кольцевые диаграммы + центр (огонь+число) ---
             '<div class="desktop-stats-rings" id="desktopStatsRings">' +
                 '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' +
-                    // Внешнее кольцо (деньги) — r=34
-                    '<circle cx="50" cy="50" r="34" fill="none" class="stats-ring-money-bg" stroke-width="5" />' +
-                    '<circle id="statsRingMoney" cx="50" cy="50" r="34" fill="none" class="stats-ring-money" stroke-width="5" stroke-linecap="round" stroke-dasharray="0 213.63" transform="rotate(-90 50 50)" />' +
-                    // Внутреннее кольцо (время) — r=26
-                    '<circle cx="50" cy="50" r="26" fill="none" class="stats-ring-time-bg" stroke-width="5" />' +
-                    '<circle id="statsRingTime" cx="50" cy="50" r="26" fill="none" class="stats-ring-time" stroke-width="5" stroke-linecap="round" stroke-dasharray="0 163.36" transform="rotate(-90 50 50)" />' +
+                    // Внутреннее кольцо (время) — r=26. Ширина задаётся в CSS (.stats-ring-time*)
+                    '<circle cx="50" cy="50" r="26" fill="none" class="stats-ring-time-bg" />' +
+                    '<circle id="statsRingTime" cx="50" cy="50" r="26" fill="none" class="stats-ring-time" stroke-linecap="round" stroke-dasharray="0 163.36" transform="rotate(-90 50 50)" />' +
+                    // Внешнее кольцо (деньги) — r=34. Ширина задаётся в CSS (.stats-ring-money*)
+                    '<circle cx="50" cy="50" r="34" fill="none" class="stats-ring-money-bg" />' +
+                    '<circle id="statsRingMoney" cx="50" cy="50" r="34" fill="none" class="stats-ring-money" stroke-linecap="round" stroke-dasharray="0 213.63" transform="rotate(-90 50 50)" />' +
                 '</svg>' +
                 '<div class="desktop-stats-rings-center">' +
                     '<div class="desktop-stats-fire-row">' +
@@ -82,13 +82,13 @@ window.DesktopStatsPanel = {
                 '</div>' +
                 '<div class="desktop-stats-separator"></div>' +
                 '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon"><i data-lucide="clock" width="14" height="14"></i></span>' +
+                    '<span class="stats-icon stats-icon-clock"><i data-lucide="clock" width="14" height="14"></i></span>' +
                     '<span class="stats-value" id="statsTodayTime">—</span>' +
                     '<span class="stats-label">/</span>' +
                     '<span class="stats-value stats-value-plan" id="statsTodayTimePlan">—</span>' +
                 '</div>' +
                 '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon"><i data-lucide="coins" width="14" height="14"></i></span>' +
+                    '<span class="stats-icon stats-icon-money"><i data-lucide="dollar-sign" width="14" height="14"></i></span>' +
                     '<span class="stats-value" id="statsTodayMoney">—</span>' +
                     '<span class="stats-label">/</span>' +
                     '<span class="stats-value stats-value-plan" id="statsTodayMoneyPlan">—</span>' +
@@ -161,6 +161,13 @@ window.DesktopStatsPanel = {
         panel.addEventListener('dblclick', (e) => {
             e.preventDefault();
             this.load();
+        });
+
+        // Закрывать выпадающее меню по клику вне панели
+        document.addEventListener('click', (e) => {
+            if (this.expanded && this.panelEl && !this.panelEl.contains(e.target)) {
+                this.toggleExpanded();
+            }
         });
 
         // Загружаем данные
