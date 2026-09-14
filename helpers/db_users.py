@@ -178,6 +178,17 @@ def create_user(
 
         conn.commit()
 
+        # Автоматически добавляем на «Стол» пользователя диктанты по умолчанию
+        # для изучаемых им языков (dictations.is_first_load IS TRUE).
+        try:
+            from .db_books import add_default_dictations_to_desk
+            add_default_dictations_to_desk(
+                int(user_row["id"]),
+                [str(x).lower() for x in learning_languages],
+            )
+        except Exception:
+            pass
+
         result = {
             "id": user_row["id"],
             "username": user_row["username"],

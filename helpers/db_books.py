@@ -301,41 +301,41 @@ def get_book_dictations(book_id: int) -> List[Dict[str, Any]]:
     try:
         # Проверяем, существует ли колонка author_materials_url
         cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
+            SELECT column_name
+            FROM information_schema.columns
             WHERE table_name='dictations' AND column_name='author_materials_url'
         """)
         has_author_materials_url = cur.fetchone() is not None
         
+        # Проверяем, существует ли колонка is_first_load
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='dictations' AND column_name='is_first_load'
+        """)
+        has_is_first_load = cur.fetchone() is not None
+        
+        select_cols = [
+            "d.id",
+            "d.title",
+            "d.language_code",
+            "d.level",
+            "d.is_public",
+        ]
         if has_author_materials_url:
-            query = """
-                SELECT
-                    d.id,
-                    d.title,
-                    d.language_code,
-                    d.level,
-                    d.is_public,
-                    d.author_materials_url,
-                    bd.order_index
-                FROM book_dictations bd
-                JOIN dictations d ON d.id = bd.dictation_id
-                WHERE bd.book_id = %s
-                ORDER BY COALESCE(bd.order_index, 0), d.id
-            """
-        else:
-            query = """
-                SELECT
-                    d.id,
-                    d.title,
-                    d.language_code,
-                    d.level,
-                    d.is_public,
-                    bd.order_index
-                FROM book_dictations bd
-                JOIN dictations d ON d.id = bd.dictation_id
-                WHERE bd.book_id = %s
-                ORDER BY COALESCE(bd.order_index, 0), d.id
-            """
+            select_cols.append("d.author_materials_url")
+        if has_is_first_load:
+            select_cols.append("d.is_first_load")
+        select_cols.append("bd.order_index")
+        
+        query = f"""
+            SELECT
+                {", ".join(select_cols)}
+            FROM book_dictations bd
+            JOIN dictations d ON d.id = bd.dictation_id
+            WHERE bd.book_id = %s
+            ORDER BY COALESCE(bd.order_index, 0), d.id
+        """
         
         cur.execute(query, (book_id,))
         rows = cur.fetchall()
@@ -352,6 +352,8 @@ def get_book_dictations(book_id: int) -> List[Dict[str, Any]]:
             }
             if has_author_materials_url:
                 dictation_dict["author_materials_url"] = row.get("author_materials_url")
+            if has_is_first_load:
+                dictation_dict["is_first_load"] = bool(row.get("is_first_load")) if row.get("is_first_load") is not None else False
             result.append(dictation_dict)
         return result
     finally:
@@ -580,6 +582,54 @@ def add_dictation_to_desk(
         )
         existing = cur.fetchone()
         return existing["id"] if existing else None
+    finally:
+        cur.close()
+        conn.close()
+
+
+def add_default_dictations_to_desk(user_id: int, language_codes: List[str]) -> int:
+    """
+    Добавляет на «Стол» пользователя (desk_items) все диктанты по умолчанию
+    (dictations.is_first_load IS TRUE) для указанных языков обучения.
+
+    Возвращает количество фактически добавленных записей (без учёта уже существующих).
+    """
+    if not language_codes:
+        return 0
+
+    codes = [str(x).strip().lower() for x in language_codes if str(x).strip()]
+    if not codes:
+        return 0
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT id
+            FROM dictations
+            WHERE is_first_load IS TRUE
+              AND language_code = ANY(%s)
+            ORDER BY id
+            """,
+            (codes,),
+        )
+        rows = cur.fetchall() or []
+        dictation_ids = [int(r["id"] if isinstance(r, dict) else r[0]) for r in rows]
+
+        added = 0
+        for dictation_id in dictation_ids:
+            cur.execute(
+                """
+                INSERT INTO desk_items (user_id, dictation_id)
+                VALUES (%s, %s)
+                ON CONFLICT (user_id, dictation_id) DO NOTHING
+                """,
+                (int(user_id), int(dictation_id)),
+            )
+            added += cur.rowcount
+
+        conn.commit()
+        return added
     finally:
         cur.close()
         conn.close()
@@ -1259,58 +1309,52 @@ def get_orphan_dictations(user_id: int) -> List[Dict[str, Any]]:
     try:
         # Проверяем, существует ли колонка author_materials_url
         cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
+            SELECT column_name
+            FROM information_schema.columns
             WHERE table_name='dictations' AND column_name='author_materials_url'
         """)
         has_author_materials_url = cur.fetchone() is not None
+        
+        # Проверяем, существует ли колонка is_first_load
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='dictations' AND column_name='is_first_load'
+        """)
+        has_is_first_load = cur.fetchone() is not None
         
         # IMPORTANT:
         # - consider dictation "in a book" only if the referenced book exists
         #   (prevents "lost" dictations when book_dictations contains a dangling book_id)
         # - ignore links to user's workbook ("Рабочая тетрадь") when determining orphan status.
         #   Workbook is meant to DISPLAY orphans; linking dictations to it must not hide them.
+        select_cols = [
+            "d.id",
+            "d.title",
+            "d.language_code",
+            "d.level",
+            "d.is_public",
+        ]
         if has_author_materials_url:
-            query = """
-                SELECT
-                    d.id,
-                    d.title,
-                    d.language_code,
-                    d.level,
-                    d.is_public,
-                    d.author_materials_url,
-                    d.created_at
-                FROM dictations d
-                WHERE d.owner_id = %s
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM book_dictations bd
-                    JOIN books b ON b.id = bd.book_id
-                    WHERE bd.dictation_id = d.id
-                      AND NOT (b.creator_user_id = %s AND b.title = 'Рабочая тетрадь')
-                  )
-                ORDER BY d.created_at DESC
-            """
-        else:
-            query = """
-                SELECT
-                    d.id,
-                    d.title,
-                    d.language_code,
-                    d.level,
-                    d.is_public,
-                    d.created_at
-                FROM dictations d
-                WHERE d.owner_id = %s
-                  AND NOT EXISTS (
-                    SELECT 1
-                    FROM book_dictations bd
-                    JOIN books b ON b.id = bd.book_id
-                    WHERE bd.dictation_id = d.id
-                      AND NOT (b.creator_user_id = %s AND b.title = 'Рабочая тетрадь')
-                  )
-                ORDER BY d.created_at DESC
-            """
+            select_cols.append("d.author_materials_url")
+        if has_is_first_load:
+            select_cols.append("d.is_first_load")
+        select_cols.append("d.created_at")
+        
+        query = f"""
+            SELECT
+                {", ".join(select_cols)}
+            FROM dictations d
+            WHERE d.owner_id = %s
+              AND NOT EXISTS (
+                SELECT 1
+                FROM book_dictations bd
+                JOIN books b ON b.id = bd.book_id
+                WHERE bd.dictation_id = d.id
+                  AND NOT (b.creator_user_id = %s AND b.title = 'Рабочая тетрадь')
+              )
+            ORDER BY d.created_at DESC
+        """
         
         cur.execute(query, (user_id, user_id))
         rows = cur.fetchall()
@@ -1327,6 +1371,8 @@ def get_orphan_dictations(user_id: int) -> List[Dict[str, Any]]:
             }
             if has_author_materials_url:
                 dictation_dict["author_materials_url"] = row.get("author_materials_url")
+            if has_is_first_load:
+                dictation_dict["is_first_load"] = bool(row.get("is_first_load")) if row.get("is_first_load") is not None else False
             result.append(dictation_dict)
         
         return result

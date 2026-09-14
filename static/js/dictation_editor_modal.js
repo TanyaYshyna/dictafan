@@ -2700,10 +2700,38 @@ function _initFormFields() {
     authorUrlInput.value = state.config.authorMaterialsUrl;
   }
 
+  // Флаг "Диктант для первой загрузки" (кружок / кружок с большой галочкой)
+  _renderFirstLoadToggle();
+
   const coverImg = document.getElementById('dictationEditorModalCoverImage');
   if (state.config.coverUrl) {
     if (coverImg) coverImg.src = state.config.coverUrl;
   }
+}
+
+function _renderFirstLoadToggle() {
+  var btn = document.getElementById('dictationEditorModalFirstLoadToggle');
+  if (!btn) return;
+
+  var checked = !!(state.config && state.config.is_first_load);
+  btn.dataset.checked = checked ? '1' : '0';
+  btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+  btn.innerHTML = '<i data-lucide="' + (checked ? 'circle-check-big' : 'circle') + '"></i>';
+  try {
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+  } catch (e) { }
+}
+
+function _toggleFirstLoadFlag() {
+  var btn = document.getElementById('dictationEditorModalFirstLoadToggle');
+  if (!btn) return;
+
+  var next = btn.dataset.checked !== '1';
+  if (state.config) {
+    state.config.is_first_load = next;
+  }
+  _renderFirstLoadToggle();
+  _setDirtyFlags({ db: true });
 }
 
 function _initLevelSelector() {
@@ -4018,6 +4046,7 @@ async function _handleSave() {
       sentences: sentencesPayload,
       book_id: targetBookId,
       cover_b64: cover_b64,
+      is_first_load: state.config ? !!state.config.is_first_load : false,
     };
 
     console.log('[dictationEditorModal] [TRACE] _handleSave: audio_user_shared=' + saveData.audio_user_shared + ' _sharedAudioFilename=' + state._sharedAudioFilename + ' dirty.db=' + flags.db + ' dirty.audio.size=' + (flags.audio && flags.audio.dirty ? flags.audio.dirty.size : 0));
@@ -5496,6 +5525,12 @@ async function _applySelfMicFile(filename, blob) {
 function init() {
   _setupCloseButton();
   _setupOverlayClose();
+
+  // Флаг "Диктант для первой загрузки"
+  var firstLoadToggle = document.getElementById('dictationEditorModalFirstLoadToggle');
+  if (firstLoadToggle) {
+    firstLoadToggle.addEventListener('click', _toggleFirstLoadFlag);
+  }
 
   // Кнопка сохранения
   var saveBtn = document.getElementById('dictationEditorModalSaveBtn');

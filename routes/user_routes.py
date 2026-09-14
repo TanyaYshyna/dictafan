@@ -643,6 +643,30 @@ def api_update_profile():
             updated_user = update_user(current_email, db_updates)
             if not updated_user:
                 return jsonify({'error': 'Failed to update user'}), 500
+
+            # Если добавились новые изучаемые языки — добавляем на «Стол»
+            # диктанты по умолчанию для этих языков.
+            if 'learning_languages' in updates:
+                try:
+                    old_langs = {
+                        str(x).strip().lower()
+                        for x in (user_db.get('learning_languages') or [])
+                        if str(x).strip()
+                    }
+                    new_langs = {
+                        str(x).strip().lower()
+                        for x in updates.get('learning_languages') or []
+                        if str(x).strip()
+                    }
+                    added_langs = sorted(new_langs - old_langs)
+                    if added_langs:
+                        from helpers.db_books import add_default_dictations_to_desk
+                        add_default_dictations_to_desk(
+                            int(user_db.get('id')),
+                            added_langs,
+                        )
+                except Exception:
+                    pass
         else:
             updated_user = user_db
         

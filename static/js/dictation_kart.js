@@ -1098,6 +1098,7 @@ window.DictationKart = window.DictationKart || {
             const authorMaterialsUrl = btn.getAttribute('data-author-materials-url') || '';
             const isDialog = btn.getAttribute('data-is-dialog') === 'true';
             const audioOrder = btn.getAttribute('data-audio-order') || '';
+            const isFirstLoad = btn.getAttribute('data-is-first-load') === 'true';
 
             console.log('[dictation_kart] edit-dictation-v2 data:', { dictationId, langOriginal, langTranslation, title, level, coverUrl });
 
@@ -1162,6 +1163,7 @@ window.DictationKart = window.DictationKart || {
                           coverUrl: coverUrl,
                           authorMaterialsUrl: authorMaterialsUrl,
                           is_dialog: isDialog,
+                          is_first_load: isFirstLoad,
                           sentences: serverResult.sentences,
                           audio_user_shared: serverResult.audio_user_shared,
                           audio_order: audioOrder,
@@ -1197,6 +1199,7 @@ window.DictationKart = window.DictationKart || {
                   coverUrl: coverUrl,
                   authorMaterialsUrl: authorMaterialsUrl,
                   is_dialog: isDialog,
+                  is_first_load: isFirstLoad,
                   sentences: sentences,
                   audio_user_shared: audio_user_shared,
                   audio_order: audioOrder,
@@ -1455,7 +1458,7 @@ window.DictationKart = window.DictationKart || {
     ];
   },
 
-  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation, isDialog, audioOrder }) {
+  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation, isDialog, audioOrder, isFirstLoad }) {
     const items = this.buildMenuItems(context);
 
     const t = (key, fallback) => {
@@ -1496,6 +1499,7 @@ window.DictationKart = window.DictationKart || {
                 attrs.push(`data-cover-url="${window.escapeHtml(String(coverUrl || ''))}"`);
                 attrs.push(`data-is-dialog="${isDialog ? 'true' : 'false'}"`);
                 attrs.push(`data-audio-order="${window.escapeHtml(String(audioOrder || ''))}"`);
+                attrs.push(`data-is-first-load="${isFirstLoad ? 'true' : 'false'}"`);
               } else if (it.action === 'remove-from-desk') {
                 attrs.push(`data-desk-item-id="${window.escapeHtml(String(deskItemId || ''))}"`);
                 attrs.push(`data-dictation-id="${window.escapeHtml(String(dictationId || ''))}"`);
@@ -1567,6 +1571,7 @@ window.DictationKart = window.DictationKart || {
       langTranslation,
       isDialog: item.is_dialog,
       audioOrder: item.audio_order,
+      isFirstLoad: item.is_first_load,
     });
 
     return `
@@ -1645,6 +1650,7 @@ window.DictationKart = window.DictationKart || {
       langTranslation,
       isDialog: d.is_dialog,
       audioOrder: d.audio_order,
+      isFirstLoad: d.is_first_load,
     });
 
     return `
@@ -1780,6 +1786,7 @@ window.DictationKart = window.DictationKart || {
         langTranslation,
         isDialog: item.is_dialog,
         audioOrder: item.audio_order,
+        isFirstLoad: item.is_first_load,
       });
     }
 
@@ -1881,6 +1888,7 @@ window.DictationKart = window.DictationKart || {
         langTranslation,
         isDialog: d.is_dialog,
         audioOrder: d.audio_order,
+        isFirstLoad: d.is_first_load,
       });
     }
 

@@ -8,8 +8,9 @@ from helpers.db import get_db_connection
 from helpers.language_data import load_language_data
 
 
-def create_dictation(title, language_code, level=None, owner_id=None, is_public=True, 
-                    speakers=None, audio_user_shared=None, title_translations=None, author_materials_url=None):
+def create_dictation(title, language_code, level=None, owner_id=None, is_public=True,
+                    speakers=None, audio_user_shared=None, title_translations=None, author_materials_url=None,
+                    is_first_load=None):
     """
     Создаёт новый диктант в БД
     
@@ -23,6 +24,7 @@ def create_dictation(title, language_code, level=None, owner_id=None, is_public=
         audio_user_shared: URL общего аудио файла (если есть)
         title_translations: Словарь переводов заголовка {"en": "Title", "ru": "Заголовок", "uk": "Заголовок"} или None
         author_materials_url: URL на материалы автора (если есть)
+        is_first_load: Флаг "Диктант для первой загрузки" (если есть)
     
     Returns:
         dict: Данные созданного диктанта с полем 'id'
@@ -32,30 +34,54 @@ def create_dictation(title, language_code, level=None, owner_id=None, is_public=
         with conn.cursor() as cur:
             # Проверяем, существует ли колонка author_materials_url
             cur.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
+                SELECT column_name
+                FROM information_schema.columns
                 WHERE table_name='dictations' AND column_name='author_materials_url'
             """)
             has_author_materials_url = cur.fetchone() is not None
+            
+            # Проверяем, существует ли колонка is_first_load
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name='dictations' AND column_name='is_first_load'
+            """)
+            has_is_first_load = cur.fetchone() is not None
             
             # Преобразуем speakers и title_translations в JSON строки
             speakers_json = json.dumps(speakers) if speakers else None
             title_translations_json = json.dumps(title_translations) if title_translations else None
             
-            if has_author_materials_url:
+            if has_author_materials_url and has_is_first_load:
                 cur.execute("""
-                    INSERT INTO dictations 
+                    INSERT INTO dictations
+                    (title, language_code, level, owner_id, is_public, speakers_json, audio_user_shared, title_translations_json, author_materials_url, is_first_load)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, title, language_code, level, owner_id, is_public,
+                              speakers_json, audio_user_shared, title_translations_json, author_materials_url, is_first_load, created_at, updated_at
+                """, (title, language_code, level, owner_id, is_public, speakers_json, audio_user_shared, title_translations_json, author_materials_url, is_first_load))
+            elif has_author_materials_url:
+                cur.execute("""
+                    INSERT INTO dictations
                     (title, language_code, level, owner_id, is_public, speakers_json, audio_user_shared, title_translations_json, author_materials_url)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id, title, language_code, level, owner_id, is_public, 
+                    RETURNING id, title, language_code, level, owner_id, is_public,
                               speakers_json, audio_user_shared, title_translations_json, author_materials_url, created_at, updated_at
                 """, (title, language_code, level, owner_id, is_public, speakers_json, audio_user_shared, title_translations_json, author_materials_url))
+            elif has_is_first_load:
+                cur.execute("""
+                    INSERT INTO dictations
+                    (title, language_code, level, owner_id, is_public, speakers_json, audio_user_shared, title_translations_json, is_first_load)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, title, language_code, level, owner_id, is_public,
+                              speakers_json, audio_user_shared, title_translations_json, is_first_load, created_at, updated_at
+                """, (title, language_code, level, owner_id, is_public, speakers_json, audio_user_shared, title_translations_json, is_first_load))
             else:
                 cur.execute("""
-                    INSERT INTO dictations 
+                    INSERT INTO dictations
                     (title, language_code, level, owner_id, is_public, speakers_json, audio_user_shared, title_translations_json)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id, title, language_code, level, owner_id, is_public, 
+                    RETURNING id, title, language_code, level, owner_id, is_public,
                               speakers_json, audio_user_shared, title_translations_json, created_at, updated_at
                 """, (title, language_code, level, owner_id, is_public, speakers_json, audio_user_shared, title_translations_json))
             
@@ -63,7 +89,7 @@ def create_dictation(title, language_code, level=None, owner_id=None, is_public=
             conn.commit()
             
             # Преобразуем результат в словарь
-            if has_author_materials_url:
+            if has_author_materials_url and has_is_first_load:
                 dictation = {
                     'id': row[0],
                     'title': row[1],
@@ -75,6 +101,39 @@ def create_dictation(title, language_code, level=None, owner_id=None, is_public=
                     'audio_user_shared': row[7],
                     'title_translations': json.loads(row[8]) if row[8] else {},
                     'author_materials_url': row[9],
+                    'is_first_load': bool(row[10]) if row[10] is not None else False,
+                    'created_at': row[11].isoformat() if row[11] else None,
+                    'updated_at': row[12].isoformat() if row[12] else None,
+                }
+            elif has_author_materials_url:
+                dictation = {
+                    'id': row[0],
+                    'title': row[1],
+                    'language_code': row[2],
+                    'level': row[3],
+                    'owner_id': row[4],
+                    'is_public': row[5],
+                    'speakers': json.loads(row[6]) if row[6] else {},
+                    'audio_user_shared': row[7],
+                    'title_translations': json.loads(row[8]) if row[8] else {},
+                    'author_materials_url': row[9],
+                    'is_first_load': False,
+                    'created_at': row[10].isoformat() if row[10] else None,
+                    'updated_at': row[11].isoformat() if row[11] else None,
+                }
+            elif has_is_first_load:
+                dictation = {
+                    'id': row[0],
+                    'title': row[1],
+                    'language_code': row[2],
+                    'level': row[3],
+                    'owner_id': row[4],
+                    'is_public': row[5],
+                    'speakers': json.loads(row[6]) if row[6] else {},
+                    'audio_user_shared': row[7],
+                    'title_translations': json.loads(row[8]) if row[8] else {},
+                    'author_materials_url': None,
+                    'is_first_load': bool(row[9]) if row[9] is not None else False,
                     'created_at': row[10].isoformat() if row[10] else None,
                     'updated_at': row[11].isoformat() if row[11] else None,
                 }
@@ -90,6 +149,7 @@ def create_dictation(title, language_code, level=None, owner_id=None, is_public=
                     'audio_user_shared': row[7],
                     'title_translations': json.loads(row[8]) if row[8] else {},
                     'author_materials_url': None,
+                    'is_first_load': False,
                     'created_at': row[9].isoformat() if row[9] else None,
                     'updated_at': row[10].isoformat() if row[10] else None,
                 }
@@ -662,7 +722,7 @@ def set_dictation_translation_flags(dictation_id: int, flags: dict) -> None:
 
 def update_dictation(dictation_id, title=None, language_code=None, level=None,
                     is_public=None, speakers=None, audio_user_shared=None, title_translations=None, author_materials_url=None, sentences_count=None,
-                    audio_order=None):
+                    audio_order=None, is_first_load=None):
     """
     Обновляет диктант в БД
     
@@ -678,6 +738,7 @@ def update_dictation(dictation_id, title=None, language_code=None, level=None,
         title_translations: Новый словарь переводов заголовка (если None - не обновляется)
         author_materials_url: URL на материалы автора (если None - не обновляется)
         audio_order: Режим озвучки: 'f' (файл), 'm' (микрофон), '' (авто). None — не обновлять.
+        is_first_load: Флаг "Диктант для первой загрузки" (если None - не обновляется)
     
     Returns:
         dict: Обновлённые данные диктанта
@@ -687,11 +748,19 @@ def update_dictation(dictation_id, title=None, language_code=None, level=None,
         with conn.cursor() as cur:
             # Проверяем, существует ли колонка author_materials_url
             cur.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
+                SELECT column_name
+                FROM information_schema.columns
                 WHERE table_name='dictations' AND column_name='author_materials_url'
             """)
             has_author_materials_url = cur.fetchone() is not None
+            
+            # Проверяем, существует ли колонка is_first_load
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name='dictations' AND column_name='is_first_load'
+            """)
+            has_is_first_load = cur.fetchone() is not None
             
             # Формируем список обновляемых полей
             updates = []
@@ -739,6 +808,11 @@ def update_dictation(dictation_id, title=None, language_code=None, level=None,
                 updates.append("author_materials_url = %s")
                 values.append(author_materials_url)
             
+            # is_first_load: обновляем, если колонка существует и значение передано
+            if has_is_first_load and is_first_load is not None:
+                updates.append("is_first_load = %s")
+                values.append(bool(is_first_load))
+            
             # Всегда обновляем updated_at
             updates.append("updated_at = CURRENT_TIMESTAMP")
             
@@ -748,22 +822,22 @@ def update_dictation(dictation_id, title=None, language_code=None, level=None,
             
             values.append(dictation_id)
             
+            returning_cols = [
+                "id", "title", "language_code", "level", "owner_id", "is_public",
+                "speakers_json", "audio_user_shared", "title_translations_json",
+            ]
             if has_author_materials_url:
-                query = f"""
-                    UPDATE dictations 
-                    SET {', '.join(updates)}
-                    WHERE id = %s
-                    RETURNING id, title, language_code, level, owner_id, is_public, 
-                              speakers_json, audio_user_shared, title_translations_json, author_materials_url, created_at, updated_at
-                """
-            else:
-                query = f"""
-                    UPDATE dictations 
-                    SET {', '.join(updates)}
-                    WHERE id = %s
-                    RETURNING id, title, language_code, level, owner_id, is_public, 
-                              speakers_json, audio_user_shared, title_translations_json, created_at, updated_at
-                """
+                returning_cols.append("author_materials_url")
+            if has_is_first_load:
+                returning_cols.append("is_first_load")
+            returning_cols.extend(["created_at", "updated_at"])
+            
+            query = f"""
+                UPDATE dictations
+                SET {', '.join(updates)}
+                WHERE id = %s
+                RETURNING {', '.join(returning_cols)}
+            """
             
             cur.execute(query, values)
             row = cur.fetchone()
@@ -772,36 +846,30 @@ def update_dictation(dictation_id, title=None, language_code=None, level=None,
             if not row:
                 raise Exception(f"Dictation with id {dictation_id} not found")
             
+            dictation = {
+                'id': row[0],
+                'title': row[1],
+                'language_code': row[2],
+                'level': row[3],
+                'owner_id': row[4],
+                'is_public': row[5],
+                'speakers': json.loads(row[6]) if row[6] else {},
+                'audio_user_shared': row[7],
+                'title_translations': json.loads(row[8]) if row[8] else {},
+            }
+            idx = 9
             if has_author_materials_url:
-                dictation = {
-                    'id': row[0],
-                    'title': row[1],
-                    'language_code': row[2],
-                    'level': row[3],
-                    'owner_id': row[4],
-                    'is_public': row[5],
-                    'speakers': json.loads(row[6]) if row[6] else {},
-                    'audio_user_shared': row[7],
-                    'title_translations': json.loads(row[8]) if row[8] else {},
-                    'author_materials_url': row[9],
-                    'created_at': row[10].isoformat() if row[10] else None,
-                    'updated_at': row[11].isoformat() if row[11] else None,
-                }
+                dictation['author_materials_url'] = row[idx]
+                idx += 1
             else:
-                dictation = {
-                    'id': row[0],
-                    'title': row[1],
-                    'language_code': row[2],
-                    'level': row[3],
-                    'owner_id': row[4],
-                    'is_public': row[5],
-                    'speakers': json.loads(row[6]) if row[6] else {},
-                    'audio_user_shared': row[7],
-                    'title_translations': json.loads(row[8]) if row[8] else {},
-                    'author_materials_url': None,
-                    'created_at': row[9].isoformat() if row[9] else None,
-                    'updated_at': row[10].isoformat() if row[10] else None,
-                }
+                dictation['author_materials_url'] = None
+            if has_is_first_load:
+                dictation['is_first_load'] = bool(row[idx]) if row[idx] is not None else False
+                idx += 1
+            else:
+                dictation['is_first_load'] = False
+            dictation['created_at'] = row[idx].isoformat() if row[idx] else None
+            dictation['updated_at'] = row[idx + 1].isoformat() if row[idx + 1] else None
             
             return dictation
     except Exception as e:
@@ -826,62 +894,68 @@ def get_dictation_by_id(dictation_id):
         with conn.cursor() as cur:
             # Проверяем, существует ли колонка author_materials_url
             cur.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
+                SELECT column_name
+                FROM information_schema.columns
                 WHERE table_name='dictations' AND column_name='author_materials_url'
             """)
             has_author_materials_url = cur.fetchone() is not None
             
+            # Проверяем, существует ли колонка is_first_load
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name='dictations' AND column_name='is_first_load'
+            """)
+            has_is_first_load = cur.fetchone() is not None
+            
+            select_cols = [
+                "id", "title", "language_code", "level", "owner_id", "is_public",
+                "speakers_json", "audio_user_shared", "title_translations_json",
+            ]
             if has_author_materials_url:
-                cur.execute("""
-                    SELECT id, title, language_code, level, owner_id, is_public, 
-                           speakers_json, audio_user_shared, title_translations_json, author_materials_url, created_at, updated_at
+                select_cols.append("author_materials_url")
+            if has_is_first_load:
+                select_cols.append("is_first_load")
+            select_cols.extend(["created_at", "updated_at"])
+            
+            cur.execute(
+                f"""
+                    SELECT {', '.join(select_cols)}
                     FROM dictations
                     WHERE id = %s
-                """, (dictation_id,))
-            else:
-                cur.execute("""
-                    SELECT id, title, language_code, level, owner_id, is_public, 
-                           speakers_json, audio_user_shared, title_translations_json, created_at, updated_at
-                    FROM dictations
-                    WHERE id = %s
-                """, (dictation_id,))
+                """,
+                (dictation_id,),
+            )
             
             row = cur.fetchone()
             
             if not row:
                 return None
             
+            dictation = {
+                'id': row[0],
+                'title': row[1],
+                'language_code': row[2],
+                'level': row[3],
+                'owner_id': row[4],
+                'is_public': row[5],
+                'speakers': json.loads(row[6]) if row[6] else {},
+                'audio_user_shared': row[7],
+                'title_translations': json.loads(row[8]) if row[8] else {},
+            }
+            idx = 9
             if has_author_materials_url:
-                dictation = {
-                    'id': row[0],
-                    'title': row[1],
-                    'language_code': row[2],
-                    'level': row[3],
-                    'owner_id': row[4],
-                    'is_public': row[5],
-                    'speakers': json.loads(row[6]) if row[6] else {},
-                    'audio_user_shared': row[7],
-                    'title_translations': json.loads(row[8]) if row[8] else {},
-                    'author_materials_url': row[9],
-                    'created_at': row[10].isoformat() if row[10] else None,
-                    'updated_at': row[11].isoformat() if row[11] else None,
-                }
+                dictation['author_materials_url'] = row[idx]
+                idx += 1
             else:
-                dictation = {
-                    'id': row[0],
-                    'title': row[1],
-                    'language_code': row[2],
-                    'level': row[3],
-                    'owner_id': row[4],
-                    'is_public': row[5],
-                    'speakers': json.loads(row[6]) if row[6] else {},
-                    'audio_user_shared': row[7],
-                    'title_translations': json.loads(row[8]) if row[8] else {},
-                    'author_materials_url': None,
-                    'created_at': row[9].isoformat() if row[9] else None,
-                    'updated_at': row[10].isoformat() if row[10] else None,
-                }
+                dictation['author_materials_url'] = None
+            if has_is_first_load:
+                dictation['is_first_load'] = bool(row[idx]) if row[idx] is not None else False
+                idx += 1
+            else:
+                dictation['is_first_load'] = False
+            dictation['created_at'] = row[idx].isoformat() if row[idx] else None
+            dictation['updated_at'] = row[idx + 1].isoformat() if row[idx + 1] else None
             
             return dictation
     except Exception as e:

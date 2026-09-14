@@ -682,7 +682,8 @@ def save_dictation_final():
                     is_public=True,
                     speakers=data.get("speakers", {}),  # Передаём словарь, не JSON строку
                     title_translations=data.get("title_translations", {}),  # Переводы заголовка
-                    author_materials_url=data.get("author_materials_url")  # Ссылка на материалы автора
+                    author_materials_url=data.get("author_materials_url"),  # Ссылка на материалы автора
+                    is_first_load=data.get("is_first_load")  # Флаг "Диктант для первой загрузки"
                 )
                 
                 if not dictation or 'id' not in dictation:
@@ -709,6 +710,7 @@ def save_dictation_final():
                 speakers=data.get("speakers", {}),
                 title_translations=data.get("title_translations", {}),
                 author_materials_url=data.get("author_materials_url"),
+                is_first_load=data.get("is_first_load"),
                 audio_user_shared=_normalize_audio_filename(data.get("audio_user_shared")),
                 audio_order=data.get("audio_order")
             )
@@ -722,6 +724,7 @@ def save_dictation_final():
                 speakers=data.get("speakers", {}),
                 title_translations=data.get("title_translations", {}),
                 author_materials_url=data.get("author_materials_url"),
+                is_first_load=data.get("is_first_load"),
                 audio_user_shared=_normalize_audio_filename(data.get("audio_user_shared")),
                 audio_order=data.get("audio_order")
             )

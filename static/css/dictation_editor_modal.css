@@ -360,6 +360,38 @@
 .dictation-editor-modal__form-group-line--author-url label {
   white-space: normal;
 }
+.dictation-editor-modal__author-url-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dictation-editor-modal__first-load-toggle {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  padding: 0;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text, #1f2933);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: none;
+  outline: none;
+  margin-left: auto;
+}
+.dictation-editor-modal__first-load-toggle:focus {
+  outline: none;
+  box-shadow: none;
+}
+.dictation-editor-modal__first-load-toggle svg {
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
 .dictation-editor-modal__form-group-line--author-url .text-input {
   width: 100%;
   box-sizing: border-box;

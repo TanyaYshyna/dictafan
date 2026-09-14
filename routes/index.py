@@ -856,7 +856,8 @@ def dictations_list():
                 "level": dictation['level'],
                 "cover_url": cover_url,
                 "sentences_count": sentences_count,
-                "author_materials_url": dictation.get('author_materials_url')
+                "author_materials_url": dictation.get('author_materials_url'),
+                "is_first_load": dictation.get('is_first_load', False)
             })
             
         except (ValueError, Exception) as e:
