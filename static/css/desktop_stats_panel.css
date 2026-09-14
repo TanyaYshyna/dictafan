@@ -8,11 +8,13 @@
 
 /* ---- ШИРИНА КОЛЕЦ (регулируется ЗДЕСЬ, для экспериментов) ----
    Единицы — user-units viewBox (0 0 100 100).
-   Жёлтое внутреннее кольцо (время): ширина = радиусу r=26.
+   Жёлтое внутреннее кольцо (время): r=14.5 + ширина 29 (= 2r) → сектор закрашен
+   от центра до радиуса 29, без «дырки от бублика» и не перекрывая фиолетовое
+   кольцо (r=34, ширина 7.5 → внутренний край 30.25).
    Фиолетовое внешнее кольцо (деньги): 7.5 = 5 * 1.5 (в 1.5 раза шире исходной). */
 .stats-ring-time-bg,
 .stats-ring-time {
-    stroke-width: 26;
+    stroke-width: 29;
 }
 .stats-ring-money-bg,
 .stats-ring-money {
@@ -76,6 +78,7 @@
     align-items: center;
     justify-content: center;
     gap: 1px;
+    transform: translateX(-4px);
 }
 
 .desktop-stats-fire-row .stats-fire-icon {
@@ -94,9 +97,9 @@
 
 .desktop-stats-fire-row .stats-streak-number {
     font-size: 14px;
-    font-weight: 800;
+    font-weight: 900;
     line-height: 1;
-    color: var(--color-text-secondary, #6b7280);
+    color: var(--color-text-primary, #1f2937);
 }
 
 /* ---- Инфо справа от колец: время сверху, деньги снизу ---- */
