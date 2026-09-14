@@ -689,8 +689,14 @@
             const data = JSON.parse(rec.data);
             const dictId = data.dictationId || rec.dictationId;
             if (!dictId) continue;
-            const content = this.getOrCreateContent({ dictationId: dictId });
-            const allKeys = content ? content.getAllKeys() : [];
+            // Читаем контент, но НЕ создаём пустой: getContent вернёт null, если
+            // контент для этого диктанта ещё не загружен. Раньше здесь был
+            // getOrCreateContent(), который создавал пустой контент (langBlocks=[]),
+            // из-за чего проверка allKeys.length === 0 пропускала ВСЕ сессии и
+            // восстановление прогресса никогда не работало.
+            const content = this.getContent({ dictationId: dictId });
+            if (!content) continue;
+            const allKeys = content.getAllKeys();
             if (!allKeys.length) continue;
             const session = DictationSession.fromJSON(data, content);
             this._sessions.set(rec.key, session);

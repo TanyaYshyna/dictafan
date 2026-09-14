@@ -5312,6 +5312,14 @@
     });
     console.log('[DM:getOrCreateSession] store.getOrCreateSession вернул сессию, dictationId=', session.dictationId, 'selectedKeys.length=', session.selectedKeys ? session.selectedKeys.length : 0);
 
+    // Если сессия была восстановлена из IndexedDB (у неё уже есть прогресс:
+    // activeKeys установлен), возвращаем её как есть — пользователь продолжит
+    // с того же места. Переинициализация выбора ниже сбросила бы весь прогресс.
+    if (Array.isArray(session.activeKeys) && session.activeKeys.length > 0) {
+      console.log('[DM:getOrCreateSession] сессия восстановлена из IDB, пропускаем переинициализацию выбора');
+      return session;
+    }
+
     try {
       const hasSubset = Array.isArray(subsetPositions) && subsetPositions.length > 0;
       if (!hasSubset) {
@@ -7401,22 +7409,6 @@
       } catch (e) {
       }
 
-      // Восстанавливаем сессию из IndexedDB ПЕРЕД загрузкой контента.
-      // Важно: restoreFromIdb() создаёт контенты для всех диктантов из IDB,
-      // и если их больше _maxContents (5), он удаляет старые, включая
-      // только что загруженный контент текущего диктанта.
-      // Поэтому восстанавливаем ДО, а потом загружаем/перезагружаем контент текущего диктанта.
-      try {
-        const store = getRuntimeStore();
-        if (store && typeof store.restoreFromIdb === 'function') {
-          console.log('[DM:open] вызываю restoreFromIdb ДО загрузки контента');
-          await store.restoreFromIdb().catch(function(e){});
-          console.log('[DM:open] restoreFromIdb завершён, _contents.size=', store._contents ? store._contents.size : '?');
-        }
-      } catch (eReset) {
-        console.error('[DM:open] ошибка restoreFromIdb:', eReset);
-      }
-
       // Загружаем контент диктанта (предложения) в runtime.
       // Если загрузка не удалась — не создаём сессию, показываем ошибку.
       let contentLoaded = false;
@@ -7441,6 +7433,23 @@
             window.showNoSelectionModal('Не удалось загрузить диктант. Проверь интернет и обнови страницу.');
           }
         } catch (e1) {
+        }
+      }
+
+      // Восстанавливаем сессию из IndexedDB ПОСЛЕ загрузки контента.
+      // restoreFromIdb() пропускает сессии, у которых контент ещё не загружен
+      // (внутри стоит проверка allKeys.length === 0), поэтому восстановление
+      // вызываем только после успешной загрузки контента текущего диктанта.
+      if (contentLoaded) {
+        try {
+          const store = getRuntimeStore();
+          if (store && typeof store.restoreFromIdb === 'function') {
+            console.log('[DM:open] вызываю restoreFromIdb ПОСЛЕ загрузки контента');
+            await store.restoreFromIdb().catch(function(e){});
+            console.log('[DM:open] restoreFromIdb завершён, _contents.size=', store._contents ? store._contents.size : '?');
+          }
+        } catch (eReset) {
+          console.error('[DM:open] ошибка restoreFromIdb:', eReset);
         }
       }
 

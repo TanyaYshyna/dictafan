@@ -10,6 +10,8 @@
         });
         // Восстанавливаем сессии из IDB, чтобы активные диктанты отображались корректно.
         // Вызов без await — fire-and-forget, так как это не критично для отображения списка.
+        // Сессии восстановятся только для уже загруженного контента; список активных
+        // диктантов читается из IDB напрямую в getActiveDictations().
         try {
           window.__dictationRuntimeStore.restoreFromIdb().catch(function(e){});
         } catch (eRestore) {
@@ -21,51 +23,63 @@
     return null;
   }
 
-  function getActiveDictations() {
+  async function getActiveDictations() {
     const store = getRuntimeStore();
-    if (!store) return [];
+    const byDict = new Map();
 
-    const contents = [];
+    function ensure(dictId) {
+      const d = String(dictId);
+      if (!byDict.has(d)) {
+        byDict.set(d, { dictationId: d, sessionsCount: 0, languages: [], sentencesCount: 0, loadedAtMs: 0 });
+      }
+      return byDict.get(d);
+    }
+
+    // Главный источник незавершённых диктантов — сессии в IndexedDB.
+    // Раньше список строился по _contents (которые создавались пустыми в
+    // restoreFromIdb через getOrCreateContent). Теперь restoreFromIdb не создаёт
+    // пустых контентов, поэтому читаем записи 'sessions' напрямую.
     try {
-      // DictationSessionsStore хранит _contents как Map<key, DictationContent>
-      // и _sessions как Map<key, DictationSession>
-      if (store._contents && typeof store._contents.values === 'function') {
-        for (const content of store._contents.values()) {
-          if (content && content.dictationId) {
-            // Считаем количество сессий для этого контента
-            let sessionsCount = 0;
-            if (store._sessions && typeof store._sessions.values === 'function') {
-              for (const session of store._sessions.values()) {
-                if (session && session.content && session.content.dictationId === content.dictationId) {
-                  sessionsCount++;
-                }
-              }
-            }
-            const languages = content.getLanguages ? content.getLanguages() : [];
-            contents.push({
-              dictationId: content.dictationId,
-              languages: languages,
-              sentencesCount: content.getAllKeys ? content.getAllKeys().length : 0,
-              sessionsCount: sessionsCount,
-              loadedAtMs: content.loadedAtMs || 0,
-            });
+      if (window.IdbManager && typeof window.IdbManager.idbGetAll === 'function') {
+        const records = await window.IdbManager.idbGetAll('sessions');
+        for (const rec of (records || [])) {
+          let dictId = null;
+          if (rec && rec.dictationId) {
+            dictId = rec.dictationId;
+          } else if (rec && rec.data) {
+            try { dictId = (JSON.parse(rec.data) || {}).dictationId; } catch (e) { }
           }
+          if (!dictId) continue;
+          ensure(dictId).sessionsCount += 1;
         }
       }
     } catch (e) {
-      console.warn('[activeDictations] error reading store:', e);
+      console.warn('[activeDictations] error reading IDB sessions:', e);
     }
 
+    // Дополняем данными загруженного контента из runtime store
+    // (языки, количество предложений) — если контент уже загружен.
+    if (store && store._contents && typeof store._contents.values === 'function') {
+      for (const content of store._contents.values()) {
+        if (!content || !content.dictationId) continue;
+        const entry = ensure(content.dictationId);
+        entry.languages = content.getLanguages ? content.getLanguages() : [];
+        entry.sentencesCount = content.getAllKeys ? content.getAllKeys().length : 0;
+        entry.loadedAtMs = content.loadedAtMs || 0;
+      }
+    }
+
+    const result = Array.from(byDict.values());
     // Сортируем по времени загрузки (сначала новые)
-    contents.sort((a, b) => (b.loadedAtMs || 0) - (a.loadedAtMs || 0));
-    return contents;
+    result.sort((a, b) => (b.loadedAtMs || 0) - (a.loadedAtMs || 0));
+    return result;
   }
 
-  function renderActiveDictations() {
+  async function renderActiveDictations() {
     const listEl = document.getElementById('activeDictationsList');
     if (!listEl) return;
 
-    const dictations = getActiveDictations();
+    const dictations = await getActiveDictations();
 
     if (dictations.length === 0) {
       listEl.innerHTML = '<div class="active-dictations-empty">Нет активных диктантов</div>';
@@ -95,11 +109,11 @@
     listEl.innerHTML = html;
   }
 
-  function openModal() {
+  async function openModal() {
     const modal = document.getElementById('activeDictationsModal');
     if (!modal) return;
 
-    renderActiveDictations();
+    await renderActiveDictations();
 
     modal.style.display = 'flex';
 
