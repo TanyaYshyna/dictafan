@@ -12,6 +12,49 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .db import get_db_connection, get_db_cursor
 
 
+def _ensure_languages_exist(cur, language_codes) -> None:
+    """
+    Гарантирует наличие языков в таблице languages (upsert из languages.json).
+
+    Необходимо, т.к. user_learning_languages.language_code ссылается на
+    languages.code по внешнему ключу, а таблица languages заполняется
+    только скриптом seed_languages.py. Если админ добавил новый язык
+    в languages.json, но не перезапустил seed, вставка падала бы с
+    ошибкой FK. Эта функция делает синхронизацию автоматически.
+    """
+    if not language_codes:
+        return
+    try:
+        from .language_data import load_language_data
+
+        data = load_language_data() or {}
+        for raw_code in language_codes:
+            code = str(raw_code or "").strip().lower()
+            if not code:
+                continue
+            info = data.get(code) or {}
+            cur.execute(
+                """
+                INSERT INTO languages (code, code_url, name_native, name_en, is_active)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (code) DO UPDATE
+                SET code_url = EXCLUDED.code_url,
+                    name_native = EXCLUDED.name_native,
+                    name_en = EXCLUDED.name_en,
+                    is_active = EXCLUDED.is_active
+                """,
+                (
+                    code,
+                    (str(info.get("country_cod_url") or "").strip()) or None,
+                    (str(info.get("language_ru") or "").strip()) or code.upper(),
+                    (str(info.get("language_en") or "").strip()) or code.upper(),
+                    True,
+                ),
+            )
+    except Exception as exc:
+        print(f"[db_users] _ensure_languages_exist error: {exc}")
+
+
 def create_user(
     email: str,
     username: str,
@@ -162,6 +205,9 @@ def create_user(
             pass
 
         # Очищаем и заполняем user_learning_languages
+        # Сначала гарантируем, что все нужные языки есть в таблице languages,
+        # иначе вставка упадёт по внешнему ключу (language_code_fkey).
+        _ensure_languages_exist(cur, learning_languages)
         cur.execute(
             "DELETE FROM user_learning_languages WHERE user_id = %s",
             (user_row["id"],),
@@ -755,6 +801,9 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
         # Обновляем языки обучения если указаны
         if 'learning_languages' in updates:
             print(f"[db_users.update_user] learning_languages in updates: {updates['learning_languages']}")
+            # Сначала гарантируем, что все нужные языки есть в таблице languages,
+            # иначе вставка упадёт по внешнему ключу (language_code_fkey).
+            _ensure_languages_exist(cur, updates['learning_languages'])
             # Удаляем старые языки
             cur.execute("DELETE FROM user_learning_languages WHERE user_id = %s", (user_id,))
             # Добавляем новые
