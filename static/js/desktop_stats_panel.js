@@ -44,9 +44,9 @@ window.DesktopStatsPanel = {
             // --- Кольцевые диаграммы + центр (огонь+число) ---
             '<div class="desktop-stats-rings" id="desktopStatsRings">' +
                 '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' +
-                    // Внутреннее кольцо (время) — r=26. Ширина задаётся в CSS (.stats-ring-time*)
-                    '<circle cx="50" cy="50" r="26" fill="none" class="stats-ring-time-bg" />' +
-                    '<circle id="statsRingTime" cx="50" cy="50" r="26" fill="none" class="stats-ring-time" stroke-linecap="round" stroke-dasharray="0 163.36" transform="rotate(-90 50 50)" />' +
+                    // Внутренний сектор (время) — r=14.5, закрашен от центра. Ширина задаётся в CSS (.stats-ring-time*)
+                    '<circle cx="50" cy="50" r="14.5" fill="none" class="stats-ring-time-bg" />' +
+                    '<circle id="statsRingTime" cx="50" cy="50" r="14.5" fill="none" class="stats-ring-time" stroke-linecap="round" stroke-dasharray="0 91.11" transform="rotate(-90 50 50)" />' +
                     // Внешнее кольцо (деньги) — r=34. Ширина задаётся в CSS (.stats-ring-money*)
                     '<circle cx="50" cy="50" r="34" fill="none" class="stats-ring-money-bg" />' +
                     '<circle id="statsRingMoney" cx="50" cy="50" r="34" fill="none" class="stats-ring-money" stroke-linecap="round" stroke-dasharray="0 213.63" transform="rotate(-90 50 50)" />' +
@@ -239,9 +239,9 @@ window.DesktopStatsPanel = {
 
         // --- Кольцевые диаграммы ---
 
-        // Внутреннее кольцо — время (жёлтое), 2*PI*26 ≈ 163.36
+        // Внутренний сектор — время (жёлтое), 2*PI*14.5 ≈ 91.11
         const timeRatio = timePlan > 0 ? Math.min(timeFact / timePlan, 1) : 0;
-        this._updateRing('statsRingTime', timeRatio, 163.36);
+        this._updateRing('statsRingTime', timeRatio, 91.11);
 
         // Внешнее кольцо — деньги (розовое), 2*PI*34 ≈ 213.63
         const moneyRatio = moneyPlan > 0 ? Math.min(moneyFact / moneyPlan, 1) : 0;
@@ -314,29 +314,35 @@ window.DesktopStatsPanel = {
     },
 
     /**
-     * Отформатировать время в компактный вид чч:мм.
+     * Отформатировать время в компактный вид с явными единицами: «45 мин» / «1 ч 05 мин».
      * @param {number} ms
      * @returns {string}
      */
     _formatTimeCompact(ms) {
-        if (!ms || ms <= 0) return '0:00';
+        if (!ms || ms <= 0) return '0 мин';
         const totalMinutes = Math.floor(ms / 60000);
         const hours = Math.floor(totalMinutes / 60);
         const minutes = totalMinutes % 60;
-        return hours + ':' + String(minutes).padStart(2, '0');
+        if (hours > 0) {
+            return hours + ' ч ' + String(minutes).padStart(2, '0') + ' мин';
+        }
+        return minutes + ' мин';
     },
 
     /**
-     * Отформатировать время из ms в человекочитаемый вид (чч:мм).
+     * Отформатировать время из ms в человекочитаемый вид: «45 мин» / «1 ч 05 мин».
      * @param {number} ms
      * @returns {string}
      */
     _formatTime(ms) {
-        if (!ms || ms <= 0) return '0:00';
+        if (!ms || ms <= 0) return '0 мин';
         const totalMinutes = Math.floor(ms / 60000);
         const hours = Math.floor(totalMinutes / 60);
         const minutes = totalMinutes % 60;
-        return hours + ':' + String(minutes).padStart(2, '0');
+        if (hours > 0) {
+            return hours + ' ч ' + String(minutes).padStart(2, '0') + ' мин';
+        }
+        return minutes + ' мин';
     },
 
     /**

@@ -510,8 +510,13 @@
         }
       }
       if (data.timer) {
-        s.timer.running = !!data.timer.running;
-        s.timer.startedAtMs = Number(data.timer.startedAtMs) || 0;
+        // НЕ восстанавливаем «запущенный» таймер. Сессия сериализуется при закрытии
+        // модалки, и если сохранить running=true со старым startedAtMs, то после
+        // восстановления getElapsedMs() насчитает дни «работы» (время стены часов
+        // с момента startedAtMs). Запущенный таймер актуален только внутри открытой
+        // модалки, а при повторном открытии он будет запущен заново.
+        s.timer.running = false;
+        s.timer.startedAtMs = 0;
         s.timer.accumulatedMs = Number(data.timer.accumulatedMs) || 0;
       }
       if (data.completionCount != null) {

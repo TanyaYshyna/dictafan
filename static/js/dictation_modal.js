@@ -7734,6 +7734,17 @@
       } catch (e) {
       }
     } else {
+      // Останавливаем таймер сессии перед сохранением, чтобы в IDB не уехало
+      // running=true со старым startedAtMs (иначе после восстановления время
+      // «раздуется» до дней/часов).
+      try {
+        const session = window.__dictationModalActiveSession;
+        if (session && typeof session.stopTimer === 'function') {
+          session.stopTimer();
+        }
+      } catch (eStop) {
+      }
+
       // Сохраняем время текущего предложения в сессию перед закрытием
       try {
         const session = window.__dictationModalActiveSession;
