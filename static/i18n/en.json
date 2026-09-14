@@ -30,6 +30,7 @@
     },
     "learning_languages": {
       "label": "Learning languages:",
+      "refresh_title": "Refresh language list",
       "at_least_one": "Select at least one language"
     },
     "learning_language": {

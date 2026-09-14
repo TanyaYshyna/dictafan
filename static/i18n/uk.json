@@ -30,6 +30,7 @@
     },
     "learning_languages": {
       "label": "Мови, які вивчаю:",
+      "refresh_title": "Оновити список мов",
       "at_least_one": "Потрібно вибрати хоча б одну мову"
     },
     "learning_language": {

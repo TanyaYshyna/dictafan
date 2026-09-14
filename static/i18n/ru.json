@@ -30,6 +30,7 @@
     },
     "learning_languages": {
       "label": "Изучаю языки:",
+      "refresh_title": "Обновить список языков",
       "at_least_one": "Нужно выбрать хотя бы один язык"
     },
     "learning_language": {

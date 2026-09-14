@@ -1656,6 +1656,32 @@ function initializeLanguageSelector() {
     }
 }
 
+function initializeRefreshLanguagesListButton() {
+    const btn = document.getElementById('refreshLanguagesListBtn');
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+
+    btn.addEventListener('click', async function () {
+        if (btn.classList.contains('is-spinning')) return;
+
+        const lm = window.LanguageManager;
+        if (!lm || typeof lm.refreshLanguageData !== 'function') return;
+
+        btn.classList.add('is-spinning');
+        try {
+            await lm.refreshLanguageData();
+            // Пересоздаём селекторы, чтобы подхватить обновлённый languageData
+            initializeLanguageSelector();
+            try { if (window.lucide) window.lucide.createIcons(); } catch (e) { }
+        } catch (e) {
+            console.error('❌ Ошибка обновления списка языков:', e);
+        } finally {
+            btn.classList.remove('is-spinning');
+            try { if (window.lucide) window.lucide.createIcons(); } catch (e) { }
+        }
+    });
+}
+
 // ==================== LANGUAGE MODELS SELECTOR ====================
 
 let languageModelsSelector = null;
@@ -2368,6 +2394,14 @@ async function saveProfile(options = {}) {
         pendingAvatarBlob = null;
         showSuccess(profileT('profile.common.profile_saved', null, 'Профиль успешно сохранен!'));
 
+        // Сообщаем рабочему столу, что профиль сохранён: селектор языков должен
+        // дополниться новыми изучаемыми языками без полной перерисовки стола.
+        try {
+            window.dispatchEvent(new CustomEvent('profile-saved', {
+                detail: { learningLanguages: originalData.learning_languages, currentLearning: originalData.current_learning }
+            }));
+        } catch (e) { }
+
         if (typeof afterSave === 'function') afterSave();
 
     } catch (error) {
@@ -2715,6 +2749,7 @@ async function initUserProfilePageOrModal() {
         loadUserData();
         console.log('=== LOG #1c: calling initializeLanguageSelector');
         initializeLanguageSelector();
+        initializeRefreshLanguagesListButton();
         console.log('=== LOG #1d: calling initializeLanguageModelsSelector');
         initializeLanguageModelsSelector();
         console.log('=== LOG #1e: calling initializeAudioSettings');

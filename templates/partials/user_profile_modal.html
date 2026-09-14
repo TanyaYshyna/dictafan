@@ -75,7 +75,12 @@
 
                                     <div class="profile-lang-panel-right">
                                         <div class="form-row profile-lang-row">
-                                            <label>{{ t('profile.learning_languages.label') }}</label>
+                                            <div class="profile-lang-label-row">
+                                                <label>{{ t('profile.learning_languages.label') }}</label>
+                                                <button type="button" id="refreshLanguagesListBtn" class="profile-lang-refresh-btn" title="{{ t('profile.learning_languages.refresh_title') }}" aria-label="{{ t('profile.learning_languages.refresh_title') }}">
+                                                    <i data-lucide="refresh-cw"></i>
+                                                </button>
+                                            </div>
                                             <div id="learningLanguagesListContainer" class="profile-lang-control"></div>
                                         </div>
 

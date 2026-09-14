@@ -1163,6 +1163,15 @@ class LoginModal {
             submitBtn.textContent = this._t('login_modal.states.creating_account', 'Создаём аккаунт...');
         }
 
+        // Универсальный индикатор ожидания (жёлтый кружок), чтобы процесс
+        // регистрации не выглядел как "зависание".
+        try {
+            if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.show === 'function') {
+                window.DesktopLoadingModal.show(this._t('login_modal.states.creating_account', 'Создаём аккаунт...'));
+            }
+        } catch (e) {
+        }
+
         this.clearErrors();
 
         try {
@@ -1194,6 +1203,12 @@ class LoginModal {
             console.error('Ошибка при регистрации:', error);
             this.showError(this._t('login_modal.errors.register_network', 'Произошла ошибка при регистрации. Попробуйте еще раз.'), 'register');
         } finally {
+            try {
+                if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') {
+                    window.DesktopLoadingModal.hide();
+                }
+            } catch (e) {
+            }
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = this._t('login_modal.actions.register', 'Зарегистрироваться');

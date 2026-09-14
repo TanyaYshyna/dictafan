@@ -171,16 +171,20 @@ class LanguageManager {
         return [];
     }
 
-    async _fetchLanguageData() {
+    async _fetchLanguageData(force = false) {
         if (!('fetch' in window)) {
             return;
         }
 
-        if (this._languageDataPromise) {
+        if (!force && this._languageDataPromise) {
             return this._languageDataPromise;
         }
 
-        this._languageDataPromise = fetch('/static/data/languages.json', { cache: 'no-cache' })
+        const url = force
+            ? `/static/data/languages.json?ts=${Date.now()}`
+            : '/static/data/languages.json';
+
+        this._languageDataPromise = fetch(url, { cache: force ? 'no-store' : 'no-cache' })
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
@@ -203,9 +207,16 @@ class LanguageManager {
             })
             .catch(error => {
                 console.error('❌ Ошибка загрузки languages.json:', error);
+                if (force) {
+                    this._languageDataPromise = null;
+                }
             });
 
         return this._languageDataPromise;
+    }
+
+    async refreshLanguageData() {
+        return this._fetchLanguageData(true);
     }
 
     async _fetchModelsData() {

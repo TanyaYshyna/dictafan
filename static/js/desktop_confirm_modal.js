@@ -248,7 +248,7 @@
         try { return document.getElementById('desktopLoadingModal'); } catch (e) { return null; }
       }
 
-      function show(message) {
+      function showLoading(message) {
         const modal = _getLoadingEl();
         if (!modal) return;
         const textEl = document.getElementById('desktopLoadingModalText');
@@ -257,21 +257,21 @@
         loadingState.visible = true;
       }
 
-      function hide() {
+      function hideLoading() {
         const modal = _getLoadingEl();
         if (!modal) return;
         modal.style.display = 'none';
         loadingState.visible = false;
       }
 
-      function isVisible() {
+      function isVisibleLoading() {
         return !!loadingState.visible;
       }
 
       window.DesktopLoadingModal = window.DesktopLoadingModal || {
-        show,
-        hide,
-        isVisible,
+        show: showLoading,
+        hide: hideLoading,
+        isVisible: isVisibleLoading,
       };
     } catch (e) {
     }

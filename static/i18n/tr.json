@@ -30,6 +30,7 @@
     },
     "learning_languages": {
       "label": "Öğrenilen diller:",
+      "refresh_title": "Dil listesini yenile",
       "at_least_one": "En az bir dil seçin"
     },
     "learning_language": {

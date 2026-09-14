@@ -189,6 +189,45 @@
   margin: 0;
 }
 
+#user-profile-modal .profile-lang-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#user-profile-modal .profile-lang-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-text, #1f2933);
+  flex: 0 0 auto;
+}
+
+#user-profile-modal .profile-lang-refresh-btn:hover {
+  background: var(--color-hover, #f8f9fa);
+}
+
+#user-profile-modal .profile-lang-refresh-btn i[data-lucide] {
+  width: 16px;
+  height: 16px;
+}
+
+#user-profile-modal .profile-lang-refresh-btn.is-spinning i[data-lucide] {
+  animation: profileLangRefreshSpin 0.8s linear infinite;
+}
+
+@keyframes profileLangRefreshSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 #user-profile-modal .profile-lang-control {
   width: 100%;
 }

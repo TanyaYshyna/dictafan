@@ -956,6 +956,60 @@ window.Desktop = window.Desktop || {
     }
   },
 
+  /**
+   * После сохранения профиля (например, добавили изучаемые языки) обновляем
+   * селектор языков на левой панели БЕЗ полной перерисовки рабочего стола.
+   * Если текущий выбранный язык исчез из изучаемых — переключаемся на актуальный
+   * и только тогда перерисовываем стол.
+   */
+  syncLangSelectorAfterProfileSave() {
+    try {
+      if (!this._langSelector) return;
+      const sel = this._langSelector;
+      const opts = sel.options || {};
+
+      const normalize = (arr) => Array.from(new Set(
+        (Array.isArray(arr) ? arr : []).map((x) => String(x || '').trim().toLowerCase()).filter(Boolean)
+      ));
+
+      const userLangs = normalize(
+        (window.UM && window.UM.userData && window.UM.userData.learning_languages) || []
+      );
+
+      // Сохраняем языки, которые уже были в селекторе (например, языки со стола).
+      const existingExtra = normalize(opts.learningAvailableLanguages);
+
+      const merged = Array.from(new Set([...userLangs, ...existingExtra]));
+
+      const nextCurrent = (function () {
+        const cur = String((window.UM && window.UM.userData && window.UM.userData.current_learning) || '').trim().toLowerCase();
+        if (cur && userLangs.includes(cur)) return cur;
+        return userLangs[0] || cur || (merged[0] || 'en');
+      })();
+
+      const currentMissing = !userLangs.includes(String(this._activeLanguage || '').trim().toLowerCase());
+
+      opts.learningLanguages = merged;
+      opts.learningAvailableLanguages = merged;
+      opts.currentLearning = nextCurrent;
+
+      try {
+        sel.render();
+      } catch (e) {
+      }
+
+      if (currentMissing) {
+        this._activeLanguage = nextCurrent;
+        if (this._allDeskItems && this._allDeskItems.length > 0) {
+          this.renderDeskCards(this._allDeskItems);
+        } else {
+          this.loadDeskItems().catch(function () {});
+        }
+      }
+    } catch (e) {
+    }
+  },
+
   initUserMenu() {
     const toggle = document.getElementById('desktopUserMenuToggle');
     const dropdown = document.getElementById('desktopUserMenuDropdown');
@@ -1478,6 +1532,10 @@ window.Desktop = window.Desktop || {
       this.initLangSelector().catch(function () {});
       this.loadDeskItems().catch(() => { });
       this.toggleAdminSection();
+    });
+
+    window.addEventListener('profile-saved', () => {
+      this.syncLangSelectorAfterProfileSave();
     });
   },
 
