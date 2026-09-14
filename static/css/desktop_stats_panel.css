@@ -6,6 +6,19 @@
 .stats-ring-time-bg   { stroke: var(--color-panel-bg, #f5f3f0); }
 .stats-ring-time      { stroke: var(--color-stats-ring-time, #f59e0b); }
 
+/* ---- ШИРИНА КОЛЕЦ (регулируется ЗДЕСЬ, для экспериментов) ----
+   Единицы — user-units viewBox (0 0 100 100).
+   Жёлтое внутреннее кольцо (время): ширина = радиусу r=26.
+   Фиолетовое внешнее кольцо (деньги): 7.5 = 5 * 1.5 (в 1.5 раза шире исходной). */
+.stats-ring-time-bg,
+.stats-ring-time {
+    stroke-width: 26;
+}
+.stats-ring-money-bg,
+.stats-ring-money {
+    stroke-width: 7.5;
+}
+
 /* ---- Контейнер панели (в шапке) ---- */
 .desktop-stats-panel {
     display: flex;
@@ -112,7 +125,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-text-secondary, #6b7280);
+    color: var(--color-stats-ring-time, #f59e0b);
     flex-shrink: 0;
 }
 
@@ -138,8 +151,14 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-text-secondary, #6b7280);
+    color: var(--color-stats-ring-money, #7b7ce3);
     flex-shrink: 0;
+}
+
+/* Иконка доллара — жирная (увеличиваем толщину обводки Lucide) */
+.desktop-stats-money-row .stats-money-icon i,
+.desktop-stats-money-row .stats-money-icon svg {
+    stroke-width: 3;
 }
 
 .desktop-stats-money-row .stats-money-icon i {
@@ -223,6 +242,20 @@
 
 .desktop-stats-row .stats-icon.stats-icon-fire {
     color: #f97316;
+}
+
+.desktop-stats-row .stats-icon.stats-icon-clock {
+    color: var(--color-stats-ring-time, #f59e0b);
+}
+
+.desktop-stats-row .stats-icon.stats-icon-money {
+    color: var(--color-stats-ring-money, #7b7ce3);
+}
+
+/* Иконка доллара в расширенной панели — жирная */
+.desktop-stats-row .stats-icon.stats-icon-money i,
+.desktop-stats-row .stats-icon.stats-icon-money svg {
+    stroke-width: 3;
 }
 
 .desktop-stats-separator {
