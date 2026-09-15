@@ -429,6 +429,8 @@ class ProgressPanel {
 
     updateTimerButtons() {
         const isCountdownActive = !!(this.countdownEnabled && this.timerState && this.timerState.countdownRemainingMs > 0);
+        // Время "течёт" только когда сессия активна. Если остановлено — кнопка серая.
+        const isRunning = !!(this.timerState && this.timerState.sessionActive);
         const apply = (btnId) => {
             const btn = document.getElementById(btnId);
             if (!btn) return;
@@ -438,6 +440,12 @@ class ProgressPanel {
             // В режиме countdown: скрываем label, показываем value, если отсчёт активен
             if (label) label.hidden = isCountdownActive;
             if (value) value.hidden = false; // Всегда показываем время
+            // Серый цвет кнопки часов, если время остановлено
+            if (isRunning) {
+                btn.classList.remove('is-inactive');
+            } else {
+                btn.classList.add('is-inactive');
+            }
         };
         apply('btn-timer');
         apply('btn-modal-timer');

@@ -360,6 +360,12 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   color: var(--color-button-text-yellow);
 }
 
+/* Кнопка времени в остановленном состоянии — серая, как неактивные кнопки */
+#dictationModal .table-progress .pp-clock.is-inactive {
+  background: var(--color-button-gray);
+  color: var(--color-button-text-gray);
+}
+
 #dictationModal .table-progress .pp-perfect {
   background: var(--color-button-mint);
   color: var(--color-button-text-mint);
