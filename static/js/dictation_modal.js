@@ -2547,8 +2547,22 @@
 
         switch (event.code) {
           case 'Escape': {
+            // ctrl+esc — закрыть диктант
+            close();
+            event.preventDefault();
+            break;
+          }
+          case 'Digit0': {
+            // ctrl+0 — открыть меню выбора предложений
             if (!dictationModalState.dictationStarted) return;
-            pauseGame(false);
+            try {
+              const session = window.__dictationModalActiveSession;
+              if (!session) return;
+              _saveSentenceTime(session);
+            } catch (e0) {
+            }
+            dictationModalState.startModalContext = 'navigator';
+            showStartModal();
             event.preventDefault();
             break;
           }
@@ -2569,11 +2583,23 @@
             break;
           }
           case 'Digit3': {
-            if (typeof window.previousSentence === 'function') window.previousSentence();
+            // ctrl+3 — проиграть аудио, записанное пользователем (фиолетовая кнопка с треугольником)
+            if (!dictationModalState.dictationStarted) return;
+            const btn = document.getElementById('userAudioPlayButton');
+            if (btn && !btn.disabled && dictationModalState._userAudioObjectUrl) btn.click();
             event.preventDefault();
             break;
           }
           case 'Digit4': {
+            // ctrl+4 — предыдущее предложение
+            if (!dictationModalState.dictationStarted) return;
+            if (typeof window.previousSentence === 'function') window.previousSentence();
+            event.preventDefault();
+            break;
+          }
+          case 'Digit5': {
+            // ctrl+5 — следующее предложение
+            if (!dictationModalState.dictationStarted) return;
             if (typeof window.nextSentence === 'function') window.nextSentence();
             event.preventDefault();
             break;
@@ -7292,7 +7318,7 @@
     document.addEventListener('keydown', async (e) => {
       try {
         if (!dictationModalState.isOpen) return;
-        if (e && e.key === 'Escape') await close();
+        if (e && e.key === 'Escape' && !e.ctrlKey && !e.metaKey) await close();
       } catch (e2) {
       }
     });
