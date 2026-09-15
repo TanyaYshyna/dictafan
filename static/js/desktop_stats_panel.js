@@ -31,103 +31,18 @@ window.DesktopStatsPanel = {
     // ==================== ПУБЛИЧНЫЙ API ====================
 
     /**
-     * Инициализировать панель. Вставляет HTML в шапку и начинает загрузку.
-     * @param {HTMLElement} container — элемент шапки (.topbar), куда вставить панель
+     * Инициализировать панель. Разметка уже отрендерена сервером в шапке
+     * (partials/desktop_stats_panel.html); здесь навешиваем логику и начинаем загрузку.
+     * @param {HTMLElement} container — элемент шапки (.topbar), не используется для вставки
      */
     init(container) {
         if (this.panelEl) return; // уже инициализирована
 
-        const panel = document.createElement('div');
-        panel.className = 'desktop-stats-panel';
-        panel.id = 'desktopStatsPanel';
-        panel.innerHTML =
-            // --- Кольцевые диаграммы + центр (огонь+число) ---
-            '<div class="desktop-stats-rings" id="desktopStatsRings">' +
-                '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' +
-                    // Внутренний сектор (время) — r=14.5, закрашен от центра. Ширина задаётся в CSS (.stats-ring-time*)
-                    '<circle cx="50" cy="50" r="14.5" fill="none" class="stats-ring-time-bg" />' +
-                    '<circle id="statsRingTime" cx="50" cy="50" r="14.5" fill="none" class="stats-ring-time" stroke-linecap="round" stroke-dasharray="0 91.11" transform="rotate(-90 50 50)" />' +
-                    // Внешнее кольцо (деньги) — r=34. Ширина задаётся в CSS (.stats-ring-money*)
-                    '<circle cx="50" cy="50" r="34" fill="none" class="stats-ring-money-bg" />' +
-                    '<circle id="statsRingMoney" cx="50" cy="50" r="34" fill="none" class="stats-ring-money" stroke-linecap="round" stroke-dasharray="0 213.63" transform="rotate(-90 50 50)" />' +
-                '</svg>' +
-                '<div class="desktop-stats-rings-center">' +
-                    '<div class="desktop-stats-fire-row">' +
-                        '<span class="stats-fire-icon"><i data-lucide="flame" width="12" height="12"></i></span>' +
-                        '<span class="stats-streak-number" id="statsStreakNumber">—</span>' +
-                    '</div>' +
-                '</div>' +
-            '</div>' +
-            // --- Инфо справа от колец: время сверху, деньги снизу ---
-            '<div class="desktop-stats-info">' +
-                '<div class="desktop-stats-time-row">' +
-                    '<span class="stats-label-icon"><i data-lucide="clock" width="12" height="12"></i></span>' +
-                    '<span id="statsTodayTimeCompact">—</span>' +
-                '</div>' +
-                '<div class="desktop-stats-money-row">' +
-                    '<span class="stats-money-icon"><i data-lucide="dollar-sign" width="12" height="12"></i></span>' +
-                    '<span id="statsTodayMoneyCompact">—</span>' +
-                '</div>' +
-            '</div>' +
-            // --- Pull-tab (правый нижний угол) ---
-            '<button class="desktop-stats-pull-tab" id="desktopStatsPullTab" title="Подробнее">' +
-                '<i data-lucide="chevron-down" width="12" height="12"></i>' +
-            '</button>' +
-            // --- Расширенная панель (скрыта, пока не нажать pull-tab) ---
-            '<div class="desktop-stats-expanded" id="desktopStatsExpanded">' +
-                '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon stats-icon-fire"><i data-lucide="flame" width="14" height="14"></i></span>' +
-                    '<span class="stats-value" id="statsStreakDays">—</span>' +
-                    '<span class="stats-label" id="statsStreakLabel">дней</span>' +
-                '</div>' +
-                '<div class="desktop-stats-separator"></div>' +
-                '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon stats-icon-clock"><i data-lucide="clock" width="14" height="14"></i></span>' +
-                    '<span class="stats-value" id="statsTodayTime">—</span>' +
-                    '<span class="stats-label">/</span>' +
-                    '<span class="stats-value stats-value-plan" id="statsTodayTimePlan">—</span>' +
-                '</div>' +
-                '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon stats-icon-money"><i data-lucide="dollar-sign" width="14" height="14"></i></span>' +
-                    '<span class="stats-value" id="statsTodayMoney">—</span>' +
-                    '<span class="stats-label">/</span>' +
-                    '<span class="stats-value stats-value-plan" id="statsTodayMoneyPlan">—</span>' +
-                '</div>' +
-                '<div class="desktop-stats-separator"></div>' +
-                '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon"><i data-lucide="hourglass" width="14" height="14"></i></span>' +
-                    '<span class="stats-value" id="statsTotalTime">—</span>' +
-                    '<span class="stats-label">всего</span>' +
-                '</div>' +
-                '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon"><i data-lucide="banknote" width="14" height="14"></i></span>' +
-                    '<span class="stats-value" id="statsTotalMoney">—</span>' +
-                    '<span class="stats-label">всего</span>' +
-                '</div>' +
-                '<div class="desktop-stats-separator"></div>' +
-                '<div class="desktop-stats-view-streak" id="desktopStatsViewStreak">' +
-                    '<div class="desktop-stats-streak-header">' +
-                        '<span class="stats-icon stats-icon-fire"><i data-lucide="flame" width="14" height="14"></i></span>' +
-                        '<span>Несгораемые дни</span>' +
-                    '</div>' +
-                    '<div class="desktop-stats-streak-days" id="statsStreakDaysGrid"></div>' +
-                    '<div class="desktop-stats-streak-info" id="statsStreakInfo"></div>' +
-                '</div>' +
-                '<div class="desktop-stats-separator"></div>' +
-                '<div style="display:flex; align-items:center; justify-content:flex-end; padding-top:1px;">' +
-                    '<button class="desktop-stats-refresh-btn" id="desktopStatsRefreshBtn" title="Обновить">' +
-                        '<i data-lucide="refresh-ccw" width="14" height="14"></i>' +
-                    '</button>' +
-                '</div>' +
-            '</div>';
-
-        // Вставляем панель в шапку после логотипа
-        const logoLink = container.querySelector('.logo-link');
-        if (logoLink && logoLink.nextSibling) {
-            container.insertBefore(panel, logoLink.nextSibling);
-        } else {
-            container.appendChild(panel);
-        }
+        // HTML панели находится в шаблоне templates/partials/desktop_stats_panel.html,
+        // включённом в topbar страницы (templates/desktop.html). JS не создаёт разметку —
+        // он только находит готовый элемент и навешивает логику.
+        const panel = document.getElementById('desktopStatsPanel');
+        if (!panel) return;
         this.panelEl = panel;
 
         // Рендерим иконки Lucide внутри панели

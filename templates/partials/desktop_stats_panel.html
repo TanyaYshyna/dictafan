@@ -1,0 +1,85 @@
+<!-- desktop-stats-panel: панель статистики «Время / Деньги» в шапке рабочего стола -->
+<div class="desktop-stats-panel" id="desktopStatsPanel">
+    <!-- Кольцевые диаграммы + центр (огонь + число несгораемых дней) -->
+    <div class="desktop-stats-rings" id="desktopStatsRings">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- Внутренний сектор (время) — r=14.5, закрашен от центра. Ширина задаётся в CSS (.stats-ring-time*) -->
+            <circle cx="50" cy="50" r="14.5" fill="none" class="stats-ring-time-bg"></circle>
+            <circle id="statsRingTime" cx="50" cy="50" r="14.5" fill="none" class="stats-ring-time" stroke-linecap="butt" stroke-dasharray="0 91.11" transform="rotate(-90 50 50)"></circle>
+            <!-- Внешнее кольцо (деньги) — r=34. Ширина задаётся в CSS (.stats-ring-money*) -->
+            <circle cx="50" cy="50" r="34" fill="none" class="stats-ring-money-bg"></circle>
+            <circle id="statsRingMoney" cx="50" cy="50" r="34" fill="none" class="stats-ring-money" stroke-linecap="round" stroke-dasharray="0 213.63" transform="rotate(-90 50 50)"></circle>
+        </svg>
+        <div class="desktop-stats-rings-center">
+            <div class="desktop-stats-fire-row">
+                <span class="stats-fire-icon"><i data-lucide="flame"></i></span>
+                <span class="stats-streak-number" id="statsStreakNumber">—</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Инфо справа от колец: время сверху, деньги снизу -->
+    <div class="desktop-stats-info">
+        <div class="desktop-stats-time-row">
+            <span class="stats-label-icon"><i data-lucide="clock"></i></span>
+            <span id="statsTodayTimeCompact">—</span>
+        </div>
+        <div class="desktop-stats-money-row">
+            <span class="stats-money-icon"><i data-lucide="dollar-sign"></i></span>
+            <span id="statsTodayMoneyCompact">—</span>
+        </div>
+    </div>
+
+    <!-- Pull-tab (правый нижний угол) -->
+    <button class="desktop-stats-pull-tab" id="desktopStatsPullTab" type="button" title="Подробнее">
+        <i data-lucide="chevron-down"></i>
+    </button>
+
+    <!-- Расширенная панель (скрыта, пока не нажать pull-tab) -->
+    <div class="desktop-stats-expanded" id="desktopStatsExpanded">
+        <div class="desktop-stats-row">
+            <span class="stats-icon stats-icon-fire"><i data-lucide="flame"></i></span>
+            <span class="stats-value" id="statsStreakDays">—</span>
+            <span class="stats-label" id="statsStreakLabel">дней</span>
+        </div>
+        <div class="desktop-stats-separator"></div>
+        <div class="desktop-stats-row">
+            <span class="stats-icon stats-icon-clock"><i data-lucide="clock"></i></span>
+            <span class="stats-value" id="statsTodayTime">—</span>
+            <span class="stats-label">/</span>
+            <span class="stats-value stats-value-plan" id="statsTodayTimePlan">—</span>
+        </div>
+        <div class="desktop-stats-row">
+            <span class="stats-icon stats-icon-money"><i data-lucide="dollar-sign"></i></span>
+            <span class="stats-value" id="statsTodayMoney">—</span>
+            <span class="stats-label">/</span>
+            <span class="stats-value stats-value-plan" id="statsTodayMoneyPlan">—</span>
+        </div>
+        <div class="desktop-stats-separator"></div>
+        <div class="desktop-stats-row">
+            <span class="stats-icon"><i data-lucide="hourglass"></i></span>
+            <span class="stats-value" id="statsTotalTime">—</span>
+            <span class="stats-label">всего</span>
+        </div>
+        <div class="desktop-stats-row">
+            <span class="stats-icon"><i data-lucide="banknote"></i></span>
+            <span class="stats-value" id="statsTotalMoney">—</span>
+            <span class="stats-label">всего</span>
+        </div>
+        <div class="desktop-stats-separator"></div>
+        <div class="desktop-stats-view-streak" id="desktopStatsViewStreak">
+            <div class="desktop-stats-streak-header">
+                <span class="stats-icon stats-icon-fire"><i data-lucide="flame"></i></span>
+                <span>Несгораемые дни</span>
+            </div>
+            <div class="desktop-stats-streak-days" id="statsStreakDaysGrid"></div>
+            <div class="desktop-stats-streak-info" id="statsStreakInfo"></div>
+        </div>
+        <div class="desktop-stats-separator"></div>
+        <div class="desktop-stats-refresh-wrap">
+            <button class="desktop-stats-refresh-btn" id="desktopStatsRefreshBtn" type="button" title="Обновить">
+                <i data-lucide="refresh-ccw"></i>
+            </button>
+        </div>
+    </div>
+</div>

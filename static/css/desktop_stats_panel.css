@@ -78,7 +78,7 @@
     align-items: center;
     justify-content: center;
     gap: 1px;
-    transform: translateX(-4px);
+    transform: translateX(-7px);
 }
 
 .desktop-stats-fire-row .stats-fire-icon {
@@ -90,7 +90,7 @@
     justify-content: center;
 }
 
-.desktop-stats-fire-row .stats-fire-icon i {
+.desktop-stats-fire-row .stats-fire-icon svg {
     width: 12px;
     height: 12px;
 }
@@ -132,7 +132,7 @@
     flex-shrink: 0;
 }
 
-.desktop-stats-time-row .stats-label-icon i {
+.desktop-stats-time-row .stats-label-icon svg {
     width: 12px;
     height: 12px;
 }
@@ -159,14 +159,10 @@
 }
 
 /* Иконка доллара — жирная (увеличиваем толщину обводки Lucide) */
-.desktop-stats-money-row .stats-money-icon i,
 .desktop-stats-money-row .stats-money-icon svg {
-    stroke-width: 3;
-}
-
-.desktop-stats-money-row .stats-money-icon i {
     width: 12px;
     height: 12px;
+    stroke-width: 3;
 }
 
 /* ---- Pull-tab (язычок) ---- */
@@ -192,13 +188,13 @@
     color: var(--color-text, #1f2933);
 }
 
-.desktop-stats-pull-tab i {
+.desktop-stats-pull-tab svg {
     width: 12px;
     height: 12px;
     transition: transform 0.2s ease;
 }
 
-.desktop-stats-pull-tab.open i {
+.desktop-stats-pull-tab.open svg {
     transform: rotate(180deg);
 }
 
@@ -243,6 +239,11 @@
     color: var(--color-text-secondary, #6b7280);
 }
 
+.desktop-stats-row .stats-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
 .desktop-stats-row .stats-icon.stats-icon-fire {
     color: #f97316;
 }
@@ -256,7 +257,6 @@
 }
 
 /* Иконка доллара в расширенной панели — жирная */
-.desktop-stats-row .stats-icon.stats-icon-money i,
 .desktop-stats-row .stats-icon.stats-icon-money svg {
     stroke-width: 3;
 }
@@ -325,6 +325,13 @@
 }
 
 /* ---- Кнопка обновить ---- */
+.desktop-stats-refresh-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-top: 1px;
+}
+
 .desktop-stats-refresh-btn {
     display: inline-flex;
     align-items: center;
@@ -344,7 +351,7 @@
     color: var(--color-text, #1f2933);
 }
 
-.desktop-stats-refresh-btn i {
+.desktop-stats-refresh-btn svg {
     width: 14px;
     height: 14px;
 }
