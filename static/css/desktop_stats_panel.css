@@ -78,7 +78,7 @@
     align-items: center;
     justify-content: center;
     gap: 1px;
-    transform: translateX(-7px);
+    transform: translateX(-5px);
 }
 
 .desktop-stats-fire-row .stats-fire-icon {
@@ -91,8 +91,9 @@
 }
 
 .desktop-stats-fire-row .stats-fire-icon svg {
-    width: 12px;
-    height: 12px;
+    width: 16px;
+    height: 16px;
+    stroke-width: 3;
 }
 
 .desktop-stats-fire-row .stats-streak-number {

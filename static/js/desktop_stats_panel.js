@@ -229,35 +229,35 @@ window.DesktopStatsPanel = {
     },
 
     /**
-     * Отформатировать время в компактный вид с явными единицами: «45 мин» / «1 ч 05 мин».
+     * Отформатировать время в компактный вид «дд:чч:мм» (цифровой, без привязки к языку):
+     * дни показываются только если их больше нуля.
      * @param {number} ms
      * @returns {string}
      */
     _formatTimeCompact(ms) {
-        if (!ms || ms <= 0) return '0 мин';
-        const totalMinutes = Math.floor(ms / 60000);
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-        if (hours > 0) {
-            return hours + ' ч ' + String(minutes).padStart(2, '0') + ' мин';
-        }
-        return minutes + ' мин';
+        return this._formatTime(ms);
     },
 
     /**
-     * Отформатировать время из ms в человекочитаемый вид: «45 мин» / «1 ч 05 мин».
+     * Отформатировать время из ms в цифровой вид «дд:чч:мм»:
+     * 2 ч 03 мин → «02:03», 4 д 05 ч 59 мин → «04:05:59».
+     * Если дней нет — нули дней не показываются, остаётся «чч:мм».
+     * Все компоненты выводятся двумя цифрами.
      * @param {number} ms
      * @returns {string}
      */
     _formatTime(ms) {
-        if (!ms || ms <= 0) return '0 мин';
+        if (!ms || ms <= 0) return '00:00';
         const totalMinutes = Math.floor(ms / 60000);
-        const hours = Math.floor(totalMinutes / 60);
+        const days = Math.floor(totalMinutes / 1440);
+        const hours = Math.floor((totalMinutes % 1440) / 60);
         const minutes = totalMinutes % 60;
-        if (hours > 0) {
-            return hours + ' ч ' + String(minutes).padStart(2, '0') + ' мин';
+        const hh = String(hours).padStart(2, '0');
+        const mm = String(minutes).padStart(2, '0');
+        if (days > 0) {
+            return String(days).padStart(2, '0') + ':' + hh + ':' + mm;
         }
-        return minutes + ' мин';
+        return hh + ':' + mm;
     },
 
     /**
