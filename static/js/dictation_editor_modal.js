@@ -1632,7 +1632,9 @@ function _recalcPositions() {
   if (!langBlocks) return;
   langBlocks.forEach(function (block) {
     block.sentences.forEach(function (s, idx) {
-      s.position = idx;
+      // position должен быть 1-based: отображение нумерации в модальном окне
+      // выбора предложений сравнивает (idx + 1) === position.
+      s.position = idx + 1;
     });
   });
 }
@@ -1837,12 +1839,20 @@ function _deleteRow(row) {
   var key = row.dataset.key;
   if (!state.content) return;
 
-  // Удаляем предложение из всех langBlocks
+  // Удаляем предложение из всех langBlocks и собираем имена аудиофайлов
+  // удаляемой строки (audio / audio_file / audio_mic во всех языках),
+  // чтобы пометить аудио как изменённое (фиолетовая звезда) — удаление строки
+  // означает удаление её аудио из хранилища при сохранении.
+  var deletedAudioFilenames = [];
   var langBlocks = state.content.langBlocks;
   if (langBlocks) {
     langBlocks.forEach(function (block) {
       var index = block.sentences.findIndex(function (s) { return s.key === key; });
       if (index !== -1) {
+        var s = block.sentences[index];
+        if (s.audio) deletedAudioFilenames.push(s.audio);
+        if (s.audio_file) deletedAudioFilenames.push(s.audio_file);
+        if (s.audio_mic) deletedAudioFilenames.push(s.audio_mic);
         block.sentences.splice(index, 1);
       }
     });
@@ -1852,6 +1862,14 @@ function _deleteRow(row) {
   _recalcPositions();
 
   _setDirtyFlags({ db: true });
+  // Помечаем аудио удалённой строки как изменённое (фиолетовая звезда).
+  // Передаём конкретные имена файлов, а не сентинел '*', чтобы _uploadDraftAudioToB2
+  // не пытался заново загружать все файлы: удалённых файлов уже нет в контенте,
+  // а серверная очистка B2 (save_dictation_final) удалит осиротевшие файлы.
+  deletedAudioFilenames.forEach(function (fn) {
+    _setDirtyFlags({ audio: fn });
+  });
+
   _renderTable();
   _bindAudioPlaybackHandlers();
 }
