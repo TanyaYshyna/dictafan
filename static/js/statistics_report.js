@@ -3576,8 +3576,6 @@ class DictationReport {
 
         const fillLanguageSelect = async () => {
             langSel.innerHTML = '';
-            const token = this.getToken();
-            if (!token) return;
 
             // «Все языки» всегда доступен.
             const allOpt = document.createElement('option');
@@ -3590,6 +3588,9 @@ class DictationReport {
                 this._selectedLanguageCode = '';
                 return;
             }
+
+            const token = this.getToken();
+            if (!token) return;
 
             try {
                 const res = await fetch(`/api/statistics/dictation-report/languages?user_id=${encodeURIComponent(this._selectedUserId)}`, {
@@ -4161,36 +4162,4 @@ if (typeof lucide !== 'undefined') {
         }
     }
 
-    /* ---------- helpers ---------- */
-
-    formatDurationHhMmSs(ms) {
-        if (!ms || ms <= 0) return '';
-        const totalSec = Math.floor(ms / 1000);
-        const h = Math.floor(totalSec / 3600);
-        const m = Math.floor((totalSec % 3600) / 60);
-        const s = totalSec % 60;
-        if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        return `${m}:${String(s).padStart(2, '0')}`;
-    }
-
-    formatMoney(v) {
-        const n = Number(v) || 0;
-        return n > 0 ? String(n) : '';
-    }
-
-    escapeHtml(str) {
-        if (!str) return '';
-        const div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
-        return div.innerHTML;
-    }
-
-    getToken() {
-        try {
-            if (window.AuthManager && typeof window.AuthManager.getToken === 'function') {
-                return window.AuthManager.getToken();
-            }
-        } catch (e) {}
-        return null;
-    }
 }
