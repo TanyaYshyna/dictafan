@@ -2147,18 +2147,26 @@
 
   function preloadUiSounds() {
     try {
-      if (window.__dictafanUiSounds && typeof window.__dictafanUiSounds === 'object') return;
+      if (
+        window.__dictafanUiSounds &&
+        window.__dictafanUiSounds.coins_plus_audio &&
+        window.__dictafanUiSounds.coins_plus_audio.audio
+      ) {
+        return;
+      }
       window.__dictafanUiSounds = {
-        coins_minus: '/static/data/sounds/coins/coins_minus.wav',
-        coins_plus_text: '/static/data/sounds/coins/coins_plus_text.wav',
-        coins_plus_audio: '/static/data/sounds/coins/coins_plus_audio.wav',
+        coins_minus: { url: '/static/data/sounds/coins/coins_minus.wav', audio: null },
+        coins_plus_text: { url: '/static/data/sounds/coins/coins_plus_text.wav', audio: null },
+        coins_plus_audio: { url: '/static/data/sounds/coins/coins_plus_audio.wav', audio: null },
       };
       for (const k of Object.keys(window.__dictafanUiSounds)) {
         try {
-          const url = window.__dictafanUiSounds[k];
-          const a = new Audio(url);
+          const entry = window.__dictafanUiSounds[k];
+          const a = new Audio(entry.url);
           a.preload = 'auto';
+          a.volume = 1;
           a.load();
+          entry.audio = a;
         } catch (e0) {
         }
       }
@@ -2169,10 +2177,24 @@
   function playUiSound(key) {
     try {
       const map = window.__dictafanUiSounds;
-      const url = map && map[key] ? String(map[key]) : '';
-      if (!url) return;
-      const a = new Audio(url);
+      const entry = map && map[key];
+      if (!entry) return;
+
+      let a = null;
+      if (entry.audio && typeof entry.audio.play === 'function') {
+        a = entry.audio;
+      } else if (entry.url) {
+        a = new Audio(String(entry.url));
+        entry.audio = a;
+      }
+      if (!a) return;
+
       a.volume = 1;
+      try {
+        // Перематываем в начало, чтобы повторное воспроизведение играло звук заново.
+        if (typeof a.currentTime === 'number') a.currentTime = 0;
+      } catch (e0) {
+      }
       a.play().catch(() => {});
     } catch (e) {
     }
