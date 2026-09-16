@@ -3462,7 +3462,14 @@
   function updateTaskProgressFromSession(session) {
     try {
       if (!session || !Array.isArray(session.selectedKeys)) return;
-      const keys = session.selectedKeys;
+      // Защита от «чужой» сессии: считаем только ключи, реально присутствующие
+      // в контенте текущего диктанта. Восстановленная из IndexedDB сессия может
+      // содержать ключи из другого (или отредактированного) диктанта, из-за чего
+      // в шапке появляются звёзды/полузвёзды от предыдущего выполнения.
+      const contentKeys = session.content && typeof session.content.getAllKeys === 'function'
+        ? new Set(session.content.getAllKeys())
+        : null;
+      const keys = session.selectedKeys.filter((k) => !contentKeys || contentKeys.has(String(k)));
       const total = keys.length;
       let perfect = 0;
       let corrected = 0;

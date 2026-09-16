@@ -497,15 +497,44 @@
         planDate: data.planDate || null,
         translationLanguage: data.translationLanguage || null,
       });
-      s.activeKeys = data.activeKeys || null;
-      s.selectedKeys = data.selectedKeys || [];
+      // Санитизация восстанавливаемых ключей. В IndexedDB могла остаться сессия
+      // от предыдущего (более длинного) выполнения этого диктанта или вовсе от
+      // другого диктанта. Ключи, которых нет в текущем контенте, отбрасываем,
+      // иначе ProgressPanel покажет в шапке звёзды/полузвёзды «чужого» выполнения.
+      const contentKeys = content && typeof content.getAllKeys === 'function'
+        ? new Set(content.getAllKeys())
+        : null;
+      const keepKey = (k) => {
+        if (!contentKeys) return true;
+        return contentKeys.has(String(k));
+      };
+      const sanitizeList = (arr) => {
+        if (!Array.isArray(arr)) return arr;
+        return arr.filter((k) => keepKey(k));
+      };
+
+      s.activeKeys = sanitizeList(data.activeKeys || null);
+      s.selectedKeys = sanitizeList(data.selectedKeys || []);
+
+      // Если activeKeys задан подмножеством — selectedKeys не должен выходить за его пределы
+      if (Array.isArray(s.activeKeys)) {
+        const activeSet = new Set(s.activeKeys.map((k) => String(k)));
+        s.selectedKeys = s.selectedKeys.filter((k) => activeSet.has(String(k)));
+      }
+
       s.currentSelectedIndex = data.currentSelectedIndex || 0;
+      if (s.selectedKeys.length > 0 && s.currentSelectedIndex >= s.selectedKeys.length) {
+        s.currentSelectedIndex = s.selectedKeys.length - 1;
+      } else if (s.selectedKeys.length === 0) {
+        s.currentSelectedIndex = 0;
+      }
       s.dateStart = data.dateStart || null;
       if (data.completed === true) {
         s.completed = true;
       }
       if (data.stateByKey) {
         for (const [k, v] of Object.entries(data.stateByKey)) {
+          if (!keepKey(k)) continue;
           s._stateByKey.set(k, { ...v });
         }
       }
