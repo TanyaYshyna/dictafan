@@ -3413,8 +3413,12 @@ class DictationReport {
     constructor() {
         this._modalId = 'dictation-report-modal';
         this._token = null;
+        this._groups = [];
         this._users = [];
+        this._selfId = null;
+        this._selectedGroupId = null;
         this._selectedUserId = null;
+        this._selectedLanguageCode = '';
         this._languagesData = null;
         this._startDate = null;
         this._endDate = null;
@@ -3487,197 +3491,161 @@ class DictationReport {
         return `/user/api/avatar?user_id=${userId}&size=small`;
     }
 
-    /* ---------- user picker ---------- */
+    /* ---------- cascading selects (group → user → language) ---------- */
 
-    async ensureUsersLoaded() {
-        if (this._users.length > 0) return;
+    async ensureGroupsLoaded() {
+        if (this._groups.length > 0) return;
         const token = this.getToken();
         if (!token) return;
         try {
-            console.log('[DictationReport] Загружаю пользователей...');
-            const res = await fetch('/api/statistics/report-users', {
+            const res = await fetch('/api/statistics/dictation-report/groups', {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            console.log('[DictationReport] Статус ответа:', res.status, res.statusText);
-            const text = await res.text();
-            console.log('[DictationReport] Сырой ответ:', text.substring(0, 500));
-            const js = JSON.parse(text);
-            if (js && js.success && Array.isArray(js.users)) {
-                this._users = js.users;
-                console.log('[DictationReport] Загружено пользователей:', this._users.length, JSON.stringify(this._users));
-                if (this._users.length === 0) {
-                    console.warn('[DictationReport] API вернул пустой список пользователей');
+            const js = await res.json().catch(() => null);
+            if (js && js.success && Array.isArray(js.groups)) {
+                this._groups = js.groups;
+                this._selfId = js.self_id || null;
+                // Первая группа — персональная группа самого пользователя.
+                if (this._groups.length > 0 && this._selectedGroupId == null) {
+                    this._selectedGroupId = String(this._groups[0].id ?? 'self');
                 }
             } else {
-                console.warn('[DictationReport] Ошибка загрузки пользователей:', js?.error || 'неизвестная ошибка', 'full:', JSON.stringify(js));
+                console.warn('[DictationReport] Ошибка загрузки групп:', js?.error || 'неизвестная ошибка');
             }
         } catch (e) {
-            console.warn('[DictationReport] Failed to load users for dictation report', e);
+            console.warn('[DictationReport] Failed to load groups for dictation report', e);
         }
     }
 
-    _getFlatUsers() {
-        const flat = [];
-        for (const u of this._users) {
-            if (u.type === 'group' && Array.isArray(u.children)) {
-                for (const c of u.children) {
-                    flat.push(c);
-                }
-            } else {
-                flat.push(u);
-            }
-        }
-        return flat;
+    _findGroupById(id) {
+        return this._groups.find(g => String(g.id ?? 'self') === String(id)) || null;
     }
 
-    _findUserById(id) {
-        const flat = this._getFlatUsers();
-        return flat.find(u => String(u.id) === String(id)) || null;
-    }
-
-    _renderUserPicker(container) {
-        console.log('[DictationReport] _renderUserPicker() вызван, container:', container?.id || container?.className || 'unknown');
-        console.log('[DictationReport] _users в _renderUserPicker:', JSON.stringify(this._users));
+    _renderSelects(container) {
         container.innerHTML = '';
         const wrapper = document.createElement('div');
-        wrapper.className = 'dictation-report-user-picker';
+        wrapper.className = 'dictation-report-selects';
 
-        const trigger = document.createElement('button');
-        trigger.className = 'user-picker-trigger';
-        trigger.type = 'button';
+        // Группа
+        const groupSel = document.createElement('select');
+        groupSel.className = 'dictation-report-select';
+        groupSel.title = 'Группа';
 
-        const avatarImg = document.createElement('img');
-        avatarImg.className = 'avatar';
-        avatarImg.alt = '';
-        const chevron = document.createElement('i');
-        chevron.setAttribute('data-lucide', 'chevron-down');
-        chevron.className = 'chevron';
+        // Пользователь
+        const userSel = document.createElement('select');
+        userSel.className = 'dictation-report-select';
+        userSel.title = 'Пользователь';
 
-        const labelSpan = document.createElement('span');
-        labelSpan.className = 'label';
+        // Язык
+        const langSel = document.createElement('select');
+        langSel.className = 'dictation-report-select';
+        langSel.title = 'Язык';
 
-        trigger.appendChild(avatarImg);
-        trigger.appendChild(labelSpan);
-        trigger.appendChild(chevron);
+        const fillGroupSelect = () => {
+            groupSel.innerHTML = '';
+            for (const g of this._groups) {
+                const opt = document.createElement('option');
+                opt.value = String(g.id ?? 'self');
+                opt.textContent = g.title || 'Без названия';
+                groupSel.appendChild(opt);
+            }
+            groupSel.value = String(this._selectedGroupId);
+        };
 
-        const menu = document.createElement('div');
-        menu.className = 'user-picker-menu';
-
-        const updateTrigger = (user) => {
-            console.log('[DictationReport] updateTrigger() вызван с user:', user?.id, user?.label);
-            if (!user) {
-                const self = this._users.find(u => u.type === 'self');
-                if (self) {
-                    this._selectedUserId = self.id;
-                    updateTrigger(self);
-                    return;
+        const fillUserSelect = () => {
+            const group = this._findGroupById(this._selectedGroupId);
+            const users = (group && Array.isArray(group.users)) ? group.users : [];
+            this._users = users;
+            userSel.innerHTML = '';
+            for (const u of users) {
+                const opt = document.createElement('option');
+                opt.value = String(u.id);
+                opt.textContent = u.username || `User #${u.id}`;
+                userSel.appendChild(opt);
+            }
+            if (users.length > 0) {
+                if (this._selectedUserId == null || !users.some(u => String(u.id) === String(this._selectedUserId))) {
+                    this._selectedUserId = users[0].id;
                 }
-                console.warn('[DictationReport] Нет self user в _users!');
+                userSel.value = String(this._selectedUserId);
+            } else {
+                this._selectedUserId = null;
+            }
+        };
+
+        const fillLanguageSelect = async () => {
+            langSel.innerHTML = '';
+            const token = this.getToken();
+            if (!token) return;
+
+            // «Все языки» всегда доступен.
+            const allOpt = document.createElement('option');
+            allOpt.value = '';
+            allOpt.textContent = 'Все языки';
+            langSel.appendChild(allOpt);
+
+            if (!this._selectedUserId) {
+                langSel.value = '';
+                this._selectedLanguageCode = '';
                 return;
             }
-            avatarImg.src = this.avatarUrlForUser(user.id);
-            avatarImg.onerror = () => { avatarImg.src = '/static/icons/default-avatar-small.svg'; };
-            labelSpan.textContent = user.label || `User #${user.id}`;
-            this._selectedUserId = user.id;
-        };
 
-        const buildMenu = () => {
-            console.log('[DictationReport] buildMenu() вызван, _users.length:', this._users.length);
-            menu.innerHTML = '';
-            for (const u of this._users) {
-                if (u.type === 'group' && Array.isArray(u.children)) {
-                    const groupLabel = document.createElement('div');
-                    groupLabel.className = 'menu-group-label';
-                    const icon = document.createElement('i');
-                    icon.setAttribute('data-lucide', 'users');
-                    groupLabel.appendChild(icon);
-                    groupLabel.appendChild(document.createTextNode(u.label));
-                    menu.appendChild(groupLabel);
-
-                    for (const c of u.children) {
-                        const item = document.createElement('button');
-                        item.className = 'menu-item menu-item--child';
-                        item.type = 'button';
-                        if (String(c.id) === String(this._selectedUserId)) {
-                            item.classList.add('selected');
-                        }
-                        const cAvatar = document.createElement('img');
-                        cAvatar.className = 'avatar';
-                        cAvatar.src = this.avatarUrlForUser(c.id);
-                        cAvatar.onerror = () => { cAvatar.src = '/static/icons/default-avatar-small.svg'; };
-                        cAvatar.alt = '';
-                        item.appendChild(cAvatar);
-                        item.appendChild(document.createTextNode(c.label || `User #${c.id}`));
-                        item.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            updateTrigger(c);
-                            menu.classList.remove('open');
-                            chevron.classList.remove('open');
-                            buildMenu();
-                            this._onUserChange();
-                        });
-                        menu.appendChild(item);
+            try {
+                const res = await fetch(`/api/statistics/dictation-report/languages?user_id=${encodeURIComponent(this._selectedUserId)}`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const js = await res.json().catch(() => null);
+                if (js && js.success && Array.isArray(js.languages)) {
+                    this._languagesData = js.languages;
+                    for (const l of js.languages) {
+                        const opt = document.createElement('option');
+                        opt.value = l.code || '';
+                        opt.textContent = l.label || (l.code || '').toUpperCase();
+                        langSel.appendChild(opt);
                     }
-                } else {
-                    const item = document.createElement('button');
-                    item.className = 'menu-item';
-                    item.type = 'button';
-                    if (String(u.id) === String(this._selectedUserId)) {
-                        item.classList.add('selected');
-                    }
-                    const uAvatar = document.createElement('img');
-                    uAvatar.className = 'avatar';
-                    uAvatar.src = this.avatarUrlForUser(u.id);
-                    uAvatar.onerror = () => { uAvatar.src = '/static/icons/default-avatar-small.svg'; };
-                    uAvatar.alt = '';
-                    item.appendChild(uAvatar);
-                    item.appendChild(document.createTextNode(u.label || `User #${u.id}`));
-                    item.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        updateTrigger(u);
-                        menu.classList.remove('open');
-                        chevron.classList.remove('open');
-                        buildMenu();
-                        this._onUserChange();
-                    });
-                    menu.appendChild(item);
                 }
+            } catch (e) {
+                console.warn('[DictationReport] Failed to load languages', e);
             }
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons({ root: menu });
+
+            const codes = Array.from(langSel.options).map(o => o.value);
+            if (!codes.includes(String(this._selectedLanguageCode || ''))) {
+                this._selectedLanguageCode = '';
             }
-            console.log('[DictationReport] buildMenu() завершён, menu.children.length:', menu.children.length);
+            langSel.value = String(this._selectedLanguageCode || '');
         };
 
-        trigger.addEventListener('click', () => {
-            console.log('[DictationReport] trigger click!');
-            const isOpen = menu.classList.contains('open');
-            menu.classList.toggle('open');
-            chevron.classList.toggle('open');
-            if (!isOpen) buildMenu();
+        groupSel.addEventListener('change', async () => {
+            this._selectedGroupId = groupSel.value;
+            this._selectedUserId = null;
+            this._selectedLanguageCode = '';
+            fillUserSelect();
+            await fillLanguageSelect();
+            this._loadData();
         });
 
-        // Close on outside click
-        document.addEventListener('click', (e) => {
-            if (!wrapper.contains(e.target)) {
-                menu.classList.remove('open');
-                chevron.classList.remove('open');
-            }
+        userSel.addEventListener('change', async () => {
+            this._selectedUserId = userSel.value ? Number(userSel.value) : null;
+            this._selectedLanguageCode = '';
+            await fillLanguageSelect();
+            this._loadData();
         });
 
-        wrapper.appendChild(trigger);
-        wrapper.appendChild(menu);
+        langSel.addEventListener('change', () => {
+            this._selectedLanguageCode = langSel.value || '';
+            this._loadData();
+        });
+
+        fillGroupSelect();
+        fillUserSelect();
+        fillLanguageSelect();
+
+        wrapper.appendChild(groupSel);
+        wrapper.appendChild(userSel);
+        wrapper.appendChild(langSel);
         container.appendChild(wrapper);
-
-        // Init trigger with self user
-        const self = this._users.find(u => u.type === 'self');
-        if (self) {
-            updateTrigger(self);
-        } else {
-            console.warn('[DictationReport] self не найден в _users, триггер не инициализирован');
-        }
-        console.log('[DictationReport] _renderUserPicker() завершён');
     }
 
     /* ---------- modal ---------- */
@@ -3847,29 +3815,17 @@ if (typeof lucide !== 'undefined') {
     /* ---------- show / hide ---------- */
 
     async show() {
-        console.log('[DictationReport] show() вызван');
         this.createModal();
-        console.log('[DictationReport] createModal() выполнен, _modal:', !!this._modal);
         this._modal.style.display = 'flex';
-        console.log('[DictationReport] modal показан');
 
-        // Load users and render picker
-        console.log('[DictationReport] вызываю ensureUsersLoaded()...');
-        await this.ensureUsersLoaded();
-        console.log('[DictationReport] ensureUsersLoaded() завершён, _users.length:', this._users.length, '_users:', JSON.stringify(this._users));
-        console.log('[DictationReport] вызываю _renderUserPicker()...');
-        this._renderUserPicker(this._userPickerContainer);
-        console.log('[DictationReport] _renderUserPicker() выполнен');
-// Init lucide icons
-if (typeof lucide !== 'undefined') {
-    lucide.createIcons();
-}
+        // Load groups and render cascading selects
+        await this.ensureGroupsLoaded();
+        this._renderSelects(this._userPickerContainer);
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
 
-
-        // Load data
-        console.log('[DictationReport] вызываю _loadData()...');
         await this._loadData();
-        console.log('[DictationReport] _loadData() выполнен');
     }
 
     hide() {
@@ -3879,10 +3835,6 @@ if (typeof lucide !== 'undefined') {
     }
 
     /* ---------- data loading ---------- */
-
-    _onUserChange() {
-        this._loadData();
-    }
 
     _onDateChange() {
         this._loadData();
@@ -3934,7 +3886,8 @@ if (typeof lucide !== 'undefined') {
                 body: JSON.stringify({
                     user_id: userId,
                     start_date: startDate,
-                    end_date: endDate
+                    end_date: endDate,
+                    language_code: this._selectedLanguageCode || ''
                 })
             });
             const js = await res.json().catch(() => null);
@@ -3974,27 +3927,28 @@ if (typeof lucide !== 'undefined') {
             return;
         }
 
-        // Определяем максимальное количество повторений среди всех упражнений
-        let maxRepeats = 0;
+        // Собираем уникальные номера попыток (number_successes) из всех упражнений.
+        const attemptSet = new Set();
         for (const lang of this._data) {
             for (const book of (lang.books || [])) {
-                for (const d of (book.dictations || [])) {
-                    for (const ex of (d.exercises || [])) {
-                        const rlen = (ex.repeats || []).length;
-                        if (rlen > maxRepeats) maxRepeats = rlen;
-                    }
-                }
-                for (const sec of (book.sections || [])) {
-                    for (const d of (sec.dictations || [])) {
+                const collectFromDictations = (dictations) => {
+                    for (const d of (dictations || [])) {
                         for (const ex of (d.exercises || [])) {
-                            const rlen = (ex.repeats || []).length;
-                            if (rlen > maxRepeats) maxRepeats = rlen;
+                            for (const rep of (ex.repeats || [])) {
+                                const a = Number(rep.attempt);
+                                if (Number.isFinite(a) && a > 0) attemptSet.add(a);
+                            }
                         }
                     }
+                };
+                collectFromDictations(book.dictations);
+                for (const sec of (book.sections || [])) {
+                    collectFromDictations(sec.dictations);
                 }
             }
         }
-        if (maxRepeats < 1) maxRepeats = 1;
+        // Сортируем по возрастанию; колонки — реальные номера попыток (например 4 / 10 / 40).
+        const attempts = Array.from(attemptSet).sort((a, b) => a - b);
 
         const table = document.createElement('table');
         table.className = 'dictation-report-table';
@@ -4016,12 +3970,11 @@ if (typeof lucide !== 'undefined') {
         if (this._showMoney) valueCols.push('money');
         if (this._showErrors) valueCols.push('errors');
 
-        // Repeat count headers — одна колонка на каждое повторение
-        // Внутри каждой колонки повторения — три строки: время, деньги, ош/сим
-        for (let i = 1; i <= maxRepeats; i++) {
+        // Колонка на каждый номер попытки.
+        for (const a of attempts) {
             const th = document.createElement('th');
             th.className = 'repeat-header';
-            th.textContent = String(i);
+            th.textContent = String(a);
             headerRow.appendChild(th);
         }
 
@@ -4030,6 +3983,14 @@ if (typeof lucide !== 'undefined') {
 
         // TBODY
         const tbody = document.createElement('tbody');
+
+        const appendSpacerCells = (row) => {
+            for (let i = 0; i < attempts.length; i++) {
+                const td = document.createElement('td');
+                td.textContent = '';
+                row.appendChild(td);
+            }
+        };
 
         for (const lang of this._data) {
             // Language row
@@ -4040,12 +4001,7 @@ if (typeof lucide !== 'undefined') {
             langTd.textContent = `🌐 ${(lang.language || '').toUpperCase()}`;
             langTd.style.textAlign = 'left';
             langRow.appendChild(langTd);
-
-            for (let i = 0; i < maxRepeats; i++) {
-                const td = document.createElement('td');
-                td.textContent = '';
-                langRow.appendChild(td);
-            }
+            appendSpacerCells(langRow);
             tbody.appendChild(langRow);
 
             for (const book of (lang.books || [])) {
@@ -4064,17 +4020,12 @@ if (typeof lucide !== 'undefined') {
                 bookTd.appendChild(bookCover);
                 bookTd.appendChild(document.createTextNode(book.title || 'Без названия'));
                 bookRow.appendChild(bookTd);
-
-                for (let i = 0; i < maxRepeats; i++) {
-                    const td = document.createElement('td');
-                    td.textContent = '';
-                    bookRow.appendChild(td);
-                }
+                appendSpacerCells(bookRow);
                 tbody.appendChild(bookRow);
 
                 // Dictations directly in book
                 for (const d of (book.dictations || [])) {
-                    this._appendDictationRow(tbody, d, valueCols, maxRepeats, 'dictation');
+                    this._appendDictationRow(tbody, d, valueCols, attempts, 'dictation');
                 }
 
                 // Sections
@@ -4087,16 +4038,11 @@ if (typeof lucide !== 'undefined') {
                     secTd.style.textAlign = 'left';
                     secTd.textContent = `📂 ${sec.title || 'Без названия'}`;
                     secRow.appendChild(secTd);
-
-                    for (let i = 0; i < maxRepeats; i++) {
-                        const td = document.createElement('td');
-                        td.textContent = '';
-                        secRow.appendChild(td);
-                    }
+                    appendSpacerCells(secRow);
                     tbody.appendChild(secRow);
 
                     for (const d of (sec.dictations || [])) {
-                        this._appendDictationRow(tbody, d, valueCols, maxRepeats, 'dictation');
+                        this._appendDictationRow(tbody, d, valueCols, attempts, 'dictation');
                     }
                 }
             }
@@ -4110,11 +4056,11 @@ if (typeof lucide !== 'undefined') {
         }
     }
 
-    _appendDictationRow(tbody, d, valueCols, maxRepeats, level) {
+    _appendDictationRow(tbody, d, valueCols, attempts, level) {
         const exercises = d.exercises || [];
 
         if (exercises.length === 0) {
-            // Dictation without exercises — одна строка, без повторений
+            // Dictation without exercises — одна строка, без попыток
             const row = document.createElement('tr');
             row.className = 'level-dictation';
             const td = document.createElement('td');
@@ -4130,10 +4076,9 @@ if (typeof lucide !== 'undefined') {
             td.appendChild(document.createTextNode(d.title || 'Без названия'));
             row.appendChild(td);
 
-            for (let i = 0; i < maxRepeats; i++) {
+            for (let i = 0; i < attempts.length; i++) {
                 const cell = document.createElement('td');
                 cell.className = 'value-cell';
-                // Пусто, если нет данных
                 row.appendChild(cell);
             }
             tbody.appendChild(row);
@@ -4143,6 +4088,15 @@ if (typeof lucide !== 'undefined') {
         for (let ei = 0; ei < exercises.length; ei++) {
             const ex = exercises[ei];
             const repeats = ex.repeats || [];
+            // Карта: номер попытки → повторение. Если attempt отсутствует,
+            // используем порядковый номер (fallback для старых данных).
+            const repByAttempt = new Map();
+            repeats.forEach((rep, idx) => {
+                const a = Number(rep.attempt);
+                const key = Number.isFinite(a) && a > 0 ? a : idx + 1;
+                repByAttempt.set(key, rep);
+            });
+
             const row = document.createElement('tr');
 
             if (ei === 0) {
@@ -4170,28 +4124,23 @@ if (typeof lucide !== 'undefined') {
                 row.appendChild(td);
             }
 
-            // Колонки повторений
-            // В каждой ячейке — три строки: время, деньги, ош/символы
-            for (let ri = 0; ri < maxRepeats; ri++) {
+            // Колонки по номерам попыток. В каждой ячейке — строки: время, деньги, ош/символы.
+            for (const a of attempts) {
                 const cell = document.createElement('td');
                 cell.className = 'value-cell';
 
-                if (ri < repeats.length) {
-                    const rep = repeats[ri];
-                    // Строим содержимое ячейки: три строки
+                const rep = repByAttempt.get(a);
+                if (rep) {
                     const lines = [];
-                    
-                    // Время
+
                     if (this._showTime) {
                         const t = rep.lead_time || 0;
                         lines.push(t > 0 ? this.formatDurationHhMmSs(t) : '');
                     }
-                    // Деньги
                     if (this._showMoney) {
                         const m = rep.money || 0;
                         lines.push(m > 0 ? this.formatMoney(m) : '');
                     }
-                    // Ошибки/символы
                     if (this._showErrors) {
                         const errStr = (rep.mistakes || 0) > 0 ? `✗${rep.mistakes}` : '';
                         const symStr = (rep.symbols || 0) > 0 ? `⟐${rep.symbols}` : '';
@@ -4199,14 +4148,11 @@ if (typeof lucide !== 'undefined') {
                         lines.push(errPart || '');
                     }
 
-                    // Если все три пустые — ячейка пустая
                     const hasAny = lines.some(l => l !== '');
                     if (hasAny) {
                         cell.innerHTML = lines.map(l => `<div>${l}</div>`).join('');
                     }
-                    // else: пустая ячейка
                 }
-                // else: пустая ячейка (нет повторения с таким номером)
 
                 row.appendChild(cell);
             }

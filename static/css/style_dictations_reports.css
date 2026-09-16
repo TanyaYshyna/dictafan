@@ -393,7 +393,38 @@
   border-color: var(--color-button-blue, #4a90d9);
 }
 
-/* User picker with hierarchy */
+/* Cascading selects: group → user → language */
+.dictation-report-selects {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dictation-report-selects .dictation-report-select {
+  padding: 6px 10px;
+  border: 1px solid rgba(31, 41, 51, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  color: rgba(31, 41, 51, 0.85);
+  outline: none;
+  min-height: 38px;
+  max-width: 220px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.dictation-report-selects .dictation-report-select:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(31, 41, 51, 0.3);
+}
+
+.dictation-report-selects .dictation-report-select:focus {
+  border-color: var(--color-button-blue, #4a90d9);
+}
+
+/* User picker with hierarchy (legacy single picker) */
 .dictation-report-user-picker {
   position: relative;
   min-width: 200px;
