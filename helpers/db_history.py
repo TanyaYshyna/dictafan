@@ -397,6 +397,98 @@ def recalc_history_current_for_user(user_id: int) -> None:
         conn.close()
 
 
+def recalc_number_successes_all() -> int:
+    """Пересчитать number_successes (нарастающий итог) во ВСЕХ записях history_by_day.
+
+    number_successes = глобальный порядковый номер успешного выполнения
+    для данного (user_id, dictation_id, positions). Именно это поле
+    используется как номера колонок в отчёте по диктантам за период.
+
+    Returns:
+        int: количество обновлённых строк
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                WITH cumulative AS (
+                    SELECT
+                        id,
+                        SUM(successes) OVER (
+                            PARTITION BY user_id, dictation_id, positions
+                            ORDER BY date_fact ASC, created_at ASC, id ASC
+                            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                        ) AS running_total
+                    FROM history_by_day
+                )
+                UPDATE history_by_day hbd
+                SET
+                    number_successes = c.running_total,
+                    updated_at = CURRENT_TIMESTAMP
+                FROM cumulative c
+                WHERE hbd.id = c.id
+                  AND c.running_total != COALESCE(hbd.number_successes, 0)
+                """,
+            )
+            updated = cur.rowcount
+            conn.commit()
+            return int(updated or 0)
+    except Exception as e:
+        conn.rollback()
+        print(f'❌ [HISTORY_CURRENT] Ошибка глобального пересчёта number_successes: {e}')
+        raise
+    finally:
+        conn.close()
+
+
+def recalc_history_current_all() -> int:
+    """Пересчитать history_current для ВСЕХ пользователей из history_by_day.
+
+    Удаляет все записи history_current и пересоздаёт их агрегацией SUM(successes)
+    из history_by_day. number_successes в history_current — это и есть
+    количество проходов (медаль 🥇) для упражнения.
+
+    Поля рекорда (mistake_count, lead_time) не восстанавливаются при пересчёте —
+    они будут установлены при следующих прохождениях диктанта
+    через check_and_save_dictation_record().
+
+    Returns:
+        int: количество созданных записей history_current
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM history_current")
+            cur.execute(
+                """
+                INSERT INTO history_current (user_id, dictation_id, positions, number_successes,
+                                             mistake_count, lead_time,
+                                             created_at, updated_at)
+                SELECT
+                    hbd.user_id,
+                    hbd.dictation_id,
+                    hbd.positions,
+                    SUM(hbd.successes) AS number_successes,
+                    0 AS mistake_count,
+                    0 AS lead_time,
+                    MIN(hbd.created_at) AS created_at,
+                    MAX(hbd.updated_at) AS updated_at
+                FROM history_by_day hbd
+                GROUP BY hbd.user_id, hbd.dictation_id, hbd.positions
+                """,
+            )
+            inserted = cur.rowcount
+            conn.commit()
+            return int(inserted or 0)
+    except Exception as e:
+        conn.rollback()
+        print(f'❌ [HISTORY_CURRENT] Ошибка глобального пересчёта history_current: {e}')
+        raise
+    finally:
+        conn.close()
+
+
 def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None, dictation_language_code=None, selected_sentence_positions=None, lead_time_ms=None):
     """
     Добавляет или обновляет запись активности в history_by_day (агрегация по дням)

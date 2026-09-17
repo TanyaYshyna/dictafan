@@ -20,6 +20,8 @@ from helpers.db_history import (
     get_dictation_record,
     get_all_dictation_records,
     recalc_history_current_for_user,
+    recalc_number_successes_all,
+    recalc_history_current_all,
 )
 from helpers.db_telegram import (
     filter_manual_teacher_chat_ids,
@@ -2611,6 +2613,64 @@ def recalc_history_current():
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Ошибка пересчёта history_current'}), 500
+
+
+def _is_admin_user(user_id: int) -> bool:
+    """Проверить, является ли пользователь администратором (по users.role_id → roles.code)."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT r.code
+                FROM users u
+                JOIN roles r ON r.id = u.role_id
+                WHERE u.id = %s
+                """,
+                (int(user_id),),
+            )
+            row = cur.fetchone()
+            code = row[0] if row else None
+            return bool(code == 'admin')
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+
+@statistics_bp.route('/success/recalc_all', methods=['POST'])
+@jwt_required()
+def recalc_history_current_all_users():
+    """Глобальный пересчёт количества проходов по всем диктантам (только для админа).
+
+    1) Пересчитывает number_successes (нарастающий итог) во всех записях history_by_day —
+       эти номера используются как колонки в отчёте по диктантам за период.
+    2) Пересоздаёт history_current из SUM(successes) по всем пользователям —
+       это количество проходов (медаль 🥇) для каждого упражнения.
+    """
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+
+        if not _is_admin_user(int(user['id'])):
+            return jsonify({'success': False, 'error': 'Forbidden: только для администратора'}), 403
+
+        updated_number_successes = recalc_number_successes_all()
+        inserted_current = recalc_history_current_all()
+
+        return jsonify({
+            'success': True,
+            'updated_number_successes': updated_number_successes,
+            'inserted_history_current': inserted_current,
+            'message': 'Количество проходов пересчитано по всем диктантам'
+        })
+    except Exception as e:
+        print(f'❌ [RECALC_HISTORY_CURRENT_ALL] Ошибка: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': 'Ошибка глобального пересчёта количества проходов'}), 500
 
 
 @statistics_bp.route('/dictation-report/data', methods=['POST'])

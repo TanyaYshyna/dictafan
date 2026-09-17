@@ -1171,6 +1171,49 @@ window.Desktop = window.Desktop || {
           return;
         }
 
+        if (action === 'desktop-recalc-all') {
+          (async () => {
+            try {
+              const token = (() => { try { return localStorage.getItem('jwt_token'); } catch (e) { return null; } })();
+              if (!token) return;
+              const resp = await fetch('/api/statistics/success/recalc_all', {
+                method: 'POST',
+                headers: {
+                  'Authorization': 'Bearer ' + token,
+                  'Content-Type': 'application/json',
+                },
+              });
+              const data = resp.ok ? await resp.json() : null;
+              if (data && data.success) {
+                // Очищаем кеш history_current в localStorage
+                try {
+                  const keysToRemove = [];
+                  for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('history_current:')) {
+                      keysToRemove.push(key);
+                    }
+                  }
+                  keysToRemove.forEach((k) => localStorage.removeItem(k));
+                } catch (e) {}
+                // Перезагружаем карточки стола, чтобы обновились медальки
+                this.loadDeskItems().catch(() => {});
+                if (typeof window.DictationKart._showToast === 'function') {
+                  window.DictationKart._showToast('Количество проходов пересчитано по всем диктантам', { durationMs: 3000 });
+                }
+              } else {
+                const errMsg = (data && data.error) ? data.error : 'Ошибка пересчёта количества проходов';
+                if (typeof window.DictationKart._showToast === 'function') {
+                  window.DictationKart._showToast(errMsg, { durationMs: 3000 });
+                }
+              }
+            } catch (e) {
+              console.warn('[desktop] recalc all error', e);
+            }
+          })();
+          return;
+        }
+
         this.stubAction(action);
       });
     });
