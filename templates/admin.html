@@ -5,6 +5,9 @@
 {% block page_head %}
     <link rel="stylesheet" href="/static/css/admin.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/admin_license_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/active_dictations_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/audio_cache_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/mult_preview_modal.css?v={{ app_cache_revision }}">
 {% endblock %}
 
 {% block body_attrs %}class="page-admin"{% endblock %}
@@ -41,6 +44,28 @@
         </div>
 
         <div class="admin-panel__body" id="adminPanelBody" style="display: none;">
+            <!-- Панель инструментов (кнопки, перенесённые с рабочего стола) -->
+            <div class="admin-toolbar" id="adminToolbar">
+                <span class="admin-toolbar__label">Инструменты</span>
+                <div class="admin-toolbar__group">
+                    <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-mult-preview" title="Просмотр мультфильмов">
+                        <i data-lucide="film"></i>
+                    </button>
+                    <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-recalc-history" title="Пересчитать history_current из history_by_day">
+                        <i data-lucide="refresh-cw"></i>
+                    </button>
+                    <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-recalc-all" title="Пересчитать количество проходов по всем диктантам (вся база)">
+                        <i data-lucide="medal"></i>
+                    </button>
+                    <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-active-dictations" title="Активные диктанты">
+                        <i data-lucide="database"></i>
+                    </button>
+                    <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-audio-cache" title="Аудио в кэше">
+                        <i data-lucide="music"></i>
+                    </button>
+                </div>
+            </div>
+
             <!-- Панель с закладками -->
             <div class="admin-panel__tabs-header">
                 <button class="admin-panel__tab-btn active" data-tab="licenses" type="button">
@@ -171,9 +196,19 @@
             </div>
         </div>
     </main>
+
+    <div id="adminToast" class="admin-toast" role="status" aria-live="polite" style="display: none;"></div>
+
+    {% include 'partials/active_dictations_modal.html' %}
+    {% include 'partials/audio_cache_modal.html' %}
+    {% include 'partials/mult_preview_modal.html' %}
 {% endblock %}
 
 {% block scripts %}
     {{ super() }}
+    <script defer src="/static/js/idb_manager.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/active_dictations_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/audio_cache_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/mult_manager.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/admin.js?v={{ app_cache_revision }}"></script>
 {% endblock %}

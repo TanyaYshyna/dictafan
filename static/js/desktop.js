@@ -540,28 +540,6 @@ window.Desktop = window.Desktop || {
           return;
         }
       }
-      if (name === 'desktop-admin-active-dictations') {
-        try {
-          if (window.ActiveDictationsModal && typeof window.ActiveDictationsModal.open === 'function') {
-            window.ActiveDictationsModal.open();
-            return;
-          }
-        } catch (e) {
-        }
-        console.log('[desktop] action', name);
-        return;
-      }
-      if (name === 'desktop-admin-audio-cache') {
-        try {
-          if (window.AudioCacheModal && typeof window.AudioCacheModal.open === 'function') {
-            window.AudioCacheModal.open();
-            return;
-          }
-        } catch (e) {
-        }
-        console.log('[desktop] action', name);
-        return;
-      }
       if (name === 'desktop-menu-tracker') {
         (async () => {
           try {
@@ -701,73 +679,6 @@ window.Desktop = window.Desktop || {
       console.log('[desktop] action', name);
     } catch (e) {
     }
-  },
-
-  toggleAdminSection() {
-    try {
-      const adminSection = document.getElementById('desktopToolPaletteAdmin');
-      if (!adminSection) return;
-      const isVisible = window.UM && window.UM.userData && String(window.UM.userData.role_code || '').toLowerCase() === 'admin';
-      adminSection.style.display = isVisible ? '' : 'none';
-    } catch (e) {
-    }
-  },
-
-  initAdminMenu() {
-    const toggle = document.getElementById('desktopAdminMenuToggle');
-    const dropdown = document.getElementById('desktopAdminMenuDropdown');
-    const wrapper = document.getElementById('desktopAdminMenuWrapper');
-    if (!toggle || !dropdown) return;
-
-    const close = () => {
-      try { dropdown.classList.remove('show'); } catch (e0) {}
-      try {
-        toggle.setAttribute('aria-expanded', 'false');
-      } catch (e) {
-      }
-    };
-
-    const open = () => {
-      try { dropdown.classList.add('show'); } catch (e0) {}
-      try {
-        toggle.setAttribute('aria-expanded', 'true');
-      } catch (e) {
-      }
-      this.renderLucide(dropdown);
-    };
-
-    const isOpen = () => {
-      try { return dropdown.classList.contains('show'); } catch (e) { return false; }
-    };
-
-    toggle.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (isOpen()) close();
-      else open();
-    });
-
-    document.addEventListener('click', (e) => {
-      try {
-        if (wrapper && wrapper.contains(e.target)) return;
-      } catch (e2) {
-      }
-      close();
-    });
-
-    document.addEventListener('keydown', (e) => {
-      if (e && e.key === 'Escape') close();
-    });
-
-    dropdown.querySelectorAll('[data-action]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const action = btn.getAttribute('data-action');
-        close();
-        this.stubAction(action);
-      });
-    });
   },
 
   /**
@@ -1072,8 +983,8 @@ window.Desktop = window.Desktop || {
         e.stopPropagation();
         const action = btn.getAttribute('data-action');
 
-        // Исключаем действия, которые уже обрабатываются в initUserMenu/initAdminMenu
-        if (action === 'desktop-menu-profile' || action === 'desktop-admin-active-dictations' || action === 'desktop-admin-audio-cache' || action === 'desktop-menu-license' || action === 'desktop-menu-admin-panel' || action === 'desktop-menu-admin-licenses' || action === 'desktop-admin-licenses') {
+        // Исключаем действия, которые уже обрабатываются в initUserMenu
+        if (action === 'desktop-menu-profile' || action === 'desktop-menu-license' || action === 'desktop-menu-admin-panel') {
           return;
         }
 
@@ -1110,102 +1021,6 @@ window.Desktop = window.Desktop || {
           const enabled = !this.isDeskFreeLayoutEnabled();
           this.setDeskFreeLayoutEnabled(enabled);
           this.applyDeskLayoutIfNeeded();
-          return;
-        }
-
-        if (action === 'desktop-mult-preview') {
-          try {
-            if (window.MultManager && typeof window.MultManager.openPreview === 'function') {
-              window.MultManager.openPreview();
-            }
-          } catch (e2) {
-            console.error('[desktop] mult preview error', e2);
-          }
-          return;
-        }
-
-        if (action === 'desktop-recalc-history') {
-          (async () => {
-            try {
-              const token = (() => { try { return localStorage.getItem('jwt_token'); } catch (e) { return null; } })();
-              if (!token) return;
-              const resp = await fetch('/api/statistics/success/recalc', {
-                method: 'POST',
-                headers: {
-                  'Authorization': 'Bearer ' + token,
-                  'Content-Type': 'application/json',
-                },
-              });
-              const data = resp.ok ? await resp.json() : null;
-              if (data && data.success) {
-                // Очищаем кеш history_current в localStorage
-                try {
-                  const keysToRemove = [];
-                  for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key && key.startsWith('history_current:')) {
-                      keysToRemove.push(key);
-                    }
-                  }
-                  keysToRemove.forEach((k) => localStorage.removeItem(k));
-                } catch (e) {}
-                // Перезагружаем карточки стола, чтобы обновились медальки
-                this.loadDeskItems().catch(() => {});
-                if (typeof window.DictationKart._showToast === 'function') {
-                  window.DictationKart._showToast('history_current пересчитан', { durationMs: 2000 });
-                }
-              } else {
-                if (typeof window.DictationKart._showToast === 'function') {
-                  window.DictationKart._showToast('Ошибка пересчёта history_current', { durationMs: 3000 });
-                }
-              }
-            } catch (e) {
-              console.warn('[desktop] recalc history error', e);
-            }
-          })();
-          return;
-        }
-
-        if (action === 'desktop-recalc-all') {
-          (async () => {
-            try {
-              const token = (() => { try { return localStorage.getItem('jwt_token'); } catch (e) { return null; } })();
-              if (!token) return;
-              const resp = await fetch('/api/statistics/success/recalc_all', {
-                method: 'POST',
-                headers: {
-                  'Authorization': 'Bearer ' + token,
-                  'Content-Type': 'application/json',
-                },
-              });
-              const data = resp.ok ? await resp.json() : null;
-              if (data && data.success) {
-                // Очищаем кеш history_current в localStorage
-                try {
-                  const keysToRemove = [];
-                  for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key && key.startsWith('history_current:')) {
-                      keysToRemove.push(key);
-                    }
-                  }
-                  keysToRemove.forEach((k) => localStorage.removeItem(k));
-                } catch (e) {}
-                // Перезагружаем карточки стола, чтобы обновились медальки
-                this.loadDeskItems().catch(() => {});
-                if (typeof window.DictationKart._showToast === 'function') {
-                  window.DictationKart._showToast('Количество проходов пересчитано по всем диктантам', { durationMs: 3000 });
-                }
-              } else {
-                const errMsg = (data && data.error) ? data.error : 'Ошибка пересчёта количества проходов';
-                if (typeof window.DictationKart._showToast === 'function') {
-                  window.DictationKart._showToast(errMsg, { durationMs: 3000 });
-                }
-              }
-            } catch (e) {
-              console.warn('[desktop] recalc all error', e);
-            }
-          })();
           return;
         }
 
@@ -1569,7 +1384,6 @@ window.Desktop = window.Desktop || {
       }
       this.initLangSelector().catch(function () {});
       this.loadDeskItems().catch(() => { });
-      this.toggleAdminSection();
     });
 
     window.addEventListener('profile-saved', () => {
@@ -1599,13 +1413,11 @@ window.Desktop = window.Desktop || {
 
   init() {
     this.initUserMenu();
-    this.initAdminMenu();
     this.initToolPalette();
     this.initDeskLoad();
     this.initStatsPanel();
     this.ensureDictationKartDeps();
     this.renderLucide(document.body);
-    this.toggleAdminSection();
 
     // Предзагружаем таблицы чисел для языков пользователя
     this._preloadNumberTables();

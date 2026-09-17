@@ -19,6 +19,7 @@
         bindTabs();
         bindLicenseSection();
         bindPermissionsSection();
+        bindToolbar();
 
         // Дождёмся инициализации UserManager (user_manager.js загружается в base.html)
         checkAccess();
@@ -98,6 +99,124 @@
                 if (target) target.classList.add('active');
             });
         });
+    }
+
+    // ----------------------------------------------------------------
+    // Панель инструментов (кнопки, перенесённые с рабочего стола)
+    // ----------------------------------------------------------------
+    let toastTimer = null;
+
+    function showToast(message, type) {
+        var el = document.getElementById('adminToast');
+        if (!el) return;
+        el.textContent = message || '';
+        el.className = 'admin-toast' + (type ? ' ' + type : '');
+        el.style.display = 'block';
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+            el.style.display = 'none';
+        }, 3000);
+    }
+
+    function clearHistoryCurrentCache() {
+        try {
+            var keysToRemove = [];
+            for (var i = 0; i < localStorage.length; i++) {
+                var key = localStorage.key(i);
+                if (key && key.indexOf('history_current:') === 0) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(function (k) { localStorage.removeItem(k); });
+        } catch (e) {}
+    }
+
+    function bindToolbar() {
+        document.querySelectorAll('.admin-toolbar__btn[data-action]').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var action = btn.getAttribute('data-action');
+
+                if (action === 'admin-mult-preview') {
+                    openMultPreview();
+                } else if (action === 'admin-active-dictations') {
+                    openActiveDictations();
+                } else if (action === 'admin-audio-cache') {
+                    openAudioCache();
+                } else if (action === 'admin-recalc-history') {
+                    recalcHistory();
+                } else if (action === 'admin-recalc-all') {
+                    recalcAll();
+                }
+            });
+        });
+    }
+
+    function openMultPreview() {
+        try {
+            if (window.MultManager && typeof window.MultManager.openPreview === 'function') {
+                window.MultManager.openPreview();
+            } else {
+                showToast('Менеджер мультфильмов не загружен', 'error');
+            }
+        } catch (e) {
+            showToast('Ошибка открытия предпросмотра мультфильмов', 'error');
+        }
+    }
+
+    function openActiveDictations() {
+        try {
+            if (window.ActiveDictationsModal && typeof window.ActiveDictationsModal.open === 'function') {
+                window.ActiveDictationsModal.open();
+            } else {
+                showToast('Модалка активных диктантов не загружена', 'error');
+            }
+        } catch (e) {
+            showToast('Ошибка открытия списка активных диктантов', 'error');
+        }
+    }
+
+    function openAudioCache() {
+        try {
+            if (window.AudioCacheModal && typeof window.AudioCacheModal.open === 'function') {
+                window.AudioCacheModal.open();
+            } else {
+                showToast('Модалка аудио-кэша не загружена', 'error');
+            }
+        } catch (e) {
+            showToast('Ошибка открытия списка аудио в кэше', 'error');
+        }
+    }
+
+    function recalcHistory() {
+        apiPost('/api/statistics/success/recalc', {})
+            .then(function (data) {
+                if (data && data.success) {
+                    clearHistoryCurrentCache();
+                    showToast('history_current пересчитан', 'success');
+                } else {
+                    showToast((data && data.error) ? data.error : 'Ошибка пересчёта history_current', 'error');
+                }
+            })
+            .catch(function () {
+                showToast('Ошибка соединения при пересчёте history_current', 'error');
+            });
+    }
+
+    function recalcAll() {
+        apiPost('/api/statistics/success/recalc_all', {})
+            .then(function (data) {
+                if (data && data.success) {
+                    clearHistoryCurrentCache();
+                    showToast('Количество проходов пересчитано по всем диктантам', 'success');
+                } else {
+                    showToast((data && data.error) ? data.error : 'Ошибка пересчёта количества проходов', 'error');
+                }
+            })
+            .catch(function () {
+                showToast('Ошибка соединения при пересчёте количества проходов', 'error');
+            });
     }
 
     // ----------------------------------------------------------------
