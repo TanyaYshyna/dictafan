@@ -5444,7 +5444,15 @@
 
         const tdNum = document.createElement('td');
         const position = Number.isFinite(view.position) ? view.position : '';
-        tdNum.textContent = position ? ((idx + 1) === position ? String(idx + 1) : (String(idx + 1) + '/' + String(position))) : String(idx + 1);
+        // Дробь (номер в упражнении / номер во всём диктанте) показываем ТОЛЬКО
+        // когда запущено упражнение (subsetPositions непустой). Для всего диктанта
+        // всегда показываем простую последовательную нумерацию 1, 2, 3...
+        const isSubset = Array.isArray(session.subsetPositions) && session.subsetPositions.length > 0;
+        let numText = String(idx + 1);
+        if (isSubset && position) {
+          numText = ((idx + 1) === position) ? String(idx + 1) : (String(idx + 1) + '/' + String(position));
+        }
+        tdNum.textContent = numText;
 
         const tdChoice = document.createElement('td');
         tdChoice.className = 'col-choice';

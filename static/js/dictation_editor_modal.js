@@ -3937,6 +3937,11 @@ async function _handleSave() {
       return false;
     }
 
+    // Перед сохранением нормализуем позиции: position должен быть 1-based и
+    // последовательным (1..N) внутри каждого языкового блока. Иначе в модальном
+    // окне выбора предложений появятся «дроби» и потеряется нумерация.
+    _recalcPositions();
+
     // Собираем предложения из DictationContent в плоский массив с language_code
     var sentencesPayload = [];
     if (state.content) {
@@ -4270,6 +4275,36 @@ async function _handleSave() {
             if (dbResult.id && (!state.config.dbId || state.config.dictationId !== prevId)) {
               state.config.dbId = dbResult.id;
             }
+          }
+
+          // Обновляем IndexedDB-кеш 'dictations' свежими предложениями сразу после
+          // сохранения. Иначе при запуске диктанта ensureDictationContentLoadedToRuntime
+          // прочитает УСТАРЕВШИЙ кеш (например, со старым количеством предложений
+          // после удаления строки) и «вернёт» удалённое предложение.
+          try {
+            var cacheDictationId = state.config && state.config.dictationId
+              ? String(state.config.dictationId).trim()
+              : normalizedId;
+            if (cacheDictationId && !cacheDictationId.startsWith('dict_')) {
+              cacheDictationId = 'dict_' + cacheDictationId;
+            }
+            var idb = window.IdbManager;
+            if (idb) {
+              if (typeof idb.idbDeleteDictationCache === 'function') {
+                await idb.idbDeleteDictationCache(cacheDictationId);
+              }
+              if (typeof idb.idbPut === 'function') {
+                var userIdForCache = getDraftUserIdForKey();
+                await idb.idbPut('dictations', {
+                  key: userIdForCache + ':' + cacheDictationId,
+                  dictationId: cacheDictationId,
+                  sentences: sentencesPayload,
+                  updatedAt: Date.now(),
+                });
+              }
+            }
+          } catch (eCache) {
+            console.warn('[dictationEditorModal] Не удалось обновить кеш диктанта:', eCache);
           }
 
           // Добавляем диктант на рабочий стол (если это новый диктант)
@@ -4995,9 +5030,12 @@ function _closeEditorModal(wasSaved) {
 
   // При выходе БЕЗ сохранения — удаляем мутированный контент из кэша DictationSessionsStore,
   // чтобы при повторном open() не вернулся грязный экземпляр с несохранёнными изменениями.
-  if (!wasSaved && closingDictationId && window.DictationRuntime && window.DictationRuntime.store) {
-    var store = window.DictationRuntime.store;
-    if (typeof store.discardContent === 'function') {
+  // ВАЖНО: общий стор — это window.__dictationRuntimeStore (см. _getEditorRuntimeStore()),
+  // а НЕ window.DictationRuntime.store (такого свойства в экспорте DictationRuntime нет,
+  // из-за чего discardContent раньше никогда не вызывался).
+  if (!wasSaved && closingDictationId) {
+    var store = _getEditorRuntimeStore();
+    if (store && typeof store.discardContent === 'function') {
       store.discardContent(closingDictationId);
       console.log('[dictationEditorModal] discardContent для dictationId=' + closingDictationId);
     }
