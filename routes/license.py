@@ -14,9 +14,12 @@ from helpers.db_license import (
     get_user_permissions_for_today,
     get_user_role_for_date,
     get_user_access_for_range,
+    get_user_current_role,
+    update_user_role_by_id,
 )
 from helpers.license_manager import license_manager
 from helpers.db import get_db_connection, get_db_cursor
+from helpers.permission_checker import require_permission
 
 license_bp = Blueprint('license', __name__, url_prefix='')
 
@@ -134,6 +137,7 @@ def license_status():
 
 @license_bp.route('/api/admin/license/grant', methods=['POST'])
 @jwt_required()
+@require_permission('manage_licenses')
 def admin_grant_license():
     """
     Ручная выдача лицензии администратором.
@@ -189,6 +193,7 @@ def admin_grant_license():
 
 @license_bp.route('/api/admin/license/history/<int:user_id>', methods=['GET'])
 @jwt_required()
+@require_permission('manage_licenses')
 def admin_license_history(user_id: int):
     """
     Возвращает историю операций с лицензиями для пользователя.
@@ -227,6 +232,7 @@ def admin_license_history(user_id: int):
 
 @license_bp.route('/api/admin/license/calendar/<int:user_id>', methods=['GET'])
 @jwt_required()
+@require_permission('manage_licenses')
 def admin_license_calendar(user_id: int):
     """
     Возвращает календарь доступа пользователя.
@@ -244,6 +250,7 @@ def admin_license_calendar(user_id: int):
 
 @license_bp.route('/api/admin/license/find_user', methods=['GET'])
 @jwt_required()
+@require_permission('manage_licenses')
 def admin_find_user():
     """
     Поиск пользователя по email для админ-панели.
@@ -264,3 +271,63 @@ def admin_find_user():
     finally:
         cur.close()
         conn.close()
+
+
+# ============================================================
+# Админ-панель: управление правами пользователей
+# ============================================================
+
+@license_bp.route('/api/admin/user/<int:user_id>/role', methods=['GET'])
+@jwt_required()
+@require_permission('manage_licenses')
+def admin_get_user_role(user_id: int):
+    """
+    Возвращает текущую роль пользователя и список всех ролей.
+    """
+    role = get_user_current_role(user_id)
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute("SELECT id, code, name FROM roles ORDER BY id")
+        roles = [dict(r) for r in cur.fetchall()]
+    finally:
+        cur.close()
+        conn.close()
+
+    return jsonify({
+        "success": True,
+        "current_role": role,
+        "roles": roles,
+    })
+
+
+@license_bp.route('/api/admin/user/<int:user_id>/role', methods=['POST'])
+@jwt_required()
+@require_permission('manage_licenses')
+def admin_set_user_role(user_id: int):
+    """
+    Устанавливает роль пользователя напрямую (users.role_id).
+
+    Это «ручной» способ сделать пользователя администратором,
+    не создавая лицензию. Для полноценной выдачи лицензий
+    используйте /api/admin/license/grant.
+    """
+    data = request.get_json(silent=True) or {}
+    role_code = (data.get('role_code') or '').strip()
+
+    valid_roles = ['guest', 'student', 'teacher', 'admin']
+    if role_code not in valid_roles:
+        return jsonify({
+            "success": False,
+            "error": f"Недопустимая роль: {role_code}. Допустимые: {', '.join(valid_roles)}"
+        }), 400
+
+    if not update_user_role_by_id(user_id, role_code):
+        return jsonify({"success": False, "error": "Не удалось обновить роль пользователя"}), 500
+
+    role = get_user_current_role(user_id)
+    return jsonify({
+        "success": True,
+        "message": f"Роль пользователя обновлена на {role_code}",
+        "current_role": role,
+    })

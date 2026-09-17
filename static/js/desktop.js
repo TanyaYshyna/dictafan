@@ -620,14 +620,9 @@ window.Desktop = window.Desktop || {
         }
         return;
       }
-      if (name === 'desktop-menu-admin-licenses' || name === 'desktop-admin-licenses') {
-        try {
-          if (window.AdminLicenseModal && typeof window.AdminLicenseModal.open === 'function') {
-            window.AdminLicenseModal.open();
-          }
-        } catch (e) {
-          console.error('[desktop] admin license modal error', e);
-        }
+      if (name === 'desktop-menu-admin-panel' || name === 'desktop-menu-admin-licenses' || name === 'desktop-admin-licenses') {
+        // Управление лицензиями переехало на отдельную страницу администратора
+        window.location.href = '/admin';
         return;
       }
       if (name === 'desktop-new') {
@@ -1078,7 +1073,7 @@ window.Desktop = window.Desktop || {
         const action = btn.getAttribute('data-action');
 
         // Исключаем действия, которые уже обрабатываются в initUserMenu/initAdminMenu
-        if (action === 'desktop-menu-profile' || action === 'desktop-admin-active-dictations' || action === 'desktop-admin-audio-cache' || action === 'desktop-menu-license' || action === 'desktop-menu-admin-licenses' || action === 'desktop-admin-licenses') {
+        if (action === 'desktop-menu-profile' || action === 'desktop-admin-active-dictations' || action === 'desktop-admin-audio-cache' || action === 'desktop-menu-license' || action === 'desktop-menu-admin-panel' || action === 'desktop-menu-admin-licenses' || action === 'desktop-admin-licenses') {
           return;
         }
 

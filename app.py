@@ -213,6 +213,7 @@ from routes.groups import groups_bp
 from routes.assignments import assignments_bp
 from routes.plan_tasks import plan_tasks_bp
 from routes.telegram import telegram_bp
+from routes.admin import admin_bp
 
 app.register_blueprint(index_bp)
 app.register_blueprint(editor_bp)
@@ -227,6 +228,7 @@ app.register_blueprint(groups_bp)
 app.register_blueprint(assignments_bp)
 app.register_blueprint(plan_tasks_bp)
 app.register_blueprint(telegram_bp)
+app.register_blueprint(admin_bp)
 
 # Регистрируем blueprint лицензий
 from routes.license import license_bp
@@ -238,6 +240,14 @@ try:
     seed_roles_and_permissions()
 except Exception as e:
     print(f"[app] Ошибка при seed ролей/разрешений: {e}", file=sys.stderr)
+
+# Если задан ADMIN_EMAIL — назначаем этого пользователя администратором.
+# Это способ «сказать себе, что я администратор» без доступа к админ-панели.
+try:
+    from helpers.db_license import bootstrap_admin_from_env
+    bootstrap_admin_from_env()
+except Exception as e:
+    print(f"[app] Ошибка при bootstrap администратора: {e}", file=sys.stderr)
 
 
 @app.route('/favicon.ico')

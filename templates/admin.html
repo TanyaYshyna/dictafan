@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Администрирование — DictaFan{% endblock %}
+
+{% block page_head %}
+    <link rel="stylesheet" href="/static/css/admin.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/admin_license_modal.css?v={{ app_cache_revision }}">
+{% endblock %}
+
+{% block body_attrs %}class="page-admin"{% endblock %}
+
+{% block build_channel %}dictafan:build:admin{% endblock %}
+
+{% block topbar %}
+    <div class="topbar admin-topbar">
+        <a href="/" class="logo-link">
+            <img src="/static/icons/logo.svg" class="logo">
+        </a>
+        <div class="user-section" id="user-section">
+            <div class="auth-buttons" style="display: none;"></div>
+            <div class="user-info" style="display: none;">
+                <div class="desktop-user-meta">
+                    <button type="button" class="username">
+                        <div class="user-avatar-small"></div>
+                        <span class="username-text"></span>
+                    </button>
+                    <button id="logoutBtn" class="logout-btn" title="Выйти">
+                        <i data-lucide="log-out"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <main class="admin-panel" id="adminPanel">
+        <div class="admin-panel__empty" id="adminPanelEmpty" style="display: none;">
+            <p>Недостаточно прав для просмотра админ-панели.</p>
+            <a href="/" class="button-color-yellow">На главную</a>
+        </div>
+
+        <div class="admin-panel__body" id="adminPanelBody" style="display: none;">
+            <!-- Панель с закладками -->
+            <div class="admin-panel__tabs-header">
+                <button class="admin-panel__tab-btn active" data-tab="licenses" type="button">
+                    <i data-lucide="shield-check"></i>
+                    <span>Управление лицензиями</span>
+                </button>
+                <button class="admin-panel__tab-btn" data-tab="permissions" type="button">
+                    <i data-lucide="users"></i>
+                    <span>Права пользователей</span>
+                </button>
+            </div>
+
+            <div class="admin-panel__tabs-body">
+                <!-- Вкладка: управление лицензиями -->
+                <div id="admin-tab-licenses" class="admin-panel__tab-content active">
+                    <div class="admin-panel__tab-inner">
+                        <!-- Поиск пользователя -->
+                        <div class="admin-license-section">
+                            <label class="admin-license-label">Поиск пользователя по email</label>
+                            <div class="admin-license-search-row">
+                                <input
+                                    type="email"
+                                    id="adminLicenseSearchEmail"
+                                    class="text-input"
+                                    placeholder="user@example.com"
+                                >
+                                <button id="adminLicenseSearchBtn" class="button-color-yellow">
+                                    <i data-lucide="search"></i>
+                                    <span>Найти</span>
+                                </button>
+                            </div>
+                            <div id="adminLicenseSearchResult" class="admin-license-search-result" style="display: none;"></div>
+                        </div>
+
+                        <!-- Форма выдачи лицензии -->
+                        <div id="adminLicenseGrantForm" class="admin-license-section" style="display: none;">
+                            <label class="admin-license-label">Выдать лицензию</label>
+
+                            <div class="admin-license-form-row">
+                                <select id="adminLicenseTypeSelect" class="text-input">
+                                    <option value="Free">Free (Guest)</option>
+                                    <option value="Student30">Student (30 дней)</option>
+                                    <option value="Teacher30">Teacher (30 дней)</option>
+                                    <option value="StudentTeacher30">Student + Teacher (30 дней)</option>
+                                </select>
+                            </div>
+
+                            <div class="admin-license-form-row">
+                                <input
+                                    type="number"
+                                    id="adminLicenseDaysInput"
+                                    class="text-input"
+                                    placeholder="Количество дней (0 = навсегда)"
+                                    value="30"
+                                    min="0"
+                                >
+                            </div>
+
+                            <div class="admin-license-form-row">
+                                <input
+                                    type="text"
+                                    id="adminLicenseCommentInput"
+                                    class="text-input"
+                                    placeholder="Комментарий"
+                                >
+                            </div>
+
+                            <button id="adminLicenseGrantBtn" class="button-color-yellow">
+                                <i data-lucide="gift"></i>
+                                <span>Выдать</span>
+                            </button>
+
+                            <div id="adminLicenseGrantMessage" class="admin-license-message" style="display: none;"></div>
+                        </div>
+
+                        <!-- История лицензий -->
+                        <div id="adminLicenseHistorySection" class="admin-license-section" style="display: none;">
+                            <label class="admin-license-label">История операций</label>
+                            <div id="adminLicenseHistoryTable" class="admin-license-table-wrap"></div>
+                        </div>
+
+                        <!-- Календарь доступа -->
+                        <div id="adminLicenseCalendarSection" class="admin-license-section" style="display: none;">
+                            <label class="admin-license-label">Календарь доступа (следующие дни)</label>
+                            <div id="adminLicenseCalendarTable" class="admin-license-table-wrap"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка: права пользователей -->
+                <div id="admin-tab-permissions" class="admin-panel__tab-content">
+                    <div class="admin-panel__tab-inner">
+                        <div class="admin-license-section">
+                            <label class="admin-license-label">Поиск пользователя по email</label>
+                            <div class="admin-license-search-row">
+                                <input
+                                    type="email"
+                                    id="adminPermissionsSearchEmail"
+                                    class="text-input"
+                                    placeholder="user@example.com"
+                                >
+                                <button id="adminPermissionsSearchBtn" class="button-color-yellow">
+                                    <i data-lucide="search"></i>
+                                    <span>Найти</span>
+                                </button>
+                            </div>
+                            <div id="adminPermissionsSearchResult" class="admin-license-search-result" style="display: none;"></div>
+                        </div>
+
+                        <div id="adminPermissionsRoleForm" class="admin-license-section" style="display: none;">
+                            <label class="admin-license-label">Текущая роль пользователя</label>
+                            <div id="adminPermissionsCurrentRole" class="admin-permissions-role-badge"></div>
+
+                            <div class="admin-license-form-row">
+                                <label class="admin-license-label">Назначить роль</label>
+                                <select id="adminPermissionsRoleSelect" class="text-input"></select>
+                            </div>
+
+                            <button id="adminPermissionsSaveBtn" class="button-color-yellow">
+                                <i data-lucide="save"></i>
+                                <span>Сохранить роль</span>
+                            </button>
+
+                            <div id="adminPermissionsMessage" class="admin-license-message" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+{% endblock %}
+
+{% block scripts %}
+    {{ super() }}
+    <script defer src="/static/js/admin.js?v={{ app_cache_revision }}"></script>
+{% endblock %}

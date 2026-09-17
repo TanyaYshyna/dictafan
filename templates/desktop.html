@@ -24,7 +24,6 @@
     <link rel="stylesheet" href="/static/css/model_selector.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/language_selector.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/license_purchase_modal.css?v={{ app_cache_revision }}">
-    <link rel="stylesheet" href="/static/css/admin_license_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/mult_preview_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
 {% endblock %}
@@ -74,9 +73,9 @@
                                 <i data-lucide="coffee"></i>
                                 <span>На кофе</span>
                                 </button>
-                                <button type="button" class="dropdown-menu-item" data-action="desktop-menu-admin-licenses" role="menuitem" style="display: none;" id="desktopAdminLicenseMenuItem">
+                                <button type="button" class="dropdown-menu-item" data-action="desktop-menu-admin-panel" role="menuitem" style="display: none;" id="desktopAdminLicenseMenuItem">
                                     <i data-lucide="shield-check"></i>
-                                    <span>Управление лицензиями</span>
+                                    <span>Админ-панель</span>
                                 </button>
                             </div>
                     </div>
@@ -182,7 +181,6 @@
     {% include 'partials/audio_cache_modal.html' %}
 
     {% include 'partials/license_purchase_modal.html' %}
-    {% include 'partials/admin_license_modal.html' %}
     {% include 'partials/mult_preview_modal.html' %}
 {% endblock %}
 
@@ -233,7 +231,6 @@
     <script defer src="/static/js/desktop_stats_panel.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/statistics_report.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/license_purchase_modal.js?v={{ app_cache_revision }}"></script>
-    <script defer src="/static/js/admin_license_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/mult_manager.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop.js?v={{ app_cache_revision }}"></script>
 {% endblock %}
