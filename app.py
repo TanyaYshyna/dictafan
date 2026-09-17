@@ -50,6 +50,15 @@ def get_app_cache_revision() -> str:
             os.path.join('static', 'js', 'desktop.js'),
             os.path.join('static', 'css', 'desktop.css'),
             # os.path.join('static', 'css', 'style_dictation.css'),
+            # Файлы редактора/диктанта и их рантайм-зависимостей. Раньше их не было
+            # в хеше ревизии, поэтому после правок JS браузер (через service worker
+            # networkFirstAppShell) продолжал отдавать старую версию из кеша.
+            os.path.join('static', 'js', 'dictation_editor_modal.js'),
+            os.path.join('static', 'js', 'dictation_modal.js'),
+            os.path.join('static', 'js', 'dictation_kart.js'),
+            os.path.join('static', 'js', 'idb_manager.js'),
+            os.path.join('static', 'js', 'save_queue_batcher.js'),
+            os.path.join('static', 'js', 'dictation_runtime', 'dictation_store.js'),
         ]
         parts = []
         for rel in candidates:

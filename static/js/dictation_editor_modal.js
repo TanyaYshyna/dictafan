@@ -122,12 +122,100 @@ function escapeHtml(str) {
 }
 
 function getDraftUserIdForKey() {
+  // Формат userId должен СОВПАДАТЬ с dictation_modal.js / dictation_kart.js:
+  // там используется window.UM.userData.id (или 'anon'). Раньше здесь пытались
+  // использовать window.UserManager.getUserId(), но window.UserManager не
+  // существует (есть только window.UM), поэтому всегда возвращалось
+  // 'draft_unknown' и ключ кеша никогда не совпадал с тем, что читает модалка.
   try {
-    if (window.UserManager && typeof window.UserManager.getUserId === 'function') {
-      return 'draft_' + window.UserManager.getUserId();
+    if (window.UM && window.UM.userData && window.UM.userData.id != null && String(window.UM.userData.id).trim()) {
+      return String(window.UM.userData.id).trim();
     }
   } catch (e) { }
-  return 'draft_unknown';
+  try {
+    if (window.UserManager && typeof window.UserManager.getUserId === 'function') {
+      var uid = window.UserManager.getUserId();
+      if (uid != null && String(uid).trim()) return String(uid).trim();
+    }
+  } catch (e) { }
+  return 'anon';
+}
+
+/**
+ * Приводит ID диктанта к единому формату 'dict_<число>' для ключей
+ * DictationSessionsStore._contents. Редактор получает числовой ID (например,
+ * '1303'), а модалка диктанта — 'dict_1303'. Без нормализации создаются ДВА
+ * разных экземпляра DictationContent, т.е. общий экземпляр не работает.
+ */
+function _normalizeDictationIdForKey(dictationId) {
+  var s = String(dictationId == null ? '' : dictationId).trim();
+  if (!s) return '';
+  if (s.startsWith('dict_')) return s;
+  return 'dict_' + s;
+}
+
+/**
+ * После успешного сохранения обновляет IndexedDB-кеш 'dictations' свежими
+ * предложениями ПОД ВСЕМИ КЛЮЧАМИ, которые читает dictation_modal.js.
+ * Без этого при запуске диктанта ensureDictationContentLoadedToRuntime
+ * читает УСТАРЕВШИЙ кеш (например, со старым количеством предложений после
+ * удаления строки) и «возвращает» удалённое предложение.
+ */
+async function _refreshDictationCacheAfterSave(sentencesPayload) {
+  try {
+    var rawId = state.config && state.config.dictationId
+      ? String(state.config.dictationId).trim()
+      : '';
+    if (!rawId) return;
+
+    var cacheDictationId = rawId.startsWith('dict_') ? rawId : ('dict_' + rawId);
+    var numericId = cacheDictationId.replace(/^dict_/, '');
+    var userId = getDraftUserIdForKey();
+
+    var idb = window.IdbManager;
+    if (!idb) return;
+
+    // Удаляем ВСЕ устаревшие записи кеша для этого диктанта (и по
+    // formatted-ключу 'dict_<id>', и по числовому — на случай старых форматов).
+    if (typeof idb.idbDeleteDictationCache === 'function') {
+      await idb.idbDeleteDictationCache(cacheDictationId);
+      await idb.idbDeleteDictationCache(numericId);
+    }
+
+    // Пишем свежие предложения под всеми ключами, которые перебирает
+    // dictation_modal.js loadSentencesFromIndexedDb().
+    if (typeof idb.idbPut === 'function') {
+      var keysToWrite = [];
+      keysToWrite.push(userId + ':' + cacheDictationId);
+      keysToWrite.push(userId + ':' + numericId);
+      keysToWrite.push(userId + ':dict_' + numericId);
+      keysToWrite.push('anon:dict_' + numericId);
+      var updatedAt = Date.now();
+      for (var i = 0; i < keysToWrite.length; i++) {
+        await idb.idbPut('dictations', {
+          key: keysToWrite[i],
+          dictationId: cacheDictationId,
+          sentences: sentencesPayload,
+          updatedAt: updatedAt,
+        });
+      }
+    }
+
+    // Делаем общий экземпляр DictationContent актуальным сразу после сохранения,
+    // чтобы редактор и диктант видели одни и те же предложения.
+    var store = _getEditorRuntimeStore();
+    if (store && typeof store.setContentSentences === 'function') {
+      store.setContentSentences({
+        dictationId: cacheDictationId,
+        sentences: sentencesPayload,
+        originalLanguage: state.config ? state.config.originalLanguage : '',
+      });
+    }
+
+    console.log('[dictationEditorModal] Кеш dictations обновлён: dictationId=' + cacheDictationId + ' sentences=' + (sentencesPayload ? sentencesPayload.length : 0));
+  } catch (eCache) {
+    console.warn('[dictationEditorModal] Не удалось обновить кеш диктанта:', eCache);
+  }
 }
 
 /* ===== AUDIO MANAGER ===== */
@@ -4133,6 +4221,10 @@ async function _handleSave() {
               _applySavedDictationIds(savedMeta, prevDictationId);
             }
 
+            // Обновляем IndexedDB-кеш 'dictations' свежими предложениями сразу
+            // после сохранения — иначе удалённое предложение «вернётся» из кеша.
+            await _refreshDictationCacheAfterSave(sentencesPayload);
+
             // Добавляем диктант на рабочий стол
             try {
               var newDbId = state.config ? state.config.dbId : null;
@@ -4168,6 +4260,9 @@ async function _handleSave() {
             console.log('[dictationEditorModal] Данные сохранены локально, ожидают отправки (pending=' + queueInfo.pending + ')');
             _setDirtyFlags({ db: false, audio: false, cover: false });
             saved = true;
+
+            // Обновляем локальный кеш, чтобы диктант запускался с актуальным контентом
+            await _refreshDictationCacheAfterSave(sentencesPayload);
 
             // Показываем тост об отсроченной отправке
             try {
@@ -4278,34 +4373,8 @@ async function _handleSave() {
           }
 
           // Обновляем IndexedDB-кеш 'dictations' свежими предложениями сразу после
-          // сохранения. Иначе при запуске диктанта ensureDictationContentLoadedToRuntime
-          // прочитает УСТАРЕВШИЙ кеш (например, со старым количеством предложений
-          // после удаления строки) и «вернёт» удалённое предложение.
-          try {
-            var cacheDictationId = state.config && state.config.dictationId
-              ? String(state.config.dictationId).trim()
-              : normalizedId;
-            if (cacheDictationId && !cacheDictationId.startsWith('dict_')) {
-              cacheDictationId = 'dict_' + cacheDictationId;
-            }
-            var idb = window.IdbManager;
-            if (idb) {
-              if (typeof idb.idbDeleteDictationCache === 'function') {
-                await idb.idbDeleteDictationCache(cacheDictationId);
-              }
-              if (typeof idb.idbPut === 'function') {
-                var userIdForCache = getDraftUserIdForKey();
-                await idb.idbPut('dictations', {
-                  key: userIdForCache + ':' + cacheDictationId,
-                  dictationId: cacheDictationId,
-                  sentences: sentencesPayload,
-                  updatedAt: Date.now(),
-                });
-              }
-            }
-          } catch (eCache) {
-            console.warn('[dictationEditorModal] Не удалось обновить кеш диктанта:', eCache);
-          }
+          // сохранения (по всем ключам, которые читает dictation_modal.js).
+          await _refreshDictationCacheAfterSave(sentencesPayload);
 
           // Добавляем диктант на рабочий стол (если это новый диктант)
           try {
@@ -4510,7 +4579,7 @@ function open(config) {
   console.log('[dictationEditorModal] [TRACE] open(): кэш content.audio_or_shared=' + (store ? store.getOrCreateContent({dictationId: dictationId}).audio_or_shared : 'N/A') + ' config.audio_user_shared=' + audioUserSharedFromConfig);
   if (store) {
     // Используем DictationSessionsStore — он сам кеширует content через _contents Map
-    state.content = store.getOrCreateContent({ dictationId: dictationId });
+    state.content = store.getOrCreateContent({ dictationId: _normalizeDictationIdForKey(dictationId) });
     // ВСЕГДА устанавливаем sentences из config — редактор всегда получает
     // полные данные с сервера (оригинал + все переводы).
     // Нельзя полагаться на кешированный content, потому что он мог быть создан
@@ -5036,7 +5105,7 @@ function _closeEditorModal(wasSaved) {
   if (!wasSaved && closingDictationId) {
     var store = _getEditorRuntimeStore();
     if (store && typeof store.discardContent === 'function') {
-      store.discardContent(closingDictationId);
+      store.discardContent(_normalizeDictationIdForKey(closingDictationId));
       console.log('[dictationEditorModal] discardContent для dictationId=' + closingDictationId);
     }
   }
