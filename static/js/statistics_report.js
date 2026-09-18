@@ -3990,6 +3990,12 @@ if (typeof lucide !== 'undefined') {
         // TBODY
         const tbody = document.createElement('tbody');
 
+        // Аккумуляторы для итоговой строки «Итого» внизу таблицы.
+        const grand = {
+            total: { lead_time: 0, money: 0, mistakes: 0, symbols: 0 },
+            byAttempt: new Map(),
+        };
+
         const appendSpacerCells = (row) => {
             const totalTd = document.createElement('td');
             totalTd.className = 'dictation-report-total-cell';
@@ -4034,7 +4040,7 @@ if (typeof lucide !== 'undefined') {
 
                 // Dictations directly in book
                 for (const d of (book.dictations || [])) {
-                    this._appendDictationRow(tbody, d, valueCols, attempts, 'dictation');
+                    this._appendDictationRow(tbody, d, valueCols, attempts, 'dictation', grand);
                 }
 
                 // Sections
@@ -4051,11 +4057,43 @@ if (typeof lucide !== 'undefined') {
                     tbody.appendChild(secRow);
 
                     for (const d of (sec.dictations || [])) {
-                        this._appendDictationRow(tbody, d, valueCols, attempts, 'dictation');
+                        this._appendDictationRow(tbody, d, valueCols, attempts, 'dictation', grand);
                     }
                 }
             }
         }
+
+        // Итоговая строка «Итого» внизу таблицы: сумма по каждому столбцу.
+        const totalRow = document.createElement('tr');
+        totalRow.className = 'level-total';
+        const totalLabelTd = document.createElement('td');
+        totalLabelTd.className = 'dictation-report-td-sticky';
+        totalLabelTd.textContent = 'Итого';
+        totalLabelTd.style.textAlign = 'left';
+        totalLabelTd.style.fontWeight = '800';
+        totalRow.appendChild(totalLabelTd);
+
+        const grandTotalTd = document.createElement('td');
+        grandTotalTd.className = 'dictation-report-total-cell';
+        const grandLines = this._cellLines(grand.total);
+        if (grandLines.some(l => l !== '')) {
+            grandTotalTd.innerHTML = grandLines.map(l => `<div>${l}</div>`).join('');
+        }
+        totalRow.appendChild(grandTotalTd);
+
+        for (const a of attempts) {
+            const cell = document.createElement('td');
+            cell.className = 'value-cell';
+            const agg = grand.byAttempt.get(a);
+            if (agg) {
+                const lines = this._cellLines(agg);
+                if (lines.some(l => l !== '')) {
+                    cell.innerHTML = lines.map(l => `<div>${l}</div>`).join('');
+                }
+            }
+            totalRow.appendChild(cell);
+        }
+        tbody.appendChild(totalRow);
 
         table.appendChild(tbody);
         wrapper.innerHTML = '';
@@ -4081,8 +4119,42 @@ if (typeof lucide !== 'undefined') {
         return lines;
     }
 
-    _appendDictationRow(tbody, d, valueCols, attempts, level) {
+    _appendDictationRow(tbody, d, valueCols, attempts, level, grand) {
         const exercises = d.exercises || [];
+
+        const emptyCellLines = () => ({
+            lead_time: 0, money: 0, mistakes: 0, symbols: 0,
+        });
+        const sumReps = (reps) => {
+            const t = emptyCellLines();
+            for (const rep of (reps || [])) {
+                t.lead_time += rep.lead_time || 0;
+                t.money += rep.money || 0;
+                t.mistakes += rep.mistakes || 0;
+                t.symbols += rep.symbols || 0;
+            }
+            return t;
+        };
+        const attemptKey = (rep, idx) => {
+            const a = Number(rep.attempt);
+            return Number.isFinite(a) && a > 0 ? a : idx + 1;
+        };
+        const accumulateGrand = (rep, key) => {
+            if (!grand) return;
+            grand.total.lead_time += rep.lead_time || 0;
+            grand.total.money += rep.money || 0;
+            grand.total.mistakes += rep.mistakes || 0;
+            grand.total.symbols += rep.symbols || 0;
+            let agg = grand.byAttempt.get(key);
+            if (!agg) {
+                agg = emptyCellLines();
+                grand.byAttempt.set(key, agg);
+            }
+            agg.lead_time += rep.lead_time || 0;
+            agg.money += rep.money || 0;
+            agg.mistakes += rep.mistakes || 0;
+            agg.symbols += rep.symbols || 0;
+        };
 
         if (exercises.length === 0) {
             // Dictation without exercises — одна строка, без попыток
@@ -4114,6 +4186,17 @@ if (typeof lucide !== 'undefined') {
             return;
         }
 
+        // Суммы по всему диктанту (все упражнения) — для строки-заголовка диктанта.
+        const dictTotals = emptyCellLines();
+        for (const ex of exercises) {
+            for (const rep of (ex.repeats || [])) {
+                dictTotals.lead_time += rep.lead_time || 0;
+                dictTotals.money += rep.money || 0;
+                dictTotals.mistakes += rep.mistakes || 0;
+                dictTotals.symbols += rep.symbols || 0;
+            }
+        }
+
         for (let ei = 0; ei < exercises.length; ei++) {
             const ex = exercises[ei];
             const repeats = ex.repeats || [];
@@ -4121,10 +4204,12 @@ if (typeof lucide !== 'undefined') {
             // используем порядковый номер (fallback для старых данных).
             const repByAttempt = new Map();
             repeats.forEach((rep, idx) => {
-                const a = Number(rep.attempt);
-                const key = Number.isFinite(a) && a > 0 ? a : idx + 1;
+                const key = attemptKey(rep, idx);
                 repByAttempt.set(key, rep);
             });
+
+            // Итог по конкретному упражнению (строка «↳ ...»).
+            const exTotals = sumReps(repeats);
 
             const row = document.createElement('tr');
 
@@ -4153,23 +4238,14 @@ if (typeof lucide !== 'undefined') {
                 row.appendChild(td);
             }
 
-            // Колонка «Итого» по диктанту — сумма по всем показателям.
-            const totals = { lead_time: 0, money: 0, mistakes: 0, symbols: 0 };
-            for (const ex of exercises) {
-                for (const rep of (ex.repeats || [])) {
-                    totals.lead_time += rep.lead_time || 0;
-                    totals.money += rep.money || 0;
-                    totals.mistakes += rep.mistakes || 0;
-                    totals.symbols += rep.symbols || 0;
-                }
-            }
+            // Колонка «Итого»: у заголовка диктанта — сумма по всем упражнениям,
+            // у строки «↳ ...» — сумма по этому упражнению.
             const totalTd = document.createElement('td');
             totalTd.className = 'dictation-report-total-cell';
-            if (ei === 0) {
-                const totalLines = this._cellLines(totals);
-                if (totalLines.some(l => l !== '')) {
-                    totalTd.innerHTML = totalLines.map(l => `<div>${l}</div>`).join('');
-                }
+            const totalForRow = ei === 0 ? dictTotals : exTotals;
+            const totalLines = this._cellLines(totalForRow);
+            if (totalLines.some(l => l !== '')) {
+                totalTd.innerHTML = totalLines.map(l => `<div>${l}</div>`).join('');
             }
             row.appendChild(totalTd);
 
@@ -4189,6 +4265,9 @@ if (typeof lucide !== 'undefined') {
 
                 row.appendChild(cell);
             }
+
+            // Накопление в глобальный итог (нижняя строка «Итого»).
+            repeats.forEach((rep, idx) => accumulateGrand(rep, attemptKey(rep, idx)));
 
             tbody.appendChild(row);
         }

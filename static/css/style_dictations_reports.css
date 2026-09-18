@@ -711,6 +711,20 @@
   color: rgba(31, 41, 51, 0.6);
 }
 
+.dictation-report-table .level-total td:first-child {
+  padding-left: 20px;
+  font-weight: 800;
+  font-size: 13px;
+  color: rgba(31, 41, 51, 0.9);
+  background: #eef5fd;
+}
+
+.dictation-report-table .level-total td {
+  border-top: 2px solid rgba(31, 41, 51, 0.28);
+  font-weight: 700;
+  background: #f5f8ff;
+}
+
 /* Value cells */
 .dictation-report-table .value-cell {
   font-variant-numeric: tabular-nums;
