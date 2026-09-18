@@ -599,8 +599,9 @@ window.Desktop = window.Desktop || {
         return;
       }
       if (name === 'desktop-menu-admin-panel' || name === 'desktop-menu-admin-licenses' || name === 'desktop-admin-licenses') {
-        // Управление лицензиями переехало на отдельную страницу администратора
-        window.location.href = '/admin';
+        // Управление лицензиями переехало на отдельную страницу администратора.
+        // Открываем админ-панель в новой вкладке браузера.
+        window.open('/admin', '_blank', 'noopener');
         return;
       }
       if (name === 'desktop-new') {

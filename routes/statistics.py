@@ -2646,7 +2646,8 @@ def recalc_history_current_all_users():
 
     1) Восстанавливает successes=1 для полных проходов (positions='{}') с successes=0
        по эвристике (полный диктант реально выполнен).
-    2) Пересчитывает number_successes (нарастающий итог) во всех записях history_by_day —
+    2) Пересчитывает number_successes во всех записях history_by_day как сквозной
+       порядковый номер завершённых проходов (successes > 0) без пропусков —
        эти номера используются как колонки в отчёте по диктантам за период.
     3) Пересоздаёт history_current из SUM(successes) по всем пользователям —
        это количество проходов (медаль 🥇) для каждого упражнения.
@@ -2754,6 +2755,7 @@ def api_dictation_report_data():
                     WHERE hbd.user_id = %s
                       AND hbd.date_fact >= %s::date
                       AND hbd.date_fact <= %s::date
+                      AND COALESCE(hbd.successes, 0) > 0
                       {lang_filter}
                     ORDER BY hbd.dictation_id, hbd.positions, hbd.date_start
                     """,

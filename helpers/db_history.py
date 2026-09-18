@@ -86,8 +86,9 @@ def _upsert_history_by_day(
 ) -> int:
     """Upsert в history_by_day и возвращает id записи.
 
-    После upsert обновляет number_successes — нарастающий итог successes
-    для данного (user_id, dictation_id, positions) на дату date_fact.
+    После upsert обновляет number_successes — сквозной порядковый номер
+    завершённых проходов (successes > 0) для данного
+    (user_id, dictation_id, positions) на дату date_fact.
     """
     positions_arr = _normalize_selected_sentence_positions(positions)
     # Если date_start не передан, используем date_fact
@@ -156,8 +157,8 @@ def _upsert_history_by_day(
     row = cur.fetchone()
     hbd_id = int(row[0]) if row else 0
 
-    # Обновляем number_successes — нарастающий итог successes
-    # для данного (user_id, dictation_id, positions) на дату date_fact
+    # Обновляем number_successes — сквозной порядковый номер завершённых
+    # проходов (successes > 0) для данного (user_id, dictation_id, positions)
     if successes_delta != 0:
         _recalc_number_successes(cur, int(user_id), int(dictation_id), positions_arr, date_fact)
 
@@ -168,32 +169,50 @@ def _recalc_number_successes(cur, user_id: int, dictation_id: int, positions_arr
     """Пересчитать number_successes для (user_id, dictation_id, positions) на дату up_to_date.
 
     number_successes = глобальный порядковый номер успешного выполнения
-    для данного диктанта (без разбивки по дням).
+    для данного диктанта (без разбивки по дням). Нумеруются ТОЛЬКО
+    завершённые проходы (successes > 0), подряд без пропусков (1, 2, 3, ...);
+    незавершённые попытки (successes = 0) получают 0.
     """
     cur.execute(
         """
-        WITH cumulative AS (
+        WITH completed AS (
             SELECT
                 id,
-                SUM(successes) OVER (
+                ROW_NUMBER() OVER (
                     PARTITION BY user_id, dictation_id, positions
-                    ORDER BY date_fact ASC, created_at ASC
-                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-                ) AS running_total
+                    ORDER BY date_fact ASC, created_at ASC, id ASC
+                ) AS pass_number
             FROM history_by_day
             WHERE user_id = %s
               AND dictation_id = %s
               AND positions = %s
               AND date_fact <= %s
-            ORDER BY date_fact ASC, created_at ASC
+              AND COALESCE(successes, 0) > 0
         )
         UPDATE history_by_day hbd
         SET
-            number_successes = c.running_total,
+            number_successes = c.pass_number,
             updated_at = CURRENT_TIMESTAMP
-        FROM cumulative c
+        FROM completed c
         WHERE hbd.id = c.id
-          AND c.running_total != COALESCE(hbd.number_successes, 0)
+          AND c.pass_number != COALESCE(hbd.number_successes, 0)
+        """,
+        (user_id, dictation_id, positions_arr, up_to_date),
+    )
+
+    # Незавершённые попытки не участвуют в нумерации колонок отчёта.
+    cur.execute(
+        """
+        UPDATE history_by_day
+        SET
+            number_successes = 0,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = %s
+          AND dictation_id = %s
+          AND positions = %s
+          AND date_fact <= %s
+          AND COALESCE(successes, 0) = 0
+          AND COALESCE(number_successes, 0) != 0
         """,
         (user_id, dictation_id, positions_arr, up_to_date),
     )
@@ -398,40 +417,55 @@ def recalc_history_current_for_user(user_id: int) -> None:
 
 
 def recalc_number_successes_all() -> int:
-    """Пересчитать number_successes (нарастающий итог) во ВСЕХ записях history_by_day.
+    """Пересчитать number_successes во ВСЕХ записях history_by_day.
 
     number_successes = глобальный порядковый номер успешного выполнения
-    для данного (user_id, dictation_id, positions). Именно это поле
+    для данного (user_id, dictation_id, positions). Нумеруются ТОЛЬКО
+    завершённые проходы (successes > 0), подряд без пропусков (1, 2, 3, ...);
+    незавершённые попытки (successes = 0) получают 0. Именно это поле
     используется как номера колонок в отчёте по диктантам за период.
 
     Returns:
-        int: количество обновлённых строк
+        int: количество обновлённых строк (среди завершённых проходов)
     """
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                WITH cumulative AS (
+                WITH completed AS (
                     SELECT
                         id,
-                        SUM(successes) OVER (
+                        ROW_NUMBER() OVER (
                             PARTITION BY user_id, dictation_id, positions
                             ORDER BY date_fact ASC, created_at ASC, id ASC
-                            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-                        ) AS running_total
+                        ) AS pass_number
                     FROM history_by_day
+                    WHERE COALESCE(successes, 0) > 0
                 )
                 UPDATE history_by_day hbd
                 SET
-                    number_successes = c.running_total,
+                    number_successes = c.pass_number,
                     updated_at = CURRENT_TIMESTAMP
-                FROM cumulative c
+                FROM completed c
                 WHERE hbd.id = c.id
-                  AND c.running_total != COALESCE(hbd.number_successes, 0)
+                  AND c.pass_number != COALESCE(hbd.number_successes, 0)
                 """,
             )
             updated = cur.rowcount
+
+            # Незавершённые попытки не участвуют в нумерации колонок отчёта.
+            cur.execute(
+                """
+                UPDATE history_by_day
+                SET
+                    number_successes = 0,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE COALESCE(successes, 0) = 0
+                  AND COALESCE(number_successes, 0) != 0
+                """,
+            )
+
             conn.commit()
             return int(updated or 0)
     except Exception as e:
