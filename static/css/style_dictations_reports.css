@@ -633,6 +633,7 @@
   left: 0;
   z-index: 3;
   background: #f5f6f8;
+  border-right: 2px solid rgba(31, 41, 51, 0.28);
 }
 
 .dictation-report-table td.dictation-report-td-sticky {
@@ -640,6 +641,23 @@
   left: 0;
   z-index: 1;
   background: #ffffff;
+  border-right: 2px solid rgba(31, 41, 51, 0.28);
+}
+
+.dictation-report-table th.dictation-report-total-header {
+  min-width: 92px;
+  font-weight: 800;
+  color: rgba(31, 41, 51, 0.85);
+  border-right: 2px solid rgba(31, 41, 51, 0.28);
+  background: #f5f6f8;
+}
+
+.dictation-report-table .dictation-report-total-cell {
+  min-width: 92px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  border-right: 2px solid rgba(31, 41, 51, 0.28);
+  background: #fbfcfe;
 }
 
 /* Hierarchy indentation */

@@ -3964,6 +3964,12 @@ if (typeof lucide !== 'undefined') {
         thDict.style.textAlign = 'left';
         headerRow.appendChild(thDict);
 
+        // Totals column (right after the sticky first column)
+        const thTotal = document.createElement('th');
+        thTotal.className = 'dictation-report-total-header';
+        thTotal.textContent = 'Итого';
+        headerRow.appendChild(thTotal);
+
         // Value columns header (time, money, errors)
         const valueCols = [];
         if (this._showTime) valueCols.push('time');
@@ -3985,6 +3991,9 @@ if (typeof lucide !== 'undefined') {
         const tbody = document.createElement('tbody');
 
         const appendSpacerCells = (row) => {
+            const totalTd = document.createElement('td');
+            totalTd.className = 'dictation-report-total-cell';
+            row.appendChild(totalTd);
             for (let i = 0; i < attempts.length; i++) {
                 const td = document.createElement('td');
                 td.textContent = '';
@@ -4056,6 +4065,22 @@ if (typeof lucide !== 'undefined') {
         }
     }
 
+    _cellLines(rep) {
+        const lines = [];
+        if (this._showTime) {
+            const t = rep.lead_time || 0;
+            lines.push(t > 0 ? this.formatDurationHhMmSs(t) : '');
+        }
+        if (this._showMoney) {
+            const m = rep.money || 0;
+            lines.push(m > 0 ? `$${m}` : '');
+        }
+        if (this._showErrors) {
+            lines.push(`${rep.mistakes || 0}/${rep.symbols || 0}`);
+        }
+        return lines;
+    }
+
     _appendDictationRow(tbody, d, valueCols, attempts, level) {
         const exercises = d.exercises || [];
 
@@ -4075,6 +4100,10 @@ if (typeof lucide !== 'undefined') {
             td.appendChild(cover);
             td.appendChild(document.createTextNode(d.title || 'Без названия'));
             row.appendChild(td);
+
+            const totalTd = document.createElement('td');
+            totalTd.className = 'dictation-report-total-cell';
+            row.appendChild(totalTd);
 
             for (let i = 0; i < attempts.length; i++) {
                 const cell = document.createElement('td');
@@ -4124,6 +4153,26 @@ if (typeof lucide !== 'undefined') {
                 row.appendChild(td);
             }
 
+            // Колонка «Итого» по диктанту — сумма по всем показателям.
+            const totals = { lead_time: 0, money: 0, mistakes: 0, symbols: 0 };
+            for (const ex of exercises) {
+                for (const rep of (ex.repeats || [])) {
+                    totals.lead_time += rep.lead_time || 0;
+                    totals.money += rep.money || 0;
+                    totals.mistakes += rep.mistakes || 0;
+                    totals.symbols += rep.symbols || 0;
+                }
+            }
+            const totalTd = document.createElement('td');
+            totalTd.className = 'dictation-report-total-cell';
+            if (ei === 0) {
+                const totalLines = this._cellLines(totals);
+                if (totalLines.some(l => l !== '')) {
+                    totalTd.innerHTML = totalLines.map(l => `<div>${l}</div>`).join('');
+                }
+            }
+            row.appendChild(totalTd);
+
             // Колонки по номерам попыток. В каждой ячейке — строки: время, деньги, ош/символы.
             for (const a of attempts) {
                 const cell = document.createElement('td');
@@ -4131,22 +4180,7 @@ if (typeof lucide !== 'undefined') {
 
                 const rep = repByAttempt.get(a);
                 if (rep) {
-                    const lines = [];
-
-                    if (this._showTime) {
-                        const t = rep.lead_time || 0;
-                        lines.push(t > 0 ? this.formatDurationHhMmSs(t) : '');
-                    }
-                    if (this._showMoney) {
-                        const m = rep.money || 0;
-                        lines.push(m > 0 ? `$${m}` : '');
-                    }
-                    if (this._showErrors) {
-                        const err = rep.mistakes || 0;
-                        const sym = rep.symbols || 0;
-                        lines.push(`${err}/${sym}`);
-                    }
-
+                    const lines = this._cellLines(rep);
                     const hasAny = lines.some(l => l !== '');
                     if (hasAny) {
                         cell.innerHTML = lines.map(l => `<div>${l}</div>`).join('');

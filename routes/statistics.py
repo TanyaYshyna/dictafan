@@ -2726,6 +2726,12 @@ def api_dictation_report_data():
                 return ','.join(str(int(p)) for p in sorted(raw))
             return '__all__'
 
+        def _poskey_sort_key(pk):
+            # 'Весь диктант' ('__all__') должен идти ПЕРВЫМ — это строка
+            # заголовка диктанта (обложка + название), а не отдельное
+            # упражнение «↳ Весь диктант». Подмножества предложений идут после.
+            return (0, '') if pk == '__all__' else (1, pk)
+
         # 1) История за период: каждая строка = одно выполнение (попытка) диктанта.
         lang_filter = ""
         params = [target_user_id, start_date, end_date]
@@ -2740,7 +2746,7 @@ def api_dictation_report_data():
                     f"""
                     SELECT
                         hbd.dictation_id,
-                        hbd.positions,
+                        COALESCE(hbd.positions, '{{}}'::int[]) AS positions,
                         hbd.date_start,
                         hbd.lead_time,
                         hbd.money_dt_count,
@@ -2996,7 +3002,7 @@ def api_dictation_report_data():
                 db_ex_by_poskey[_pos_key(ex.get('positions'))] = ex
 
             exercise_list = []
-            for pk in sorted(repeats_by_poskey.keys()):
+            for pk in sorted(repeats_by_poskey.keys(), key=_poskey_sort_key):
                 repeats = repeats_by_poskey[pk]
                 if not repeats:
                     continue
