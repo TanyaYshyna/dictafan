@@ -22,6 +22,7 @@ from helpers.db_history import (
     recalc_history_current_for_user,
     recalc_number_successes_all,
     recalc_history_current_all,
+    repair_full_dictation_successes_all,
 )
 from helpers.db_telegram import (
     filter_manual_teacher_chat_ids,
@@ -2643,9 +2644,11 @@ def _is_admin_user(user_id: int) -> bool:
 def recalc_history_current_all_users():
     """Глобальный пересчёт количества проходов по всем диктантам (только для админа).
 
-    1) Пересчитывает number_successes (нарастающий итог) во всех записях history_by_day —
+    1) Восстанавливает successes=1 для полных проходов (positions='{}') с successes=0
+       по эвристике (полный диктант реально выполнен).
+    2) Пересчитывает number_successes (нарастающий итог) во всех записях history_by_day —
        эти номера используются как колонки в отчёте по диктантам за период.
-    2) Пересоздаёт history_current из SUM(successes) по всем пользователям —
+    3) Пересоздаёт history_current из SUM(successes) по всем пользователям —
        это количество проходов (медаль 🥇) для каждого упражнения.
     """
     try:
@@ -2657,11 +2660,13 @@ def recalc_history_current_all_users():
         if not _is_admin_user(int(user['id'])):
             return jsonify({'success': False, 'error': 'Forbidden: только для администратора'}), 403
 
+        repaired_successes = repair_full_dictation_successes_all()
         updated_number_successes = recalc_number_successes_all()
         inserted_current = recalc_history_current_all()
 
         return jsonify({
             'success': True,
+            'repaired_successes': repaired_successes,
             'updated_number_successes': updated_number_successes,
             'inserted_history_current': inserted_current,
             'message': 'Количество проходов пересчитано по всем диктантам'

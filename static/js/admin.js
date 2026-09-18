@@ -209,7 +209,12 @@
             .then(function (data) {
                 if (data && data.success) {
                     clearHistoryCurrentCache();
-                    showToast('Количество проходов пересчитано по всем диктантам', 'success');
+                    var repaired = (data && typeof data.repaired_successes === 'number') ? data.repaired_successes : 0;
+                    var msg = 'Количество проходов пересчитано по всем диктантам';
+                    if (repaired > 0) {
+                        msg += ' (восстановлено полных проходов: ' + repaired + ')';
+                    }
+                    showToast(msg, 'success');
                 } else {
                     showToast((data && data.error) ? data.error : 'Ошибка пересчёта количества проходов', 'error');
                 }

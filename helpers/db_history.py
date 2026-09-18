@@ -489,6 +489,56 @@ def recalc_history_current_all() -> int:
         conn.close()
 
 
+def repair_full_dictation_successes_all() -> int:
+    """Восстановить successes=1 для полных проходов (positions='{}') с successes=0.
+
+    Часть истории может содержать successes=0 у полных диктантов, потому что
+    раньше завершение диктанта в некоторых ветках UI не записывало successes
+    в outbox (кнопка «Далее», обмен монет). Такие строки «ломали» нарастающий
+    итог number_successes и медаль 🥇.
+
+    Эвристика: считаем полный проход реально выполненным, если суммарное число
+    идеально набранных и исправленных предложений покрывает все предложения
+    диктанта (perfect_count + corrected_count >= sentences_count), ИЛИ число
+    прослушиваний аудио покрывает все предложения (audio_count >= sentences_count).
+
+    Вызывается кнопкой «Пересчитать количество проходов» перед recalc_number_successes_all()
+    и recalc_history_current_all(), поэтому достаточно запускать пересчёт повторно,
+    чтобы восстановить параметр по всей базе.
+
+    Returns:
+        int: количество восстановленных строк history_by_day
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE history_by_day hbd
+                SET successes = 1,
+                    updated_at = CURRENT_TIMESTAMP
+                FROM dictations d
+                WHERE hbd.dictation_id = d.id
+                  AND (hbd.positions IS NULL OR hbd.positions = '{}')
+                  AND COALESCE(hbd.successes, 0) = 0
+                  AND COALESCE(d.sentences_count, 0) > 0
+                  AND (
+                        (COALESCE(hbd.perfect_count, 0) + COALESCE(hbd.corrected_count, 0)) >= d.sentences_count
+                        OR COALESCE(hbd.audio_count, 0) >= d.sentences_count
+                  )
+                """,
+            )
+            repaired = cur.rowcount
+            conn.commit()
+            return int(repaired or 0)
+    except Exception as e:
+        conn.rollback()
+        print(f'❌ [HISTORY_CURRENT] Ошибка восстановления successes полных проходов: {e}')
+        raise
+    finally:
+        conn.close()
+
+
 def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None, dictation_language_code=None, selected_sentence_positions=None, lead_time_ms=None):
     """
     Добавляет или обновляет запись активности в history_by_day (агрегация по дням)

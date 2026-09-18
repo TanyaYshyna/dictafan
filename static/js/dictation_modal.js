@@ -938,9 +938,20 @@
 
     // Увеличиваем completionCount в сессии и обновляем медальки
     let completionCountAfter = 0;
+    let needSuccessWrite = false;
     try {
       const session = window.__dictationModalActiveSession;
       if (session) {
+        // Если завершение произошло по «обходному» пути (кнопка «Далее» /
+        // обмен монет), handleActivity мог не выполниться, и successes не был
+        // записан в outbox. Проверяем это ДО инкремента и записываем ниже
+        // ровно один раз за цикл выполнения.
+        try {
+          needSuccessWrite = !session._successRecordedThisCycle && _isDictationFullyCompleted(session);
+        } catch (eNeedSuccess) {
+          needSuccessWrite = false;
+        }
+
         session.completionCount = (Number(session.completionCount) || 0) + 1;
         completionCountAfter = session.completionCount;
         updateMedalDisplay(session.completionCount);
@@ -967,6 +978,22 @@
         medalCount.style.display = completionCountAfter > 0 ? '' : 'none';
       }
     } catch (e3) {
+    }
+
+    // Гарантируем запись successes в outbox, если завершение диктанта прошло
+    // без handleActivity (кнопка «Далее» или обмен монет). Тип 'completion'
+    // не инкрементирует счётчики, но записывает completionCount → successes.
+    if (needSuccessWrite) {
+      try {
+        const session = window.__dictationModalActiveSession;
+        const st = session ? getCurrentSentenceStateFromSession(session) : null;
+        const key = (session && typeof session.getCurrentKey === 'function') ? session.getCurrentKey() : null;
+        if (session && st && key != null) {
+          await handleActivity('completion', st, key, session, 0, 0, 0, 1, completionCountAfter);
+        }
+      } catch (eSuccessWrite) {
+        console.warn('[DM] не удалось записать successes при завершении:', eSuccessWrite);
+      }
     }
 
     try {
@@ -3683,6 +3710,12 @@
         const selectedSentencePositions = _getSelectedSentencePositions(session);
         const cc = Number(completionCount) || 0;
         const sn = Number(successNumber) || 0;
+        // Помечаем, что successes за это завершение будет записан в outbox
+        // (через enqueueActivity ниже). Флаг сбрасывается при сбросе прогресса,
+        // чтобы при повторном выполнении successes записался снова.
+        if (cc > 0) {
+          try { session._successRecordedThisCycle = true; } catch (eFlagSuccess) {}
+        }
         const enqueued = await ob.enqueueActivity({
           type: type,
           count: 1,
@@ -6617,6 +6650,12 @@
       try {
         session.completionCount = 0;
       } catch (eCc) {
+      }
+
+      // Сбрасываем флаг записи successes для нового цикла выполнения
+      try {
+        session._successRecordedThisCycle = false;
+      } catch (eSr) {
       }
 
       // Сбрасываем dateStart, чтобы при следующем старте установилась новая дата/время
