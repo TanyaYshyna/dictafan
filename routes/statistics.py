@@ -2908,12 +2908,28 @@ def api_dictation_report_data():
             finally:
                 conn.close()
 
+        def _compact_positions(nums):
+            nums = sorted({int(n) for n in nums if str(n).lstrip('-').isdigit()})
+            if not nums:
+                return ''
+            ranges = []
+            start = prev = nums[0]
+            for n in nums[1:]:
+                if n == prev + 1:
+                    prev = n
+                    continue
+                ranges.append(str(start) if start == prev else f"{start}-{prev}")
+                start = prev = n
+            ranges.append(str(start) if start == prev else f"{start}-{prev}")
+            return ','.join(ranges)
+
         def _exercise_title(pos_key, db_ex):
             if db_ex and db_ex.get('title'):
                 return str(db_ex['title'])
             if pos_key == '__all__':
                 return 'Весь диктант'
-            return 'Предложения: ' + pos_key.replace(',', ', ')
+            compact = _compact_positions(pos_key.split(','))
+            return f"Предложения: ({compact})" if compact else 'Предложения'
 
         # Построение иерархии: язык → книга → раздел → диктант → упражнения.
         lang_books = {}        # lang -> [book_entry]

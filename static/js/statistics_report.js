@@ -3467,14 +3467,13 @@ class DictationReport {
     }
 
     formatDurationHhMmSs(ms) {
-        if (!ms || ms <= 0) return '—';
+        if (!ms || ms <= 0) return '';
         const totalSec = Math.floor(ms / 1000);
         const h = Math.floor(totalSec / 3600);
         const m = Math.floor((totalSec % 3600) / 60);
         const s = totalSec % 60;
-        if (h > 0) return `${h}ч ${m}м`;
-        if (m > 0) return `${m}м ${s}с`;
-        return `${s}с`;
+        if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        return `${m}:${String(s).padStart(2, '0')}`;
     }
 
     formatMoney(val) {
@@ -4140,13 +4139,12 @@ if (typeof lucide !== 'undefined') {
                     }
                     if (this._showMoney) {
                         const m = rep.money || 0;
-                        lines.push(m > 0 ? this.formatMoney(m) : '');
+                        lines.push(m > 0 ? `$${m}` : '');
                     }
                     if (this._showErrors) {
-                        const errStr = (rep.mistakes || 0) > 0 ? `✗${rep.mistakes}` : '';
-                        const symStr = (rep.symbols || 0) > 0 ? `⟐${rep.symbols}` : '';
-                        const errPart = [errStr, symStr].filter(Boolean).join(' ');
-                        lines.push(errPart || '');
+                        const err = rep.mistakes || 0;
+                        const sym = rep.symbols || 0;
+                        lines.push(`${err}/${sym}`);
                     }
 
                     const hasAny = lines.some(l => l !== '');
