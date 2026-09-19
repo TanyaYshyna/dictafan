@@ -58,6 +58,14 @@
                                 <i data-lucide="calendar"></i>
                                 <span>Трекер</span>
                             </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-activity-report" role="menuitem">
+                                <i data-lucide="bar-chart-3"></i>
+                                <span>Отчет об активности</span>
+                            </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-plan-fact" role="menuitem">
+                                <i data-lucide="clipboard-check"></i>
+                                <span>Отчет План-факт</span>
+                            </button>
                             <button type="button" class="dropdown-menu-item" data-action="desktop-menu-ratings" role="menuitem">
                                 <i data-lucide="trophy"></i>
                                 <span>Рейтинги</span>
@@ -186,6 +194,7 @@
     <script defer src="{{ url_for('static', filename='js/audio_settings_panel.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="{{ url_for('static', filename='js/user_profile_modal.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop_stats_panel.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/user_activity_history.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/statistics_report.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/license_purchase_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/mult_manager.js?v={{ app_cache_revision }}"></script>

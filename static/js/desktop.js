@@ -571,6 +571,40 @@ window.Desktop = window.Desktop || {
         })();
         return;
       }
+      if (name === 'desktop-menu-activity-report') {
+        (async () => {
+          try {
+            if (typeof StatisticsReport === 'undefined' || typeof UserActivityHistory === 'undefined') {
+              console.warn('[desktop] StatisticsReport/UserActivityHistory not available');
+              return;
+            }
+            if (!window.activityHistory) {
+              window.activityHistory = new UserActivityHistory('/user/api');
+            }
+            await StatisticsReport.open(window.activityHistory);
+          } catch (e) {
+            console.error('[desktop] activity report error', e);
+          }
+        })();
+        return;
+      }
+      if (name === 'desktop-menu-plan-fact') {
+        (async () => {
+          try {
+            if (typeof PlanFactReport === 'undefined' || typeof UserActivityHistory === 'undefined') {
+              console.warn('[desktop] PlanFactReport/UserActivityHistory not available');
+              return;
+            }
+            if (!window.activityHistory) {
+              window.activityHistory = new UserActivityHistory('/user/api');
+            }
+            await PlanFactReport.open(window.activityHistory);
+          } catch (e) {
+            console.error('[desktop] plan-fact report error', e);
+          }
+        })();
+        return;
+      }
       if (name === 'desktop-menu-dictation-report') {
         (async () => {
           try {
