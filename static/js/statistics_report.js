@@ -23,6 +23,7 @@ class StatisticsReport {
         this._showMoney = true;
         this._showSymbols = true;
         this._showErrors = true;
+        this._showAudio = true;
     }
 
     getToken() {
@@ -559,6 +560,7 @@ class StatisticsReport {
                 if (id === 'money') this._showMoney = cb.checked;
                 if (id === 'symbols') this._showSymbols = cb.checked;
                 if (id === 'errors') this._showErrors = cb.checked;
+                if (id === 'audio') this._showAudio = cb.checked;
                 this.renderChart(this._lastStats || []);
             });
             return labelEl;
@@ -568,6 +570,7 @@ class StatisticsReport {
         container.appendChild(make('money', 'dollar-sign', 'Деньги', this._showMoney, 'var(--color-button-pink, #f5c0ca)'));
         container.appendChild(make('symbols', 'type', 'Набранные символы', this._showSymbols, 'var(--color-button-mint, #aae7e4)'));
         container.appendChild(make('errors', 'bug', 'Ошибки', this._showErrors, 'var(--color-button-gray, #eeede8)'));
+        container.appendChild(make('audio', 'mic', 'Аудио', this._showAudio, 'var(--color-button-purple, #c8c9fb)'));
 
         if (typeof lucide !== 'undefined') {
             lucide.createIcons({ root: container });
@@ -760,20 +763,23 @@ class StatisticsReport {
         const orderedStats = Array.isArray(stats) ? [...stats].reverse() : [];
 
         // У каждого измерения своя шкала и свой максимум.
-        // Время приводим к секундам, деньги/символы/ошибки считаем в их собственных единицах.
+        // Время приводим к секундам, деньги/символы/ошибки/аудио считаем в их собственных единицах.
         let maxTimeSec = 0;
         let maxMoney = 0;
         let maxSymbols = 0;
         let maxMistakes = 0;
+        let maxAudio = 0;
         for (const s of orderedStats) {
             const leadSec = Math.floor((Number(s.lead_time) || 0) / 1000);
             const money = Number(s.money) || 0;
             const symbols = Number(s.symbols) || 0;
             const mistakes = Number(s.mistakes) || 0;
+            const audio = Number(s.audio) || 0;
             if (this._showTime && leadSec > maxTimeSec) maxTimeSec = leadSec;
             if (this._showMoney && money > maxMoney) maxMoney = money;
             if (this._showSymbols && symbols > maxSymbols) maxSymbols = symbols;
             if (this._showErrors && mistakes > maxMistakes) maxMistakes = mistakes;
+            if (this._showAudio && audio > maxAudio) maxAudio = audio;
         }
 
         let html = '<div class="chart-container">';
@@ -792,6 +798,7 @@ class StatisticsReport {
             const scaleMoney = (value) => maxMoney > 0 ? (value / maxMoney) * 100 : 0;
             const scaleSymbols = (value) => maxSymbols > 0 ? (value / maxSymbols) * 100 : 0;
             const scaleMistakes = (value) => maxMistakes > 0 ? (value / maxMistakes) * 100 : 0;
+            const scaleAudio = (value) => maxAudio > 0 ? (value / maxAudio) * 100 : 0;
 
             const dow = (this.groupBy === 'days') ? this.getWeekdayShort(stat.date) : '';
             const dowStyle = (this.groupBy === 'days') ? this.getWeekdayBadgeStyle(stat.date) : '';
@@ -838,6 +845,14 @@ class StatisticsReport {
                     <div class="bar-container">
                         ${mistakes > 0 ? `<div class="bar mistakes-bar" style="width: ${scaleMistakes(mistakes)}%" title="Ошибки: ${mistakes}"></div>` : ''}
                         <span class="bar-label">${mistakes || '—'}</span>
+                    </div>
+                `);
+            }
+            if (this._showAudio) {
+                rows.push(`
+                    <div class="bar-container">
+                        ${audio > 0 ? `<div class="bar audio-bar" style="width: ${scaleAudio(audio)}%" title="Аудио: ${audio}"></div>` : ''}
+                        <span class="bar-label">${audio || '—'}</span>
                     </div>
                 `);
             }
