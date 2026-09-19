@@ -2755,15 +2755,15 @@ def api_dictation_report_data():
                         hbd.successes,
                         hbd.monenumber_of_characters,
                         hbd.number_successes,
-                        COALESCE(NULLIF(hbd.dictation_language_code, ''), d.language_code) AS language_code
+                        COALESCE(NULLIF(hbd.dictation_language_code, ''), d.language_code) AS language_code,
+                        hbd.date_fact
                     FROM history_by_day hbd
                     LEFT JOIN dictations d ON d.id = hbd.dictation_id
                     WHERE hbd.user_id = %s
                       AND hbd.date_fact >= %s::date
                       AND hbd.date_fact <= %s::date
-                      AND COALESCE(hbd.successes, 0) > 0
                       {lang_filter}
-                    ORDER BY hbd.dictation_id, hbd.positions, hbd.date_start
+                    ORDER BY hbd.dictation_id, hbd.positions, hbd.date_start, hbd.date_fact
                     """,
                     tuple(params),
                 )
@@ -2771,34 +2771,87 @@ def api_dictation_report_data():
         finally:
             conn.close()
 
-        history_repeats = {}  # (did, pos_key) -> [repeat, ...]
+        # Группируем строки истории по сессии: (did, pos_key, date_start).
+        # Один старт диктанта может длиться несколько дней — тогда в
+        # history_by_day под одним date_start лежит несколько строк (по одной
+        # на каждый date_fact). Здесь они агрегируются в одну сессию, чтобы
+        # в отчёт попало ВСЁ время, а не только последний день.
+        history_repeats = {}   # (did, pos_key) -> [repeat, ...] (завершённые сессии)
+        unfinished_by_did = {} # did -> {lead_time, money, mistakes, symbols}
         lang_by_did = {}
         dict_ids = set()
+        sessions = {}          # (did, pos_key, session_key) -> agg
+
         for r in history_rows:
             did = int(_col(r, 0, 'dictation_id') or 0)
             if not did:
                 continue
             dict_ids.add(did)
             pos_key = _pos_key(_col(r, 1, 'positions'))
-            key = (did, pos_key)
-            history_repeats.setdefault(key, [])
 
             ds = _col(r, 2, 'date_start')
+            date_fact = _col(r, 11, 'date_fact')
+            session_key = str(ds) if ds is not None else ''
+            if not session_key and date_fact is not None:
+                session_key = f"d:{date_fact}"
+
+            lead_time = int(_col(r, 3, 'lead_time') or 0)
+            money = int(_col(r, 4, 'money_dt_count') or 0)
+            mistakes = int(_col(r, 5, 'mistake_count') or 0)
+            corrected = int(_col(r, 6, 'corrected_count') or 0)
+            successes = int(_col(r, 7, 'successes') or 0)
+            symbols = int(_col(r, 8, 'monenumber_of_characters') or 0)
             attempt = int(_col(r, 9, 'number_successes') or 0)
+
             row_lang = str(_col(r, 10, 'language_code') or '').strip().lower()
             if row_lang:
                 lang_by_did[did] = row_lang
 
-            history_repeats[key].append({
-                "date_start": str(ds) if ds is not None else '',
-                "lead_time": int(_col(r, 3, 'lead_time') or 0),
-                "money": int(_col(r, 4, 'money_dt_count') or 0),
-                "mistakes": int(_col(r, 5, 'mistake_count') or 0),
-                "corrected": int(_col(r, 6, 'corrected_count') or 0),
-                "successes": int(_col(r, 7, 'successes') or 0),
-                "symbols": int(_col(r, 8, 'monenumber_of_characters') or 0),
-                "attempt": attempt,
-            })
+            skey = (did, pos_key, session_key)
+            agg = sessions.get(skey)
+            if agg is None:
+                agg = {
+                    "date_start": session_key,
+                    "lead_time": 0,
+                    "money": 0,
+                    "mistakes": 0,
+                    "corrected": 0,
+                    "successes": 0,
+                    "symbols": 0,
+                    "attempt": 0,
+                }
+                sessions[skey] = agg
+            agg['lead_time'] += lead_time
+            agg['money'] += money
+            agg['mistakes'] += mistakes
+            agg['corrected'] += corrected
+            agg['symbols'] += symbols
+            agg['successes'] = max(agg['successes'], successes)
+            agg['attempt'] = max(agg['attempt'], attempt)
+
+        # Разделяем сессии: завершённые (есть отметка окончания и номер) уходят
+        # в повторы (разносятся по колонкам повторов), незавершённые
+        # накапливаются в отдельный агрегат «незаконченные» на диктант.
+        for (did, pos_key, _sk), agg in sessions.items():
+            if agg['successes'] > 0 and agg['attempt'] > 0:
+                history_repeats.setdefault((did, pos_key), []).append({
+                    "date_start": agg['date_start'],
+                    "lead_time": agg['lead_time'],
+                    "money": agg['money'],
+                    "mistakes": agg['mistakes'],
+                    "corrected": agg['corrected'],
+                    "successes": agg['successes'],
+                    "symbols": agg['symbols'],
+                    "attempt": agg['attempt'],
+                })
+            else:
+                u = unfinished_by_did.setdefault(did, {
+                    "lead_time": 0, "money": 0, "mistakes": 0, "symbols": 0,
+                })
+                u['lead_time'] += agg['lead_time']
+                u['money'] += agg['money']
+                u['mistakes'] += agg['mistakes']
+                u['symbols'] += agg['symbols']
 
         dict_ids_list = sorted(dict_ids)
 
@@ -2974,7 +3027,7 @@ def api_dictation_report_data():
                 for (d, pk) in history_repeats
                 if d == did
             }
-            if not repeats_by_poskey:
+            if not repeats_by_poskey and not unfinished_by_did.get(did):
                 continue
 
             meta = dict_meta.get(did) or {}
@@ -3016,6 +3069,22 @@ def api_dictation_report_data():
                     "title": _exercise_title(pk, db_ex),
                     "positions": positions,
                     "repeats": repeats,
+                })
+
+            if unfinished_by_did.get(did):
+                u = unfinished_by_did[did]
+                exercise_list.append({
+                    "id": 0,
+                    "title": "незаконченные",
+                    "positions": [],
+                    "repeats": [],
+                    "is_unfinished": True,
+                    "unfinished": {
+                        "lead_time": u['lead_time'],
+                        "money": u['money'],
+                        "mistakes": u['mistakes'],
+                        "symbols": u['symbols'],
+                    },
                 })
 
             if not exercise_list:
