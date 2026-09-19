@@ -759,17 +759,21 @@ class StatisticsReport {
 
         const orderedStats = Array.isArray(stats) ? [...stats].reverse() : [];
 
-        // Максимум для масштабирования — по самому большому значению среди активных колонок.
-        let maxValue = 0;
+        // У каждого измерения своя шкала и свой максимум.
+        // Время приводим к секундам, деньги/символы/ошибки считаем в их собственных единицах.
+        let maxTimeSec = 0;
+        let maxMoney = 0;
+        let maxSymbols = 0;
+        let maxMistakes = 0;
         for (const s of orderedStats) {
-            const lead = Number(s.lead_time) || 0;
+            const leadSec = Math.floor((Number(s.lead_time) || 0) / 1000);
             const money = Number(s.money) || 0;
             const symbols = Number(s.symbols) || 0;
             const mistakes = Number(s.mistakes) || 0;
-            if (this._showTime && lead > maxValue) maxValue = lead;
-            if (this._showMoney && money > maxValue) maxValue = money;
-            if (this._showSymbols && symbols > maxValue) maxValue = symbols;
-            if (this._showErrors && mistakes > maxValue) maxValue = mistakes;
+            if (this._showTime && leadSec > maxTimeSec) maxTimeSec = leadSec;
+            if (this._showMoney && money > maxMoney) maxMoney = money;
+            if (this._showSymbols && symbols > maxSymbols) maxSymbols = symbols;
+            if (this._showErrors && mistakes > maxMistakes) maxMistakes = mistakes;
         }
 
         let html = '<div class="chart-container">';
@@ -779,11 +783,15 @@ class StatisticsReport {
             const corrected = Number(stat.corrected) || 0;
             const audio = Number(stat.audio) || 0;
             const lead = Number(stat.lead_time) || 0;
+            const leadSec = Math.floor(lead / 1000);
             const money = Number(stat.money) || 0;
             const symbols = Number(stat.symbols) || 0;
             const mistakes = Number(stat.mistakes) || 0;
 
-            const scale = (value) => maxValue > 0 ? (value / maxValue) * 100 : 0;
+            const scaleTime = (valueSec) => maxTimeSec > 0 ? (valueSec / maxTimeSec) * 100 : 0;
+            const scaleMoney = (value) => maxMoney > 0 ? (value / maxMoney) * 100 : 0;
+            const scaleSymbols = (value) => maxSymbols > 0 ? (value / maxSymbols) * 100 : 0;
+            const scaleMistakes = (value) => maxMistakes > 0 ? (value / maxMistakes) * 100 : 0;
 
             const dow = (this.groupBy === 'days') ? this.getWeekdayShort(stat.date) : '';
             const dowStyle = (this.groupBy === 'days') ? this.getWeekdayBadgeStyle(stat.date) : '';
@@ -800,7 +808,7 @@ class StatisticsReport {
             if (this._showTime) {
                 rows.push(`
                     <div class="bar-container">
-                        ${lead > 0 ? `<div class="bar time-bar" style="width: ${scale(lead)}%" title="Время: ${timeLabel}"></div>` : ''}
+                        ${lead > 0 ? `<div class="bar time-bar" style="width: ${scaleTime(leadSec)}%" title="Время: ${timeLabel}"></div>` : ''}
                         <span class="bar-label">${timeLabel || '—'}</span>
                     </div>
                 `);
@@ -808,7 +816,7 @@ class StatisticsReport {
             if (this._showMoney) {
                 rows.push(`
                     <div class="bar-container">
-                        ${money > 0 ? `<div class="bar money-bar" style="width: ${scale(money)}%" title="Деньги: ${money}"></div>` : ''}
+                        ${money > 0 ? `<div class="bar money-bar" style="width: ${scaleMoney(money)}%" title="Деньги: ${money}"></div>` : ''}
                         <span class="bar-label">${money || '—'}</span>
                     </div>
                 `);
@@ -817,9 +825,9 @@ class StatisticsReport {
                 rows.push(`
                     <div class="bar-container bar-symbols">
                         <div class="bar-segments" style="flex: 1 1 auto; height: 10px;">
-                            ${mintSymbols > 0 ? `<div class="bar-symbol mint-symbol" style="width: ${scale(mintSymbols)}%" title="Символы (Perfect): ${mintSymbols}"></div>` : ''}
-                            ${greenSymbols > 0 ? `<div class="bar-symbol green-symbol" style="width: ${scale(greenSymbols)}%" title="Символы (Corrected): ${greenSymbols}"></div>` : ''}
-                            ${orangeSymbols > 0 ? `<div class="bar-symbol orange-symbol" style="width: ${scale(orangeSymbols)}%" title="Символы (Audio): ${orangeSymbols}"></div>` : ''}
+                            ${mintSymbols > 0 ? `<div class="bar-symbol mint-symbol" style="width: ${scaleSymbols(mintSymbols)}%" title="Символы (Perfect): ${mintSymbols}"></div>` : ''}
+                            ${greenSymbols > 0 ? `<div class="bar-symbol green-symbol" style="width: ${scaleSymbols(greenSymbols)}%" title="Символы (Corrected): ${greenSymbols}"></div>` : ''}
+                            ${orangeSymbols > 0 ? `<div class="bar-symbol orange-symbol" style="width: ${scaleSymbols(orangeSymbols)}%" title="Символы (Audio): ${orangeSymbols}"></div>` : ''}
                         </div>
                         <span class="bar-label">${symbols || '—'}</span>
                     </div>
@@ -828,7 +836,7 @@ class StatisticsReport {
             if (this._showErrors) {
                 rows.push(`
                     <div class="bar-container">
-                        ${mistakes > 0 ? `<div class="bar mistakes-bar" style="width: ${scale(mistakes)}%" title="Ошибки: ${mistakes}"></div>` : ''}
+                        ${mistakes > 0 ? `<div class="bar mistakes-bar" style="width: ${scaleMistakes(mistakes)}%" title="Ошибки: ${mistakes}"></div>` : ''}
                         <span class="bar-label">${mistakes || '—'}</span>
                     </div>
                 `);
