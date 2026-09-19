@@ -15,6 +15,14 @@ class StatisticsReport {
         this._telegramSendBusy = false;
         this._lastStats = null;
         this._lastRange = null;
+        this._groups = [];
+        this._selfId = null;
+        this._selectedGroupId = null;
+        this._users = [];
+        this._showTime = true;
+        this._showMoney = true;
+        this._showSymbols = true;
+        this._showErrors = true;
     }
 
     getToken() {
@@ -46,15 +54,7 @@ class StatisticsReport {
         }
 
         const userId = Number(this.selectedUserId) || null;
-        const userLabel = (() => {
-            try {
-                const u = (this._activityUsers || []).find(x => Number(x && x.id) === Number(userId));
-                const label = String(u && u.label ? u.label : (u && u.username ? u.username : ''));
-                if (label) return label;
-            } catch (e) {
-            }
-            return (userId != null) ? `User #${userId}` : '';
-        })();
+        const userLabel = (userId != null) ? this._findUserLabel(userId) : '';
 
         const stats = Array.isArray(this._lastStats) ? this._lastStats : [];
         const range = this._lastRange || {};
@@ -78,7 +78,7 @@ class StatisticsReport {
             sumPerfect += Number(s && s.perfect) || 0;
             sumCorrected += Number(s && s.corrected) || 0;
             sumAudio += Number(s && s.audio) || 0;
-            sumTimeMs += Number(s && s.time_ms) || 0;
+            sumTimeMs += Number(s && s.lead_time) || 0;
         }
         const timeLabel = sumTimeMs > 0 ? this.formatDurationHhMmSs(sumTimeMs) : '00:00:00';
 
@@ -248,23 +248,7 @@ class StatisticsReport {
                                 <div id="activityLanguagePicker" style="position: relative; min-width: 210px; width: 100%;"></div>
                             </div>
 
-                            <div style="display:flex; flex-direction: column; align-items:flex-start; gap: 8px; padding-top: 2px;">
-                                <div style="display:flex; align-items:center; gap: 6px;">
-                                    <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-mint, #6ee7b7);"></span>
-                                    <i data-lucide="star" style="width: 18px; height: 18px;"></i>
-                                    <span style="white-space: nowrap;">Perfect (без ошибок с 1-й попытки)</span>
-                                </div>
-                                <div style="display:flex; align-items:center; gap: 6px;">
-                                    <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-lightgreen, #86efac);"></span>
-                                    <i data-lucide="star-half" style="width: 18px; height: 18px;"></i>
-                                    <span style="white-space: nowrap;">Corrected (исправленные)</span>
-                                </div>
-                                <div style="display:flex; align-items:center; gap: 6px;">
-                                    <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-purple, #a78bfa);"></span>
-                                    <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
-                                    <span style="white-space: nowrap;">Audio (аудио контроль)</span>
-                                </div>
-                            </div>
+                            <div id="activityFlagOptions" style="display:flex; flex-wrap: wrap; align-items:center; gap: 12px; padding-top: 2px;"></div>
                         </div>
                     </div>
 
@@ -284,17 +268,7 @@ class StatisticsReport {
                 <div class="statistics-controls">
                     <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
                         <div style="display:flex; align-items:center; gap: 10px;">
-                            <div id="activityUserPicker" style="position: relative; min-width: 220px;">
-                                <button id="activityUserPickerBtn" type="button" class="group-select" style="width: 100%; display:flex; align-items:center; gap: 10px; justify-content: space-between; font-size: 16px; font-weight: 500;">
-                                    <span style="display:flex; align-items:center; gap: 10px; min-width: 0;">
-                                        <img id="activityUserPickerAvatar" src="" alt="" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #e9eef5; flex: 0 0 auto;">
-                                        <span id="activityUserPickerLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
-                                    </span>
-                                    <i data-lucide="chevron-down" style="width: 18px; height: 18px; flex: 0 0 auto;"></i>
-                                </button>
-                                <div id="activityUserPickerMenu" style="display:none; position:absolute; left:0; top: calc(100% + 6px); width: 100%; max-height: 300px; overflow:auto; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 5; padding: 6px;"></div>
-                            </div>
-                            <select id="activityUserSelect" class="group-select" style="display:none;"></select>
+                            <div id="activityUserPicker" style="display:flex; gap: 8px;"></div>
                             <select id="groupBySelect" class="group-select">
                                 <option value="days">По дням</option>
                                 <option value="weeks">По неделям</option>
@@ -434,40 +408,7 @@ class StatisticsReport {
         document.getElementById('endDate').value = this.formatDateForInput(endDate);
 
         try {
-            const userSelect = document.getElementById('activityUserSelect');
-            if (userSelect) {
-                userSelect.addEventListener('change', () => {
-                    const raw = userSelect.value;
-                    const parsed = parseInt(String(raw || ''), 10);
-                    this.selectedUserId = Number.isFinite(parsed) ? parsed : null;
-                    try {
-                        this.updateUserPickerUI();
-                    } catch (e) {
-                    }
-                    this.updateStatistics();
-                });
-            }
-        } catch (e) {
-        }
-
-        try {
-            const btn = document.getElementById('activityUserPickerBtn');
-            const menu = document.getElementById('activityUserPickerMenu');
-            if (btn && menu) {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.toggleUserDropdown();
-                });
-
-                document.addEventListener('click', (e) => {
-                    if (!this._userDropdownOpen) return;
-                    const root = document.getElementById('activityUserPicker');
-                    if (root && !root.contains(e.target)) {
-                        this.closeUserDropdown();
-                    }
-                });
-            }
+            this._renderFlagOptions();
         } catch (e) {
         }
 
@@ -494,49 +435,142 @@ class StatisticsReport {
         }
     }
 
-    toggleUserDropdown() {
-        if (this._userDropdownOpen) {
-            this.closeUserDropdown();
-        } else {
-            this.openUserDropdown();
+    async ensureGroupsLoaded() {
+        if (this._groups.length > 0) return;
+        const token = this.getToken();
+        if (!token) return;
+        try {
+            const res = await fetch('/api/statistics/dictation-report/groups', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const js = await res.json().catch(() => null);
+            if (js && js.success && Array.isArray(js.groups)) {
+                this._groups = js.groups;
+                this._selfId = js.self_id || null;
+                // Первая группа — персональная группа самого пользователя.
+                if (this._groups.length > 0 && this._selectedGroupId == null) {
+                    this._selectedGroupId = String(this._groups[0].id ?? 'self');
+                }
+            }
+        } catch (e) {
+            console.warn('[StatisticsReport] Failed to load groups for activity report', e);
         }
     }
 
-    openUserDropdown() {
-        try {
-            const menu = document.getElementById('activityUserPickerMenu');
-            if (!menu) return;
-            menu.style.display = 'block';
-            this._userDropdownOpen = true;
-        } catch (e) {
-        }
+    _findGroupById(id) {
+        return this._groups.find(g => String(g.id ?? 'self') === String(id)) || null;
     }
 
-    closeUserDropdown() {
-        try {
-            const menu = document.getElementById('activityUserPickerMenu');
-            if (!menu) return;
-            menu.style.display = 'none';
-            this._userDropdownOpen = false;
-        } catch (e) {
+    _findUserLabel(userId) {
+        const id = Number(userId);
+        for (const g of this._groups || []) {
+            const users = (g && Array.isArray(g.users)) ? g.users : [];
+            const u = users.find(x => Number(x && x.id) === id);
+            if (u) return String(u.username || `User #${id}`);
         }
+        return (Number.isFinite(id)) ? `User #${id}` : '';
     }
 
-    updateUserPickerUI() {
-        try {
-            const labelEl = document.getElementById('activityUserPickerLabel');
-            const avatarEl = document.getElementById('activityUserPickerAvatar');
-            if (!labelEl || !avatarEl) return;
+    _renderSelects(container) {
+        container.innerHTML = '';
+        const groupSel = document.createElement('select');
+        groupSel.className = 'group-select';
+        groupSel.title = 'Группа';
 
-            const u = (this._activityUsers || []).find(x => Number(x && x.id) === Number(this.selectedUserId));
-            const label = String(u && u.label ? u.label : '');
-            labelEl.textContent = label;
-            const uid = Number(u && u.id);
-            avatarEl.src = Number.isFinite(uid) ? this.avatarUrlForUser(uid) : '/static/icons/default-avatar-small.svg';
-            avatarEl.onerror = function () {
-                try { this.onerror = null; this.src = '/static/icons/default-avatar-small.svg'; } catch (e) {}
-            };
-        } catch (e) {
+        const userSel = document.createElement('select');
+        userSel.className = 'group-select';
+        userSel.title = 'Пользователь';
+
+        const fillGroupSelect = () => {
+            groupSel.innerHTML = '';
+            for (const g of this._groups) {
+                const opt = document.createElement('option');
+                opt.value = String(g.id ?? 'self');
+                opt.textContent = g.title || 'Без названия';
+                groupSel.appendChild(opt);
+            }
+            groupSel.value = String(this._selectedGroupId);
+        };
+
+        const fillUserSelect = () => {
+            const group = this._findGroupById(this._selectedGroupId);
+            const users = (group && Array.isArray(group.users)) ? group.users : [];
+            this._users = users;
+            userSel.innerHTML = '';
+            for (const u of users) {
+                const opt = document.createElement('option');
+                opt.value = String(u.id);
+                opt.textContent = u.username || `User #${u.id}`;
+                userSel.appendChild(opt);
+            }
+            if (users.length > 0) {
+                if (this.selectedUserId == null || !users.some(u => String(u.id) === String(this.selectedUserId))) {
+                    this.selectedUserId = users[0].id;
+                }
+                userSel.value = String(this.selectedUserId);
+            } else {
+                this.selectedUserId = null;
+            }
+        };
+
+        groupSel.addEventListener('change', () => {
+            this._selectedGroupId = groupSel.value;
+            this.selectedUserId = null;
+            fillUserSelect();
+            this.updateStatistics();
+        });
+
+        userSel.addEventListener('change', () => {
+            this.selectedUserId = userSel.value ? Number(userSel.value) : null;
+            this.updateStatistics();
+        });
+
+        fillGroupSelect();
+        fillUserSelect();
+
+        container.appendChild(groupSel);
+        container.appendChild(userSel);
+    }
+
+    _renderFlagOptions() {
+        const container = document.getElementById('activityFlagOptions');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const make = (id, iconName, label, checked, color) => {
+            const labelEl = document.createElement('label');
+            labelEl.className = 'col-option';
+            labelEl.style.cssText = 'display:flex; align-items:center; gap: 6px; cursor: pointer; font-size: 14px; white-space: nowrap;';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = checked;
+            const swatch = document.createElement('span');
+            swatch.style.cssText = `display:inline-block; width: 16px; height: 10px; border-radius: 4px; background: ${color}; flex: 0 0 auto;`;
+            const icon = document.createElement('i');
+            icon.setAttribute('data-lucide', iconName);
+            icon.style.cssText = 'width: 16px; height: 16px;';
+            labelEl.appendChild(cb);
+            labelEl.appendChild(swatch);
+            labelEl.appendChild(icon);
+            labelEl.appendChild(document.createTextNode(label));
+            cb.addEventListener('change', () => {
+                if (id === 'time') this._showTime = cb.checked;
+                if (id === 'money') this._showMoney = cb.checked;
+                if (id === 'symbols') this._showSymbols = cb.checked;
+                if (id === 'errors') this._showErrors = cb.checked;
+                this.renderChart(this._lastStats || []);
+            });
+            return labelEl;
+        };
+
+        container.appendChild(make('time', 'clock', 'Время', this._showTime, 'var(--color-button-yellow, rgb(252, 235, 163))'));
+        container.appendChild(make('money', 'dollar-sign', 'Деньги', this._showMoney, 'var(--color-button-pink, #f5c0ca)'));
+        container.appendChild(make('symbols', 'type', 'Набранные символы', this._showSymbols, 'var(--color-button-mint, #aae7e4)'));
+        container.appendChild(make('errors', 'bug', 'Ошибки', this._showErrors, 'var(--color-button-gray, #eeede8)'));
+
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons({ root: container });
         }
     }
 
@@ -550,15 +584,20 @@ class StatisticsReport {
 
     fillMissingDays(stats, startDate, endDate) {
         try {
+            const empty = () => ({ date: '', perfect: 0, corrected: 0, audio: 0, lead_time: 0, money: 0, mistakes: 0, symbols: 0 });
             const map = new Map();
             for (const s of stats || []) {
                 if (!s || !s.date) continue;
-                map.set(String(s.date), {
-                    date: String(s.date),
-                    perfect: Number(s.perfect) || 0,
-                    corrected: Number(s.corrected) || 0,
-                    audio: Number(s.audio) || 0,
-                });
+                const e = empty();
+                e.date = String(s.date);
+                e.perfect = Number(s.perfect) || 0;
+                e.corrected = Number(s.corrected) || 0;
+                e.audio = Number(s.audio) || 0;
+                e.lead_time = Number(s.lead_time) || 0;
+                e.money = Number(s.money) || 0;
+                e.mistakes = Number(s.mistakes) || 0;
+                e.symbols = Number(s.symbols) || 0;
+                map.set(String(s.date), e);
             }
 
             const out = [];
@@ -568,81 +607,19 @@ class StatisticsReport {
             last.setHours(0, 0, 0, 0);
             while (cur.getTime() <= last.getTime()) {
                 const id = this.dateToId(cur);
-                out.push(map.get(id) || { date: id, perfect: 0, corrected: 0, audio: 0 });
+                const row = map.get(id);
+                if (row) {
+                    out.push(row);
+                } else {
+                    const e = empty();
+                    e.date = id;
+                    out.push(e);
+                }
                 cur.setDate(cur.getDate() + 1);
             }
             return out;
         } catch (e) {
             return stats || [];
-        }
-    }
-
-    async ensureUsersLoaded() {
-        try {
-            if (!this.history || typeof this.history.listActivityReportUsers !== 'function') return;
-            const userSelect = document.getElementById('activityUserSelect');
-            if (!userSelect) return;
-            if (userSelect.options && userSelect.options.length > 0) return;
-
-            const users = await this.history.listActivityReportUsers();
-            if (!Array.isArray(users) || users.length === 0) return;
-
-            this._activityUsers = users;
-
-            const opts = [];
-            for (const u of users) {
-                const id = Number(u && u.id);
-                if (!Number.isFinite(id)) continue;
-                const label = String(u && u.label ? u.label : (u && u.username ? u.username : `User #${id}`));
-                opts.push({ id, label });
-            }
-            if (!opts.length) return;
-
-            userSelect.innerHTML = opts
-                .map(o => `<option value="${o.id}">${this.escapeHtml(o.label)}</option>`)
-                .join('');
-
-            if (this.selectedUserId == null) {
-                this.selectedUserId = opts[0].id;
-            }
-            userSelect.value = String(this.selectedUserId);
-
-            try {
-                const menu = document.getElementById('activityUserPickerMenu');
-                if (menu) {
-                    menu.innerHTML = opts.map(o => {
-                        const url = this.avatarUrlForUser(o.id);
-                        const active = Number(o.id) === Number(this.selectedUserId);
-                        return `
-                            <button type="button" data-user-id="${o.id}" style="width:100%; display:flex; align-items:center; gap: 10px; padding: 8px 10px; border: 0; background: ${active ? 'rgba(35, 99, 235, 0.08)' : 'transparent'}; border-radius: 10px; cursor: pointer; text-align:left; font-size: 14px; font-weight: 400;">
-                                <img src="${url}" alt="" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/icons/default-avatar-small.svg';">
-                                <span style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(o.label)}</span>
-                            </button>
-                        `;
-                    }).join('');
-
-                    menu.querySelectorAll('button[data-user-id]').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const uid = parseInt(String(btn.getAttribute('data-user-id') || ''), 10);
-                            if (!Number.isFinite(uid)) return;
-                            this.selectedUserId = uid;
-                            try { userSelect.value = String(uid); } catch (e2) {}
-                            this.updateUserPickerUI();
-                            this.closeUserDropdown();
-                            this.updateStatistics();
-                        });
-                    });
-                }
-            } catch (e) {
-            }
-
-            try {
-                this.updateUserPickerUI();
-            } catch (e) {
-            }
-        } catch (e) {
         }
     }
 
@@ -698,7 +675,11 @@ class StatisticsReport {
         } catch (e) {
         }
         try {
-            await this.ensureUsersLoaded();
+            await this.ensureGroupsLoaded();
+            const picker = document.getElementById('activityUserPicker');
+            if (picker) {
+                this._renderSelects(picker);
+            }
         } catch (e) {
         }
         await this.updateStatistics();
@@ -771,64 +752,97 @@ class StatisticsReport {
         const chartContainer = document.getElementById('statisticsChart');
         if (!chartContainer) return;
 
-        if (stats.length === 0) {
+        if (!stats || stats.length === 0) {
             chartContainer.innerHTML = '<p class="no-data">Нет данных за выбранный период</p>';
             return;
         }
 
         const orderedStats = Array.isArray(stats) ? [...stats].reverse() : [];
 
-        // Находим максимальное значение для масштабирования
-        const maxValue = Math.max(...orderedStats.map(s => s.perfect + s.corrected + s.audio));
-
-        const dayMs = 24 * 60 * 60 * 1000;
+        // Максимум для масштабирования — по самому большому значению среди активных колонок.
+        let maxValue = 0;
+        for (const s of orderedStats) {
+            const lead = Number(s.lead_time) || 0;
+            const money = Number(s.money) || 0;
+            const symbols = Number(s.symbols) || 0;
+            const mistakes = Number(s.mistakes) || 0;
+            if (this._showTime && lead > maxValue) maxValue = lead;
+            if (this._showMoney && money > maxValue) maxValue = money;
+            if (this._showSymbols && symbols > maxValue) maxValue = symbols;
+            if (this._showErrors && mistakes > maxValue) maxValue = mistakes;
+        }
 
         let html = '<div class="chart-container">';
 
         orderedStats.forEach(stat => {
-            const total = stat.perfect + stat.corrected + stat.audio;
-            const perfectPercent = maxValue > 0 ? (stat.perfect / maxValue) * 100 : 0;
-            const correctedPercent = maxValue > 0 ? (stat.corrected / maxValue) * 100 : 0;
-            const audioPercent = maxValue > 0 ? (stat.audio / maxValue) * 100 : 0;
+            const perfect = Number(stat.perfect) || 0;
+            const corrected = Number(stat.corrected) || 0;
+            const audio = Number(stat.audio) || 0;
+            const lead = Number(stat.lead_time) || 0;
+            const money = Number(stat.money) || 0;
+            const symbols = Number(stat.symbols) || 0;
+            const mistakes = Number(stat.mistakes) || 0;
 
-            const timeMs = Number(stat.time_ms) || 0;
-            const timeLabel = timeMs > 0 ? this.formatDurationHhMmSs(timeMs) : '';
+            const scale = (value) => maxValue > 0 ? (value / maxValue) * 100 : 0;
 
             const dow = (this.groupBy === 'days') ? this.getWeekdayShort(stat.date) : '';
             const dowStyle = (this.groupBy === 'days') ? this.getWeekdayBadgeStyle(stat.date) : '';
+
+            // Пропорциональное разделение набранных символов по типам достижений.
+            const achievementsTotal = perfect + corrected + audio;
+            const mintSymbols = achievementsTotal > 0 ? Math.round(symbols * perfect / achievementsTotal) : 0;
+            const greenSymbols = achievementsTotal > 0 ? Math.round(symbols * corrected / achievementsTotal) : 0;
+            const orangeSymbols = achievementsTotal > 0 ? Math.max(0, symbols - mintSymbols - greenSymbols) : 0;
+
+            const timeLabel = lead > 0 ? this.formatDurationHhMmSs(lead) : '';
+
+            const rows = [];
+            if (this._showTime) {
+                rows.push(`
+                    <div class="bar-container">
+                        ${lead > 0 ? `<div class="bar time-bar" style="width: ${scale(lead)}%" title="Время: ${timeLabel}"></div>` : ''}
+                        <span class="bar-label">${timeLabel || '—'}</span>
+                    </div>
+                `);
+            }
+            if (this._showMoney) {
+                rows.push(`
+                    <div class="bar-container">
+                        ${money > 0 ? `<div class="bar money-bar" style="width: ${scale(money)}%" title="Деньги: ${money}"></div>` : ''}
+                        <span class="bar-label">${money || '—'}</span>
+                    </div>
+                `);
+            }
+            if (this._showSymbols) {
+                rows.push(`
+                    <div class="bar-container bar-symbols">
+                        <div class="bar-segments" style="flex: 1 1 auto; height: 10px;">
+                            ${mintSymbols > 0 ? `<div class="bar-symbol mint-symbol" style="width: ${scale(mintSymbols)}%" title="Символы (Perfect): ${mintSymbols}"></div>` : ''}
+                            ${greenSymbols > 0 ? `<div class="bar-symbol green-symbol" style="width: ${scale(greenSymbols)}%" title="Символы (Corrected): ${greenSymbols}"></div>` : ''}
+                            ${orangeSymbols > 0 ? `<div class="bar-symbol orange-symbol" style="width: ${scale(orangeSymbols)}%" title="Символы (Audio): ${orangeSymbols}"></div>` : ''}
+                        </div>
+                        <span class="bar-label">${symbols || '—'}</span>
+                    </div>
+                `);
+            }
+            if (this._showErrors) {
+                rows.push(`
+                    <div class="bar-container">
+                        ${mistakes > 0 ? `<div class="bar mistakes-bar" style="width: ${scale(mistakes)}%" title="Ошибки: ${mistakes}"></div>` : ''}
+                        <span class="bar-label">${mistakes || '—'}</span>
+                    </div>
+                `);
+            }
 
             html += `
                 <div class="chart-row">
                     ${this.groupBy === 'days' ? `<div style="flex: 0 0 auto; width: 34px; border-radius: 10px; display:flex; align-items:center; justify-content:center; ${dowStyle}">${dow}</div>` : ''}
                     <div class="chart-date" style="text-align:left; min-width: 120px; padding-top: 0;">
                         <div style="font-size: 14px; font-weight: 500; line-height: 1.2;">${this.formatDate(stat.date)}</div>
-                        ${this.groupBy === 'days' && timeMs > 0 ? `<div style="margin-top: 4px; font-size: 13px; font-weight: 500; color: rgba(31,41,51,0.75); line-height: 1.1;">${timeLabel}</div>` : ''}
+                        ${this.groupBy === 'days' && lead > 0 && this._showTime ? `<div style="margin-top: 4px; font-size: 13px; font-weight: 500; color: rgba(31,41,51,0.75); line-height: 1.1;">${timeLabel}</div>` : ''}
                     </div>
                     <div class="chart-bars">
-                        <div class="bar-container">
-                            ${stat.perfect > 0 ? `
-                                <div class="bar perfect-bar" style="width: ${perfectPercent}%" 
-                                     title="Perfect: ${stat.perfect}">
-                                </div>
-                            ` : ''}
-                            <span class="bar-label">${stat.perfect}</span>
-                        </div>
-                        <div class="bar-container">
-                            ${stat.corrected > 0 ? `
-                                <div class="bar corrected-bar" style="width: ${correctedPercent}%" 
-                                     title="Corrected: ${stat.corrected}">
-                                </div>
-                            ` : ''}
-                            <span class="bar-label">${stat.corrected}</span>
-                        </div>
-                        <div class="bar-container">
-                            ${stat.audio > 0 ? `
-                                <div class="bar audio-bar" style="width: ${audioPercent}%" 
-                                     title="Audio: ${stat.audio}">
-                                </div>
-                            ` : ''}
-                            <span class="bar-label">${stat.audio}</span>
-                        </div>
+                        ${rows.join('') || '<span class="bar-label">—</span>'}
                     </div>
                 </div>
             `;

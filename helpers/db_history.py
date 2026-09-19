@@ -1110,7 +1110,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
         end_date: datetime.date или str YYYY-MM-DD
 
     Returns:
-        list[dict]: [{date: 'YYYY-MM-DD', perfect: int, corrected: int, audio: int}, ...]
+        list[dict]: [{date, perfect, corrected, audio, lead_time, money, mistakes, symbols}, ...]
     """
     conn = get_db_connection()
     try:
@@ -1127,7 +1127,11 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
                         date_fact AS date,
                         COALESCE(SUM(perfect_count), 0) AS perfect,
                         COALESCE(SUM(corrected_count), 0) AS corrected,
-                        COALESCE(SUM(audio_count), 0) AS audio
+                        COALESCE(SUM(audio_count), 0) AS audio,
+                        COALESCE(SUM(lead_time), 0) AS lead_time,
+                        COALESCE(SUM(money_dt_count), 0) AS money,
+                        COALESCE(SUM(mistake_count), 0) AS mistakes,
+                        COALESCE(SUM(monenumber_of_characters), 0) AS symbols
                     FROM history_by_day
                     WHERE user_id = %s
                       AND date_fact >= %s
@@ -1145,7 +1149,11 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
                         date_fact AS date,
                         COALESCE(SUM(perfect_count), 0) AS perfect,
                         COALESCE(SUM(corrected_count), 0) AS corrected,
-                        COALESCE(SUM(audio_count), 0) AS audio
+                        COALESCE(SUM(audio_count), 0) AS audio,
+                        COALESCE(SUM(lead_time), 0) AS lead_time,
+                        COALESCE(SUM(money_dt_count), 0) AS money,
+                        COALESCE(SUM(mistake_count), 0) AS mistakes,
+                        COALESCE(SUM(monenumber_of_characters), 0) AS symbols
                     FROM history_by_day
                     WHERE user_id = %s
                       AND date_fact >= %s
@@ -1169,6 +1177,10 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
                         "perfect": int(r.get("perfect") or 0),
                         "corrected": int(r.get("corrected") or 0),
                         "audio": int(r.get("audio") or 0),
+                        "lead_time": int(r.get("lead_time") or 0),
+                        "money": int(r.get("money") or 0),
+                        "mistakes": int(r.get("mistakes") or 0),
+                        "symbols": int(r.get("symbols") or 0),
                     }
                 )
             else:
@@ -1180,6 +1192,10 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
                         "perfect": int(r[1] or 0),
                         "corrected": int(r[2] or 0),
                         "audio": int(r[3] or 0),
+                        "lead_time": int(r[4] or 0),
+                        "money": int(r[5] or 0),
+                        "mistakes": int(r[6] or 0),
+                        "symbols": int(r[7] or 0),
                     }
                 )
         return out

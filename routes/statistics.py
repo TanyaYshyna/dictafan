@@ -319,10 +319,18 @@ def _group_activity_rows(rows, group_by: str):
                 'perfect': 0,
                 'corrected': 0,
                 'audio': 0,
+                'lead_time': 0,
+                'money': 0,
+                'mistakes': 0,
+                'symbols': 0,
             }
         grouped[key]['perfect'] += int(r.get('perfect') or 0)
         grouped[key]['corrected'] += int(r.get('corrected') or 0)
         grouped[key]['audio'] += int(r.get('audio') or 0)
+        grouped[key]['lead_time'] += int(r.get('lead_time') or 0)
+        grouped[key]['money'] += int(r.get('money') or 0)
+        grouped[key]['mistakes'] += int(r.get('mistakes') or 0)
+        grouped[key]['symbols'] += int(r.get('symbols') or 0)
 
     return sorted(grouped.values(), key=lambda x: str(x.get('date') or ''))
 

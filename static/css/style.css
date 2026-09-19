@@ -1676,6 +1676,58 @@ html[dir="rtl"] .topbar-save-group {
     background-color: var(--color-button-purple, #a78bfa);
 }
 
+/* Новые колонки отчёта об активности */
+.time-bar {
+    background-color: var(--color-button-yellow, rgb(252, 235, 163));
+}
+
+.money-bar {
+    background-color: var(--color-button-pink, #f5c0ca);
+}
+
+.mistakes-bar {
+    background-color: var(--color-button-gray, #eeede8);
+}
+
+.bar-symbols {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 10px;
+    position: relative;
+}
+
+.bar-segments {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    height: 10px;
+    min-width: 2px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.bar-symbol {
+    height: 10px;
+    min-width: 0;
+    display: block;
+}
+
+.mint-symbol {
+    background-color: var(--color-button-mint, #aae7e4);
+}
+
+.green-symbol {
+    background-color: var(--color-button-lightgreen, #bbf1ca);
+}
+
+.orange-symbol {
+    background-color: var(--color-button-orange, #f9d6a1);
+}
+
 .chart-values {
     display: flex;
     gap: 15px;
