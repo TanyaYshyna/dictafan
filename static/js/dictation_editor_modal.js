@@ -1497,7 +1497,7 @@ function _setupTableControls() {
           title: 'Перезаполнить таблицу',
           message: 'Это действие перезапишет все строки. Продолжить?',
           buttons: [
-            { text: 'Перезаполнить', class: 'modal-btn modal-btn-primary', callback: function () { _refillTable(); } },
+            { text: 'Перезаполнить', type: 'danger', onClick: function () { _refillTable(); } },
             { text: 'Отмена', class: 'modal-btn modal-btn-secondary transparent' },
           ]
         });
@@ -1963,8 +1963,23 @@ function _deleteRow(row) {
 }
 
 function _refillTable() {
-  _renderTable();
-  _bindAudioPlaybackHandlers();
+  // Кнопка "Перезаполнить" перезапускает начальное заполнение:
+  // заново открываем NewDictationFillModal, чтобы пользователь мог ввести новый текст.
+  // Строки таблицы к этому моменту уже удалены, поэтому простой _renderTable()
+  // лишь отрисовал бы пустую таблицу и не вернул бы модалку заполнения.
+  state.editorMode = 'fill';
+  if (state.config) {
+    state.config.isNewDictation = true;
+  }
+  _updateEditorModeDisplay();
+
+  if (window.NewDictationFillModal && typeof window.NewDictationFillModal.open === 'function') {
+    window.NewDictationFillModal.open(state.config);
+  } else {
+    // Fallback: если fill modal по какой-то причине недоступен — просто перерисовываем таблицу.
+    _renderTable();
+    _bindAudioPlaybackHandlers();
+  }
 }
 
 /* ===== УПРАВЛЕНИЕ ЯЗЫКАМИ ПЕРЕВОДА (вкладка 5) ===== */
