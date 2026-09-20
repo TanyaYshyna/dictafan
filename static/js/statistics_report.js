@@ -2899,11 +2899,14 @@ class ActivityTrackerReport {
     constructor(activityHistory, options = {}) {
         this.history = activityHistory;
         this.modal = null;
-        this.selectedUserId = options.userId || null;
-        this.selectedLanguage = options.language || 'all';
-        this.selectedYear = Number(options.year) || (new Date()).getFullYear();
+        this._groups = [];
         this._users = [];
-        this._languageSelectorInited = false;
+        this._selfId = null;
+        this._selectedGroupId = options.groupId ? String(options.groupId) : null;
+        this._selectedUserId = options.userId || null;
+        this._selectedLanguageCode = options.language || '';
+        this._languagesData = null;
+        this.selectedYear = Number(options.year) || (new Date()).getFullYear();
         this._dataDaysByIso = {};
         this._bounds = { minYear: null, maxYear: null };
         this._updateSeq = 0;
@@ -3024,22 +3027,6 @@ class ActivityTrackerReport {
         }
 
         try {
-            const userSel = document.getElementById('activityTrackerUserSelect');
-            if (userSel && !userSel.__activityTrackerBound) {
-                userSel.__activityTrackerBound = true;
-                userSel.addEventListener('change', () => {
-                    try {
-                        const v = String(userSel.value || '').trim();
-                        this.selectedUserId = v ? (Number(v) || null) : null;
-                    } catch (e2) {
-                    }
-                    this.reloadData({ force: true });
-                });
-            }
-        } catch (e) {
-        }
-
-        try {
             const root = document.getElementById('activityTrackerGrid');
             if (root && !root.__activityTrackerClickBound) {
                 root.__activityTrackerClickBound = true;
@@ -3137,15 +3124,15 @@ class ActivityTrackerReport {
         }
 
         const y = Number(this.selectedYear) || (new Date()).getFullYear();
-        const cacheKey = `${String(this.selectedUserId || '')}::${String(this.selectedLanguage || 'all')}::${String(y)}`;
+        const cacheKey = `${String(this._selectedUserId || '')}::${String(this._selectedLanguageCode || '')}::${String(y)}`;
         if (!force && this._lastCacheKey === cacheKey && this._dataDaysByIso) {
             return;
         }
 
         const body = {
-            user_id: this.selectedUserId,
+            user_id: this._selectedUserId,
             year: y,
-            language_code: String(this.selectedLanguage || 'all'),
+            language_code: String(this._selectedLanguageCode || ''),
         };
 
         const res = await fetch('/api/statistics/activity/tracker', {
@@ -3202,67 +3189,161 @@ class ActivityTrackerReport {
         }
     }
 
-    async ensureUsersLoaded() {
+    async ensureGroupsLoaded() {
         try {
-            if (Array.isArray(this._users) && this._users.length) return;
-            if (!this.history || typeof this.history.listActivityReportUsers !== 'function') {
-                this._users = [];
+            if (Array.isArray(this._groups) && this._groups.length) return;
+            const token = this.getTokenSafe();
+            if (!token) return;
+            const res = await fetch('/api/statistics/dictation-report/groups', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const js = await res.json().catch(() => null);
+            if (js && js.success && Array.isArray(js.groups)) {
+                this._groups = js.groups;
+                this._selfId = js.self_id || null;
+                if (this._groups.length > 0 && this._selectedGroupId == null) {
+                    this._selectedGroupId = String(this._groups[0].id ?? 'self');
+                }
+            } else {
+                this._groups = [];
+            }
+        } catch (e) {
+            this._groups = [];
+        }
+    }
+
+    _findGroupById(id) {
+        return (Array.isArray(this._groups) ? this._groups : []).find(g => String(g.id ?? 'self') === String(id)) || null;
+    }
+
+    async ensureUserLanguagesLoaded() {
+        if (this._languagesData != null) return;
+        this._languagesData = [];
+        if (this._selectedUserId == null) return;
+        const token = this.getTokenSafe();
+        if (!token) return;
+        try {
+            const res = await fetch(`/api/statistics/dictation-report/languages?user_id=${encodeURIComponent(this._selectedUserId)}`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const js = await res.json().catch(() => null);
+            if (js && js.success && Array.isArray(js.languages)) {
+                this._languagesData = js.languages;
+            }
+        } catch (e) {
+            this._languagesData = [];
+        }
+    }
+
+    async renderSelects() {
+        const container = document.getElementById('activityTrackerSelects');
+        if (!container) return;
+
+        const groupSel = document.createElement('select');
+        groupSel.className = 'dictation-report-select';
+        groupSel.title = 'Группа';
+
+        const userSel = document.createElement('select');
+        userSel.className = 'dictation-report-select';
+        userSel.title = 'Пользователь';
+
+        const langSel = document.createElement('select');
+        langSel.className = 'dictation-report-select';
+        langSel.title = 'Язык';
+
+        const fillGroupSelect = () => {
+            groupSel.innerHTML = '';
+            for (const g of (Array.isArray(this._groups) ? this._groups : [])) {
+                const opt = document.createElement('option');
+                opt.value = String(g.id ?? 'self');
+                opt.textContent = g.title || 'Без названия';
+                groupSel.appendChild(opt);
+            }
+            groupSel.value = String(this._selectedGroupId);
+        };
+
+        const fillUserSelect = () => {
+            const group = this._findGroupById(this._selectedGroupId);
+            const users = (group && Array.isArray(group.users)) ? group.users : [];
+            this._users = users;
+            userSel.innerHTML = '';
+            for (const u of users) {
+                const opt = document.createElement('option');
+                opt.value = String(u.id);
+                opt.textContent = u.username || `User #${u.id}`;
+                userSel.appendChild(opt);
+            }
+            if (users.length > 0) {
+                if (this._selectedUserId == null || !users.some(u => String(u.id) === String(this._selectedUserId))) {
+                    this._selectedUserId = users[0].id;
+                }
+                userSel.value = String(this._selectedUserId);
+            } else {
+                this._selectedUserId = null;
+            }
+        };
+
+        const fillLanguageSelect = async () => {
+            langSel.innerHTML = '';
+            const allOpt = document.createElement('option');
+            allOpt.value = '';
+            allOpt.textContent = 'Все языки';
+            langSel.appendChild(allOpt);
+
+            if (this._selectedUserId == null) {
+                langSel.value = '';
+                this._selectedLanguageCode = '';
                 return;
             }
-            this._users = await this.history.listActivityReportUsers();
-        } catch (e) {
-            this._users = [];
-        }
-    }
 
-    populateUsers() {
-        const sel = document.getElementById('activityTrackerUserSelect');
-        if (!sel) return;
-        const users = Array.isArray(this._users) ? this._users : [];
-        const options = [];
-        for (const u of users) {
-            try {
-                const id = Number(u && u.id);
-                if (!Number.isFinite(id)) continue;
-                const label = String(u && (u.label || u.username || u.name) ? (u.label || u.username || u.name) : `User #${id}`);
-                options.push({ id, label });
-            } catch (e) {
+            await this.ensureUserLanguagesLoaded();
+            for (const l of (Array.isArray(this._languagesData) ? this._languagesData : [])) {
+                const opt = document.createElement('option');
+                opt.value = l.code || '';
+                opt.textContent = l.label || (l.code || '').toUpperCase();
+                langSel.appendChild(opt);
             }
-        }
-        sel.innerHTML = options.map(o => `<option value="${String(o.id)}">${this.escapeHtml(o.label)}</option>`).join('');
-        try {
-            if (this.selectedUserId == null && options.length) this.selectedUserId = options[0].id;
-            if (this.selectedUserId != null) sel.value = String(this.selectedUserId);
-        } catch (e) {
-        }
-    }
 
-    initLanguageSelector() {
-        try {
-            const wrap = document.getElementById('activityTrackerLanguagePicker');
-            if (!wrap) return;
-            if (this._languageSelectorInited) return;
-            if (typeof LanguageSelector === 'undefined') return;
+            const codes = Array.from(langSel.options).map(o => o.value);
+            if (!codes.includes(String(this._selectedLanguageCode || ''))) {
+                this._selectedLanguageCode = '';
+            }
+            langSel.value = String(this._selectedLanguageCode || '');
+        };
 
-            const raw = this.getLanguageData() || {};
-            const dataWithAll = { all: { language_ru: 'Все языки', language_en: 'All languages' }, ...raw };
+        groupSel.addEventListener('change', async () => {
+            this._selectedGroupId = groupSel.value;
+            this._selectedUserId = null;
+            this._selectedLanguageCode = '';
+            this._languagesData = null;
+            fillUserSelect();
+            await fillLanguageSelect();
+            await this.reloadData({ force: true });
+        });
 
-            const codes = ['all', ...Object.keys(raw || {}).map(k => String(k).toLowerCase()).filter(Boolean).sort()];
-            new LanguageSelector({
-                container: wrap,
-                mode: 'report-selector',
-                languageData: dataWithAll,
-                nativeLanguage: 'all',
-                learningLanguages: codes,
-                currentLearning: String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all',
-                onLanguageChange: ({ currentLearning }) => {
-                    this.selectedLanguage = String(currentLearning || 'all').trim().toLowerCase() || 'all';
-                    this.reloadData({ force: true });
-                }
-            });
-            this._languageSelectorInited = true;
-        } catch (e) {
-        }
+        userSel.addEventListener('change', async () => {
+            this._selectedUserId = userSel.value ? Number(userSel.value) : null;
+            this._selectedLanguageCode = '';
+            this._languagesData = null;
+            await fillLanguageSelect();
+            await this.reloadData({ force: true });
+        });
+
+        langSel.addEventListener('change', () => {
+            this._selectedLanguageCode = langSel.value || '';
+            this.reloadData({ force: true });
+        });
+
+        fillGroupSelect();
+        fillUserSelect();
+        await fillLanguageSelect();
+
+        container.innerHTML = '';
+        container.appendChild(groupSel);
+        container.appendChild(userSel);
+        container.appendChild(langSel);
     }
 
     renderYear() {
@@ -3405,25 +3486,18 @@ class ActivityTrackerReport {
         } catch (e) {
         }
 
-        // Initialize selector UI immediately (so user sees language control right away).
-        try {
-            this.initLanguageSelector();
-        } catch (e) {
-        }
-
-        try {
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons({ root: this.modal });
-            }
-        } catch (e) {
-        }
-
-
-        // Background load: users list and year data.
+        // Load groups and render cascading selects (group → user → language).
         (async () => {
             try {
-                await this.ensureUsersLoaded();
-                this.populateUsers();
+                await this.ensureGroupsLoaded();
+                await this.renderSelects();
+            } catch (e) {
+            }
+
+            try {
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons({ root: this.modal });
+                }
             } catch (e) {
             }
 
