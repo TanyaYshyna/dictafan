@@ -258,7 +258,7 @@
         if (this.state.mode && this.state.mode.startsWith('route-off|') && window.WhisperModelManager) {
           try {
             var parts = this.state.mode.split('|');
-            var modelSize = parts.length > 1 ? parts[1] : 'base';
+            var modelSize = parts.length > 1 ? parts[1] : 'tiny';
             var mm = new window.WhisperModelManager();
             var modelKey = mm._getModelKey('en', modelSize);
             var storedModel = window.WhisperModels && window.WhisperModels.get ? window.WhisperModels.get(modelKey) : null;
@@ -406,7 +406,7 @@
         if (isOffline && this._audioBlob) {
           try {
             var parts = this.state.mode.split('|');
-            var modelSize = parts.length > 1 ? parts[1] : 'base';
+            var modelSize = parts.length > 1 ? parts[1] : 'tiny';
             var langCode = this.state.language ? this.state.language.split('-')[0].toLowerCase() : 'en';
 
             if (typeof this.callbacks.onProcessingStart === 'function') {

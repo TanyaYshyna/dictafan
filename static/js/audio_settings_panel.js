@@ -100,8 +100,8 @@ class AudioSettingsPanel {
             if (!mk.startsWith('whisper:')) return null;
             const repo = mk.slice('whisper:'.length);
             if (repo.includes('whisper-tiny')) return 'tiny';
-            if (repo.includes('whisper-small')) return 'small';
-            if (repo.includes('whisper-base')) return 'base';
+            if (repo.includes('whisper-small')) return 'tiny';
+            if (repo.includes('whisper-base')) return 'tiny';
             return null;
         } catch (e) {
             return null;
@@ -1169,7 +1169,7 @@ class AudioSettingsPanel {
         // Model-centric: whisper weights are global per size.
         const normalizedLang = (currentLang || '').toString().trim().toLowerCase().split('-')[0] || 'en';
         const selectedSize = this._getSelectedWhisperSize(normalizedLang);
-        const modelSize = selectedSize || 'base';
+        const modelSize = selectedSize || 'tiny';
 
         // 1) In-memory
         try {
@@ -1209,8 +1209,8 @@ class AudioSettingsPanel {
             'route': 'route',
             'server': 'server',
             'route-off|tiny': 'house-heart',
-            'route-off|base': 'house',
-            'route-off|small': 'house-plus',
+            'route-off|base': 'house-heart',
+            'route-off|small': 'house-heart',
         };
         return icons[mode] || 'route';
     }
@@ -1222,10 +1222,7 @@ class AudioSettingsPanel {
         const norm = String(mode || 'route');
         if (norm === 'server') return this._t('profile.audio.speech_recognition.mode_server', null, 'сервер');
         if (norm.startsWith('route-off')) {
-            if (norm.includes('tiny')) return this._t('profile.audio.speech_recognition.mode_local_tiny', null, 'Whisper Tiny');
-            if (norm.includes('base')) return this._t('profile.audio.speech_recognition.mode_local_base', null, 'Whisper Base');
-            if (norm.includes('small')) return this._t('profile.audio.speech_recognition.mode_local_small', null, 'Whisper Small');
-            return this._t('profile.audio.speech_recognition.mode_local', null, 'локально');
+            return this._t('profile.audio.speech_recognition.mode_local_tiny', null, 'Whisper Tiny');
         }
         return this._t('profile.audio.speech_recognition.mode_internet', null, 'інтернет');
     }

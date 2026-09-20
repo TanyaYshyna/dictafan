@@ -649,6 +649,15 @@
       }
     } catch (e) {
     }
+    try {
+      const telegramBtn = document.getElementById('userAudioTelegramButton');
+      if (telegramBtn) {
+        telegramBtn.disabled = !hasAudio;
+        telegramBtn.classList.remove('button-color-purple', 'button-color-gray');
+        telegramBtn.classList.add(hasAudio ? 'button-color-purple' : 'button-color-gray');
+      }
+    } catch (e) {
+    }
   }
 
   /**
@@ -684,6 +693,36 @@
     const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
 
     return `${dictId}_${sentenceKey}_${stamp}.webm`;
+  }
+
+  /**
+   * Показывает короткое уведомление через общий toast-элемент диктанта.
+   */
+  function showDictationToast(message) {
+    try {
+      const toast = document.getElementById('toastMessage');
+      if (toast) {
+        toast.textContent = String(message || '');
+        toast.style.display = 'block';
+        clearTimeout(showDictationToast._timer);
+        showDictationToast._timer = setTimeout(() => {
+          toast.style.display = 'none';
+        }, 3000);
+        return;
+      }
+    } catch (e) {
+    }
+    try {
+      if (typeof window.showToast === 'function') {
+        window.showToast(message);
+        return;
+      }
+    } catch (e) {
+    }
+    try {
+      alert(message);
+    } catch (e) {
+    }
   }
 
   /**
@@ -733,6 +772,56 @@
           a.click();
           try { document.body.removeChild(a); } catch (e1) {}
         } catch (e1) {
+        }
+      });
+    }
+
+    const telegramBtn = document.getElementById('userAudioTelegramButton');
+    if (telegramBtn && telegramBtn.dataset.boundDictationModal !== '1') {
+      telegramBtn.dataset.boundDictationModal = '1';
+      telegramBtn.addEventListener('click', async (e) => {
+        try {
+          e.preventDefault();
+          e.stopPropagation();
+        } catch (e0) {
+        }
+        try {
+          if (!dictationModalState.dictationStarted) return;
+          const blob = dictationModalState._userAudioBlob;
+          if (!blob) return;
+          const token = window.UM?.token || localStorage.getItem('jwt_token');
+          if (!token) return;
+          const session = window.__dictationModalActiveSession;
+          const filename = buildUserAudioFilename(session);
+          const formData = new FormData();
+          formData.append('audio', blob, filename);
+          telegramBtn.disabled = true;
+          const resp = await fetch('/user/api/telegram/send_audio', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            body: formData,
+          });
+          let data = null;
+          try { data = await resp.json(); } catch (eJson) {}
+          const ok = resp.ok && data && data.success;
+          if (ok) {
+            showDictationToast('✅ Аудио отправлено в Telegram');
+          } else {
+            const err = (data && data.error) ? String(data.error) : 'send_failed';
+            if (err === 'telegram_not_linked') {
+              showDictationToast('⚠️ Telegram не подключен (нужно привязать чат)');
+            } else if (err === 'telegram_disabled') {
+              showDictationToast('⚠️ Telegram недоступен');
+            } else {
+              showDictationToast('⚠️ Не удалось отправить аудио в Telegram');
+            }
+          }
+        } catch (e1) {
+          showDictationToast('⚠️ Не удалось отправить аудио в Telegram');
+        } finally {
+          updateUserAudioButtonsFromState();
         }
       });
     }
@@ -6283,13 +6372,13 @@
       const raw = localStorage.getItem('downloaded_models_v2');
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      const sizes = [];
+      const sizes = new Set();
       for (const key of Object.keys(parsed || {})) {
-        if (key.includes('whisper-tiny')) sizes.push('tiny');
-        if (key.includes('whisper-base')) sizes.push('base');
-        if (key.includes('whisper-small')) sizes.push('small');
+        // Поддерживается только одна модель — tiny. Любой скачанный whisper
+        // (включая устаревшие base/small из localStorage) ведёт к режиму tiny.
+        if (key.includes('whisper-')) sizes.add('tiny');
       }
-      return sizes;
+      return Array.from(sizes);
     } catch (e) {
       return [];
     }
@@ -6298,8 +6387,6 @@
   // Конфигурация device-режимов: размер → { icon, label }
   var DEVICE_MODE_CONFIG = {
     tiny:  { icon: 'house-heart', label: 'Whisper Tiny · 75 MB' },
-    base:  { icon: 'house',       label: 'Whisper Base · 145 MB' },
-    small: { icon: 'house-plus',  label: 'Whisper Small · 480 MB' },
   };
 
   function _renderDeviceModes() {

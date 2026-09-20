@@ -699,7 +699,7 @@ async function smartSplitAudio() {
     const langCode = currentDictation.language_original;
 
     // Проверяем, загружена ли модель для этого языка
-    const modelKey = whisperManager._getModelKey(langCode, 'base');
+    const modelKey = whisperManager._getModelKey(langCode, 'tiny');
     const storedModel = window.WhisperModels?.get?.(modelKey);
 
     if (!storedModel || !storedModel.recognizer) {

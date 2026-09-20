@@ -40,7 +40,7 @@ from helpers.db_history import (
     get_history_by_day_totals_for_date,
 )
 from helpers.email_sender import send_email
-from helpers.telegram import is_telegram_enabled, send_telegram_message
+from helpers.telegram import is_telegram_enabled, send_telegram_message, send_telegram_voice
 from helpers.db_telegram import (
     generate_and_store_telegram_link_code,
     link_telegram_chat_by_code,
@@ -855,6 +855,45 @@ def api_telegram_set_self_reports_enabled():
         return jsonify({'success': True, 'enabled': bool(updated.get('telegram_self_reports_enabled'))})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@user_bp.route('/api/telegram/send_audio', methods=['POST'])
+@jwt_required()
+def api_telegram_send_audio():
+    """Отправить записанное аудио пользователя ему самому в Telegram."""
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    if not is_telegram_enabled():
+        return jsonify({'success': False, 'error': 'telegram_disabled'}), 400
+
+    chat_id = user_db.get('telegram_chat_id')
+    if not chat_id:
+        return jsonify({'success': False, 'error': 'telegram_not_linked'}), 400
+
+    if 'audio' not in request.files:
+        return jsonify({'success': False, 'error': 'no_audio'}), 400
+
+    audio_file = request.files['audio']
+    if not audio_file or not audio_file.filename:
+        return jsonify({'success': False, 'error': 'no_audio'}), 400
+
+    try:
+        audio_bytes = audio_file.read()
+        if not audio_bytes:
+            return jsonify({'success': False, 'error': 'empty_audio'}), 400
+
+        filename = audio_file.filename or 'recording.ogg'
+        base = os.path.splitext(filename)[0] or 'recording'
+        out_filename = f"{base}.ogg"
+
+        send_telegram_voice(int(chat_id), audio_bytes, out_filename)
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'send_failed'}), 500
+
+    return jsonify({'success': True})
 
 
 @user_bp.route('/api/telegram/test_send', methods=['POST'])

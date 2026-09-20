@@ -6,16 +6,12 @@ class WhisperModelManager {
     constructor() {
         // Модели Whisper от Hugging Face через Transformers.js
         this.modelNames = {
-            'tiny': 'Xenova/whisper-tiny',      // ~75 МБ
-            'base': 'Xenova/whisper-base',      // ~140 МБ
-            'small': 'Xenova/whisper-small'     // ~460 МБ
+            'tiny': 'Xenova/whisper-tiny'       // ~75 МБ
         };
         
         // Размеры моделей для информации
         this.modelSizes = {
-            'tiny': '75 МБ',
-            'base': '140 МБ',
-            'small': '460 МБ'
+            'tiny': '75 МБ'
         };
         
         // Инициализируем хранилище моделей
@@ -103,8 +99,8 @@ class WhisperModelManager {
 
     async _findCachedWhisperAssetUrls(modelSize) {
         try {
-            const size = (modelSize || 'base').toString();
-            const modelName = this.modelNames[size] || this.modelNames.base;
+            const size = (modelSize || 'tiny').toString();
+            const modelName = this.modelNames[size] || this.modelNames.tiny;
             const wantedNeedle = modelName.toLowerCase();
 
             const out = [];
@@ -246,11 +242,29 @@ class WhisperModelManager {
         
         throw new Error('Transformers.js pipeline не найден. Проверьте подключение библиотеки.');
     }
+
+    /**
+     * Дожидается появления глобального pipeline Transformers.js.
+     * Module-скрипт с CDN грузится асинхронно, поэтому pipeline может быть ещё не готов.
+     */
+    async _waitForTransformersReady(timeoutMs = 10000) {
+        if (this.checkTransformersJS()) return true;
+        try {
+            await new Promise((resolve) => {
+                let done = false;
+                const finish = () => { if (done) return; done = true; resolve(); };
+                try { window.addEventListener('transformers-ready', finish, { once: true }); } catch (e) {}
+                setTimeout(finish, timeoutMs);
+            });
+        } catch (e) {
+        }
+        return this.checkTransformersJS();
+    }
     
     /**
      * Проверяет, загружена ли модель для языка
      */
-    async isModelCached(languageCode, modelSize = 'base') {
+    async isModelCached(languageCode, modelSize = 'tiny') {
         const modelKey = this._getModelKey(languageCode, modelSize);
         
         // Проверяем в памяти
@@ -281,7 +295,12 @@ class WhisperModelManager {
     /**
      * Загружает модель для языка через Transformers.js
      */
-    async loadLanguageModel(languageCode, modelSize = 'base', onProgress = null) {
+    async loadLanguageModel(languageCode, modelSize = 'tiny', onProgress = null) {
+        // Нормализуем устаревшие значения 'base'/'small' (например, из localStorage
+        // старых пользователей) к единственной поддерживаемой модели 'tiny'.
+        if (!this.modelNames[modelSize]) {
+            modelSize = 'tiny';
+        }
         const modelKey = this._getModelKey(languageCode, modelSize);
         
         // Проверяем, есть ли уже модель в памяти
@@ -303,9 +322,12 @@ class WhisperModelManager {
         } catch (e) {
         }
         
-        // Проверяем доступность Transformers.js
+        // Дождёмся загрузки Transformers.js (module-скрипт с CDN грузится асинхронно).
         if (!this.checkTransformersJS()) {
-            throw new Error('Библиотека Transformers.js не загружена. Проверьте подключение скрипта.');
+            await this._waitForTransformersReady(10000);
+        }
+        if (!this.checkTransformersJS()) {
+            throw new Error('Библиотека Transformers.js не загружена. Проверьте интернет-соединение и перезагрузите страницу.');
         }
         
         const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
@@ -322,14 +344,16 @@ class WhisperModelManager {
         
         try {
             const pipeline = this.getPipeline();
-            const modelName = this.modelNames[modelSize] || this.modelNames.base;
+            const modelName = this.modelNames[modelSize] || this.modelNames.tiny;
             
             console.log(`📦 Загружаем модель: ${modelName}`);
             
             const seenAssetUrls = new Set();
 
             // Функция для обновления прогресса
+            let lastProgressAt = Date.now();
             const progressCallback = (progress) => {
+                lastProgressAt = Date.now();
                 if (onProgress) {
                     // Transformers.js передает объект с полями: status, file, progress, loaded, total
                     // progress может быть уже в диапазоне 0-1 или как процент
@@ -369,14 +393,38 @@ class WhisperModelManager {
                 }
             };
             
-            // Загружаем модель через pipeline
-            const recognizer = await pipeline(
-                'automatic-speech-recognition',
-                modelName,
-                {
-                    progress_callback: progressCallback
-                }
-            );
+            // Загружаем модель через pipeline. Обёртка тайм-аутами не даёт процессу
+            // «висеть» вечно при медленном или блокированном соединении с Hugging Face.
+            const STALL_TIMEOUT_MS = 90 * 1000;          // 90 секунд без единого события прогресса
+            const OVERALL_TIMEOUT_MS = 30 * 60 * 1000;   // 30 минут на весь цикл загрузки
+
+            let watchdogTimer = null;
+            const startedAt = Date.now();
+            const watchdog = new Promise((_, reject) => {
+                watchdogTimer = setInterval(() => {
+                    const now = Date.now();
+                    if (now - lastProgressAt > STALL_TIMEOUT_MS) {
+                        clearInterval(watchdogTimer);
+                        reject(new Error('Тайм-аут загрузки модели: нет прогресса. Проверьте интернет-соединение.'));
+                    } else if (now - startedAt > OVERALL_TIMEOUT_MS) {
+                        clearInterval(watchdogTimer);
+                        reject(new Error('Тайм-аут загрузки модели. Проверьте интернет-соединение.'));
+                    }
+                }, 5000);
+            });
+
+            const recognizer = await Promise.race([
+                pipeline(
+                    'automatic-speech-recognition',
+                    modelName,
+                    {
+                        progress_callback: progressCallback
+                    }
+                ),
+                watchdog
+            ]).finally(() => {
+                if (watchdogTimer) clearInterval(watchdogTimer);
+            });
             
             console.log(`✅ Модель ${modelName} успешно загружена`);
 
@@ -418,11 +466,14 @@ class WhisperModelManager {
      * Распознает речь из аудио данных
      * @param {AudioBuffer|ArrayBuffer|Blob|string} audioData - Аудио данные для распознавания
      * @param {string} languageCode - Код языка (например, 'ru', 'en', 'sv')
-     * @param {string} modelSize - Размер модели ('tiny', 'base', 'small')
+     * @param {string} modelSize - Размер модели ('tiny')
      * @param {string} prompt - Опциональный промпт для улучшения распознавания (например, имена из подсказки)
      * @returns {Promise<Object>} Результат распознавания
      */
-    async transcribe(audioData, languageCode, modelSize = 'base', prompt = null) {
+    async transcribe(audioData, languageCode, modelSize = 'tiny', prompt = null) {
+        if (!this.modelNames[modelSize]) {
+            modelSize = 'tiny';
+        }
         const modelKey = this._getModelKey(languageCode, modelSize);
         const storedModel = window.WhisperModels?.get?.(modelKey);
         
@@ -470,15 +521,15 @@ class WhisperModelManager {
     /**
      * Получает размер модели для отображения
      */
-    getModelSizeInfo(modelSize = 'base') {
+    getModelSizeInfo(modelSize = 'tiny') {
         return this.modelSizes[modelSize] || 'Неизвестно';
     }
     
     /**
      * Получает имя модели для отображения
      */
-    getModelName(modelSize = 'base') {
-        return this.modelNames[modelSize] || this.modelNames.base;
+    getModelName(modelSize = 'tiny') {
+        return this.modelNames[modelSize] || this.modelNames.tiny;
     }
 }
 

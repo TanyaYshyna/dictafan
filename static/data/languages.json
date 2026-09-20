@@ -6,8 +6,6 @@
     "language_en": "English",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small",
       "transformer_asr:Xenova/wav2vec2-base-960h",
       "transformer_asr:Xenova/wav2vec2-bert-CV16-en"
     ]
@@ -19,8 +17,6 @@
     "language_en": "Ukrainian",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small",
       "transformer_asr:Xenova/mms-1b-fl102",
       "transformer_asr:Xenova/mms-1b-all"
     ]
@@ -32,8 +28,6 @@
     "language_en": "Swedish",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small",
       "transformer_asr:Xenova/mms-1b-fl102",
       "transformer_asr:Xenova/mms-1b-all"
     ]
@@ -45,8 +39,6 @@
     "language_en": "Belarusian",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small",
       "transformer_asr:Xenova/mms-1b-fl102",
       "transformer_asr:Xenova/mms-1b-all"
     ]
@@ -58,8 +50,6 @@
     "language_en": "Russian",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small",
       "transformer_asr:Xenova/mms-1b-fl102",
       "transformer_asr:Xenova/mms-1b-all"
     ]
@@ -71,8 +61,6 @@
     "language_en": "German",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small",
       "transformer_asr:Xenova/mms-1b-fl102",
       "transformer_asr:Xenova/mms-1b-all"
     ]
@@ -84,8 +72,6 @@
     "language_en": "French",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small",
       "transformer_asr:Xenova/mms-1b-fl102",
       "transformer_asr:Xenova/mms-1b-all"
     ]
@@ -97,8 +83,6 @@
     "language_en": "Spanish",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small",
       "transformer_asr:Xenova/mms-1b-fl102",
       "transformer_asr:Xenova/mms-1b-all"
     ]
@@ -109,9 +93,7 @@
     "language_ru": "Итальянский",
     "language_en": "Italian",
     "applicable_model_keys": [
-      "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small"
+      "whisper:Xenova/whisper-tiny"
     ]
   },
   "tr": {
@@ -121,8 +103,6 @@
     "language_en": "Turkish",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small",
       "transformer_asr:Xenova/mms-1b-fl102",
       "transformer_asr:Xenova/mms-1b-all"
     ]
@@ -133,9 +113,7 @@
     "language_ru": "Арабский",
     "language_en": "Arabic",
     "applicable_model_keys": [
-      "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small"
+      "whisper:Xenova/whisper-tiny"
     ]
   },
   "pl": {
@@ -144,9 +122,7 @@
     "language_ru": "Польский",
     "language_en": "Polish",
     "applicable_model_keys": [
-      "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small"
+      "whisper:Xenova/whisper-tiny"
     ]
   },
   "la": {
@@ -155,9 +131,7 @@
     "language_ru": "Латинский",
     "language_en": "Latin",
     "applicable_model_keys": [
-      "whisper:Xenova/whisper-tiny",
-      "whisper:Xenova/whisper-base",
-      "whisper:Xenova/whisper-small"
+      "whisper:Xenova/whisper-tiny"
     ]
   }
 }

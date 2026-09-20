@@ -1718,7 +1718,7 @@ let audioSettingsPanel = null;
 function getAudioSettingsFromDom() {
     const startEl = document.getElementById('playSequenceStart');
     const start = startEl ? String(startEl.value || '') : '';
-    const modeRadios = document.querySelectorAll('input[name="audio_exercise_mode"]');
+    const modeRadios = document.querySelectorAll('input[name="audioExerciseMode"]');
     let exercise_mode = 'record';
     modeRadios.forEach(r => { if (r.checked) exercise_mode = r.value; });
     return {
@@ -2439,20 +2439,16 @@ try { window.saveProfile = saveProfile; } catch (e) { }
 
 // Глобальная функция для карусели режимов распознавания (вызывается из HTML onclick)
 function cycleSpeechRecMode() {
-    var ALL_MODES = ['route', 'server', 'route-off|tiny', 'route-off|base', 'route-off|small'];
+    var ALL_MODES = ['route', 'server', 'route-off|tiny'];
     var MODE_ICONS = {
         'route': 'route',
         'server': 'server',
         'route-off|tiny': 'house-heart',
-        'route-off|base': 'house',
-        'route-off|small': 'house-plus',
     };
     var MODE_LABELS = {
         'route': 'Google Сервіси',
         'server': 'На сервері Whisper Tiny',
         'route-off|tiny': 'На пристрої Whisper Tiny · 75 MB',
-        'route-off|base': 'На пристрої Whisper Base · 145 MB',
-        'route-off|small': 'На пристрої Whisper Small · 480 MB',
     };
 
     function readMode() {
@@ -2502,8 +2498,6 @@ function bindProfileTestRecording() {
         'route': 'Google Сервіси',
         'server': 'На сервері Whisper Tiny',
         'route-off|tiny': 'На пристрої Whisper Tiny · 75 MB',
-        'route-off|base': 'На пристрої Whisper Base · 145 MB',
-        'route-off|small': 'На пристрої Whisper Small · 480 MB',
     };
 
     function readMode() {
@@ -2524,12 +2518,15 @@ function bindProfileTestRecording() {
     // Инициализируем иконку при загрузке
     if (modeIcon) {
         var mode = readMode();
+        // Устаревшие режимы base/small нормализуем к единственной поддерживаемой модели tiny.
+        if (mode === 'route-off|base' || mode === 'route-off|small') {
+            mode = 'route-off|tiny';
+            try { localStorage.setItem('dictafan_speech_rec_mode', mode); } catch (e) {}
+        }
         var iconName = {
             'route': 'route',
             'server': 'server',
             'route-off|tiny': 'house-heart',
-            'route-off|base': 'house',
-            'route-off|small': 'house-plus',
         }[mode] || 'route';
         var label = MODE_LABELS[mode] || 'Google Сервіси';
         modeIcon.title = label;

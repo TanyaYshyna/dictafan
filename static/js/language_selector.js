@@ -401,7 +401,8 @@ class LanguageSelector {
 
             const parts = String(modelKey).split(':');
             const hf = parts.length >= 2 ? parts.slice(1).join(':') : '';
-            const size = hf.includes('whisper-tiny') ? 'tiny' : (hf.includes('whisper-small') ? 'small' : 'base');
+            // Поддерживается единственная модель — tiny.
+            const size = 'tiny';
 
             this._openModelsCentricModal(this._t('profile.models.download_modal.preparing', null, 'Подготовка загрузки…'), 0);
 

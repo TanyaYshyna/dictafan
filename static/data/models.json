@@ -7,27 +7,7 @@
     "name": "Tiny",
     "size": "75 MB",
     "quality": "65%",
-    "recommended": false
-  },
-  {
-    "modelKey": "whisper:Xenova/whisper-base",
-    "modelType": "whisper",
-    "id": "base",
-    "hf_repo": "Xenova/whisper-base",
-    "name": "Base",
-    "size": "145 MB",
-    "quality": "75%",
     "recommended": true
-  },
-  {
-    "modelKey": "whisper:Xenova/whisper-small",
-    "modelType": "whisper",
-    "id": "small",
-    "hf_repo": "Xenova/whisper-small",
-    "name": "Small",
-    "size": "480 MB",
-    "quality": "85%",
-    "recommended": false
   },
   {
     "modelKey": "transformer_asr:Xenova/wav2vec2-base-960h",
