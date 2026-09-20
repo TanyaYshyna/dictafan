@@ -722,8 +722,14 @@
   border-color: var(--color-button-text-yellow, #f9c609);
  }
 
+/* ВАЖНО: выпадающие меню («...» в шапке книги и у разделов) должны быть ВЫШЕ
+   карточек диктантов из списка. Карточки `.short-card.dictation-kart` имеют
+   z-index: 50 (см. dictation_kart.css), а здесь wrapper был z-index: 1 —
+   из-за чего меню пряталось ЗА карточками и кнопку «Добавить диктант»
+   нельзя было нажать. Поднимаем wrapper (и вместе с ним его контекст)
+   выше уровня карточек. */
 #book-view-modal .dropdown-menu-wrapper {
-  z-index: 1;
+  z-index: 6000;
 }
 
 #book-view-modal .dropdown-menu {
