@@ -407,14 +407,21 @@
         let iconName = 'route';
         if (m === 'server') {
           iconName = 'server';
-        } else if (m === 'route-off') {
-          // Пытаемся определить размер модели из localStorage
+        } else if (m.startsWith('route-off')) {
+          // Определяем размер модели. Приоритет: значение из самого режима
+          // (например 'route-off|tiny'), затем localStorage.
           try {
-            const lsVal = localStorage.getItem('dictafan_speech_rec_mode') || '';
-            if (lsVal.includes('|tiny')) iconName = 'house-heart';
-            else if (lsVal.includes('|base')) iconName = 'house';
-            else if (lsVal.includes('|small')) iconName = 'house-plus';
-            else iconName = 'house-heart'; // fallback
+            const fromMode = m.includes('|') ? m.split('|')[1] : '';
+            let size = fromMode;
+            if (!size) {
+              const lsVal = localStorage.getItem('dictafan_speech_rec_mode') || '';
+              if (lsVal.includes('|tiny')) size = 'tiny';
+              else if (lsVal.includes('|base')) size = 'base';
+              else if (lsVal.includes('|small')) size = 'small';
+            }
+            if (size === 'base') iconName = 'house';
+            else if (size === 'small') iconName = 'house-plus';
+            else iconName = 'house-heart'; // tiny (fallback)
           } catch (e) {
             iconName = 'house-heart';
           }

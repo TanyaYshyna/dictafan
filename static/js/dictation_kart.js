@@ -741,6 +741,32 @@ window.DictationKart = window.DictationKart || {
       });
     }
 
+    // Клик по картинке в карточке книги: если есть ссылка на материалы автора —
+    // открываем её в новой вкладке. Чтобы не конфликтовать с двойным кликом
+    // (добавление на стол + запуск диктанта), откладываем открытие на короткий
+    // таймаут и отменяем его, если следом пришёл второй клик (dblclick).
+    if (thumb && cardEl.classList.contains('dictation-kart--book-row') && !thumb.dataset.boundBookAuthor) {
+      thumb.dataset.boundBookAuthor = '1';
+      thumb.addEventListener('click', (e) => {
+        try {
+          if (cardEl.__bookThumbClickTimer) {
+            clearTimeout(cardEl.__bookThumbClickTimer);
+            cardEl.__bookThumbClickTimer = null;
+            return;
+          }
+          const url = String(cardEl.getAttribute('data-author-materials-url') || '').trim();
+          if (!url) return;
+          e.preventDefault();
+          e.stopPropagation();
+          cardEl.__bookThumbClickTimer = setTimeout(() => {
+            cardEl.__bookThumbClickTimer = null;
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }, 260);
+        } catch (e5) {
+        }
+      });
+    }
+
     try {
       const launchBtn = cardEl.querySelector('[data-action="launch-assignment"]');
       const launchMenu = cardEl.querySelector('.dictation-kart-launch-menu');
@@ -1459,7 +1485,7 @@ window.DictationKart = window.DictationKart || {
     ];
   },
 
-  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation, isDialog, audioOrder, isFirstLoad }) {
+  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation, isDialog, audioOrder, isFirstLoad, authorMaterialsUrl }) {
     const items = this.buildMenuItems(context);
 
     const t = (key, fallback) => {
@@ -1501,6 +1527,7 @@ window.DictationKart = window.DictationKart || {
                 attrs.push(`data-is-dialog="${isDialog ? 'true' : 'false'}"`);
                 attrs.push(`data-audio-order="${window.escapeHtml(String(audioOrder || ''))}"`);
                 attrs.push(`data-is-first-load="${isFirstLoad ? 'true' : 'false'}"`);
+                attrs.push(`data-author-materials-url="${window.escapeHtml(String(authorMaterialsUrl || ''))}"`);
               } else if (it.action === 'remove-from-desk') {
                 attrs.push(`data-desk-item-id="${window.escapeHtml(String(deskItemId || ''))}"`);
                 attrs.push(`data-dictation-id="${window.escapeHtml(String(dictationId || ''))}"`);
@@ -1573,10 +1600,11 @@ window.DictationKart = window.DictationKart || {
       isDialog: item.is_dialog,
       audioOrder: item.audio_order,
       isFirstLoad: item.is_first_load,
+      authorMaterialsUrl: item.author_materials_url,
     });
 
     return `
-      <div class="short-card dictation-kart desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}" data-lang-original="${langOriginal}" data-available-translations="${window.escapeHtml(JSON.stringify(availableTranslations))}">
+      <div class="short-card dictation-kart desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}" data-lang-original="${langOriginal}" data-available-translations="${window.escapeHtml(JSON.stringify(availableTranslations))}" data-author-materials-url="${window.escapeHtml(String(item.author_materials_url || ''))}">
         <div class="short-thumb" data-href="${openUrl}" role="link" tabindex="0">
           <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async" draggable="false" onerror="this.onerror=null;this.src='/static/data/covers/cover_en.webp'">
           <div class="card-progress-stats">
@@ -1652,10 +1680,11 @@ window.DictationKart = window.DictationKart || {
       isDialog: d.is_dialog,
       audioOrder: d.audio_order,
       isFirstLoad: d.is_first_load,
+      authorMaterialsUrl: d.author_materials_url,
     });
 
     return `
-      <div class="short-card dictation-kart dictation-kart--book-row ${isOnDesk ? 'short-card--on-desk' : 'short-card--off-desk'}" data-dictation-id="${dbId}" data-action="toggle-desk" data-edit-url="${editUrl}" data-lang-original="${langOriginal}" data-available-translations="${window.escapeHtml(JSON.stringify(availableTranslations))}">
+      <div class="short-card dictation-kart dictation-kart--book-row ${isOnDesk ? 'short-card--on-desk' : 'short-card--off-desk'}" data-dictation-id="${dbId}" data-action="toggle-desk" data-edit-url="${editUrl}" data-lang-original="${langOriginal}" data-available-translations="${window.escapeHtml(JSON.stringify(availableTranslations))}" data-author-materials-url="${window.escapeHtml(String(d.author_materials_url || ''))}">
         <div class="short-thumb">
           <img src="${coverUrl}" alt="${d.title || 'Обложка диктанта'}" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
         </div>
@@ -1732,6 +1761,7 @@ window.DictationKart = window.DictationKart || {
     node.setAttribute('data-desk-item-id', String(item.id || ''));
     node.setAttribute('data-lang-original', String(langOriginal || ''));
     node.setAttribute('data-available-translations', String(JSON.stringify(availableTranslations)));
+    node.setAttribute('data-author-materials-url', String(item.author_materials_url || ''));
 
     const thumb = node.querySelector('.short-thumb');
     if (thumb) {
@@ -1788,6 +1818,7 @@ window.DictationKart = window.DictationKart || {
         isDialog: item.is_dialog,
         audioOrder: item.audio_order,
         isFirstLoad: item.is_first_load,
+        authorMaterialsUrl: item.author_materials_url,
       });
     }
 
@@ -1833,6 +1864,7 @@ window.DictationKart = window.DictationKart || {
     node.setAttribute('data-edit-url', editUrl);
     node.setAttribute('data-lang-original', String(langOriginal || ''));
     node.setAttribute('data-available-translations', String(JSON.stringify(availableTranslations)));
+    node.setAttribute('data-author-materials-url', String(d.author_materials_url || ''));
 
     const img = node.querySelector('.short-thumb img');
     if (img) {
@@ -1890,6 +1922,7 @@ window.DictationKart = window.DictationKart || {
         isDialog: d.is_dialog,
         audioOrder: d.audio_order,
         isFirstLoad: d.is_first_load,
+        authorMaterialsUrl: d.author_materials_url,
       });
     }
 

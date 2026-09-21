@@ -1610,6 +1610,11 @@
   box-sizing: border-box !important;
 }
 
+#user-profile-modal #userAudioSettingsContainer .audio-settings-input .play-sequence-input::placeholder {
+  color: var(--color-text-placeholder, #9ca3af) !important;
+  opacity: 1 !important;
+}
+
 #user-profile-modal #userAudioSettingsContainer .audio-settings-input .play-sequence-input:focus {
   outline: none !important;
   border-color: var(--color-button-text-pink) !important;

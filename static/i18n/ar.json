@@ -435,7 +435,13 @@
       "activity_report": "تقرير النشاط",
       "rating": "التصنيف",
       "plan_fact": "تقرير الخطة مقابل الواقع",
-      "support": "ادعمني بقهوة"
+      "support": "ادعمني بقهوة",
+      "license": "شراء الوصول",
+      "tracker": "متتبع النشاط",
+      "ratings": "التصنيفات",
+      "dictation_report": "تقرير الإملاء",
+      "coffee": "ادعمني بقهوة",
+      "admin_panel": "لوحة الإدارة"
     },
     "delete_modal": {
       "title": "حذف الإملاء",

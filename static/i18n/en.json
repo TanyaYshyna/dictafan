@@ -440,7 +440,13 @@
       "activity_report": "Activity report",
       "rating": "Rating",
       "plan_fact": "Plan-fact report",
-      "support": "Buy me a coffee"
+      "support": "Buy me a coffee",
+      "license": "Buy access",
+      "tracker": "Activity tracker",
+      "ratings": "Ratings",
+      "dictation_report": "Dictation report",
+      "coffee": "Buy me a coffee",
+      "admin_panel": "Admin panel"
     },
     "delete_modal": {
       "title": "Delete dictation",

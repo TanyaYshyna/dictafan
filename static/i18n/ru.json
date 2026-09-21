@@ -440,7 +440,13 @@
       "activity_report": "Отчет об активности",
       "rating": "Рейтинг",
       "plan_fact": "Отчет План-факт",
-      "support": "На каву"
+      "support": "На каву",
+      "license": "Купить доступ",
+      "tracker": "Трекер",
+      "ratings": "Рейтинги",
+      "dictation_report": "Отчет по диктантам",
+      "coffee": "На кофе",
+      "admin_panel": "Админ-панель"
     },
     "delete_modal": {
       "title": "Удалить диктант",

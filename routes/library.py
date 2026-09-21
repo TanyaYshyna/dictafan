@@ -99,7 +99,7 @@ def _build_desk_item_payload(dictation_id: int, desk_item_id: int, planned_date)
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'dictations'
-              AND column_name IN ('sentences_count', 'audio_order', 'is_first_load')
+              AND column_name IN ('sentences_count', 'audio_order', 'is_first_load', 'author_materials_url')
             """
         )
         existing_cols = {row["column_name"] for row in (cur.fetchall() or [])}
@@ -119,6 +119,11 @@ def _build_desk_item_payload(dictation_id: int, desk_item_id: int, planned_date)
             if "is_first_load" in existing_cols
             else "FALSE"
         )
+        author_materials_url_sql = (
+            "COALESCE(d.author_materials_url, '')"
+            if "author_materials_url" in existing_cols
+            else "''"
+        )
 
         query = f"""
             SELECT
@@ -130,6 +135,7 @@ def _build_desk_item_payload(dictation_id: int, desk_item_id: int, planned_date)
                 {sentences_count_sql} AS sentences_count,
                 {audio_order_sql} AS audio_order,
                 {is_first_load_sql} AS is_first_load,
+                {author_materials_url_sql} AS author_materials_url,
                 (SELECT DISTINCT language_code
                  FROM dictation_sentences
                  WHERE dictation_id = d.id AND language_code != d.language_code
@@ -176,6 +182,7 @@ def _build_desk_item_payload(dictation_id: int, desk_item_id: int, planned_date)
             "sentences_count": row["sentences_count"] or 0,
             "audio_order": row["audio_order"] or "",
             "is_first_load": bool(row["is_first_load"]) if row["is_first_load"] is not None else False,
+            "author_materials_url": row.get("author_materials_url") or "",
             "cover_url": f"/api/dictations_covers/{dictation_id}.webp",
         }
     finally:

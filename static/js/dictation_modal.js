@@ -35,6 +35,8 @@
     _sentencePreviousAccumulatedTime: 0,
     // Доступные языки перевода (из карточки data-available-translations)
     _availableTranslations: [],
+    // Ссылка на материалы автора (из карточки data-author-materials-url)
+    authorMaterialsUrl: '',
     // Инстанс languageSelector для флагов в шапке
     _headerLangPairSelector: null,
     // Начальный язык перевода, вычисленный в renderModalLangPair (применяется к сессии после её создания)
@@ -48,6 +50,9 @@
     // отзывается, при смене предложения blob очищается.
     _userAudioBlob: null,
     _userAudioObjectUrl: null,
+    // Локальный (в рамках текущего диктанта) режим распознавания, установленный
+    // кликом по иконке. Не персистится: при новом открытии диктанта сбрасывается.
+    _speechRecModeOverride: null,
   };
 
   /**
@@ -3915,18 +3920,32 @@
   }
 
   function getPlaySequenceStartValue() {
+    // Приоритет 1: runtime-значение window.playSequenceStart — именно его обновляет
+    // applyToRuntime() в настройках аудио диктанта при изменении схемы (t/o) в процессе
+    // выполнения. Раньше первым читался input #playSequenceStart из модалки ПРОФИЛЯ,
+    // который не меняется при изменении настроек диктанта, из-за чего схема не применялась.
     try {
-      const el = document.getElementById('playSequenceStart');
+      const v = window.playSequenceStart != null ? String(window.playSequenceStart) : '';
+      if (v.trim()) {
+        return v.trim();
+      }
+    } catch (e) {
+    }
+    // Приоритет 2: поле ввода схемы в настройках аудио самого диктанта
+    try {
+      const el = document.getElementById('modal-playSequenceStart');
       const v = el && el.value != null ? String(el.value) : '';
       if (v.trim()) {
         return v.trim();
       }
     } catch (e) {
     }
+    // Приоритет 3: поле ввода схемы в модалке профиля (устаревший fallback)
     try {
-      const v = window.playSequenceStart != null ? String(window.playSequenceStart) : '';
+      const el = document.getElementById('playSequenceStart');
+      const v = el && el.value != null ? String(el.value) : '';
       if (v.trim()) {
-       return v.trim();
+        return v.trim();
       }
     } catch (e) {
     }
@@ -4320,17 +4339,12 @@
     }
 
     try {
-      let speechRecMode = 'route';
-      try {
-        const lsVal = localStorage.getItem('dictafan_speech_rec_mode');
-        if (lsVal) {
-          speechRecMode = String(lsVal);
-        }
-      } catch (eLs) {
-      }
-      // Нормализуем: route-off|tiny → route-off (для speech_recognition_unified.js)
-      const normalized = speechRecMode.startsWith('route-off') ? 'route-off' : speechRecMode;
-      panel.setMode(normalized);
+      // Применяем эффективный режим (локальный override кликом по иконке имеет
+      // приоритет над сохранённым дефолтом). Передаём полное значение
+      // (например 'route-off|tiny'), т.к. speech_recognition_unified.js проверяет
+      // offline именно по префиксу 'route-off|'.
+      const speechRecMode = _getEffectiveSpeechRecMode();
+      panel.setMode(speechRecMode);
     } catch (eSm2) {
     }
 
@@ -4727,6 +4741,37 @@
         try { img.onerror = null; } catch (e1) {}
         img.src = '/static/data/covers/cover_en.webp';
       };
+
+      // Клик по обложке диктанта (возле логотипа) — открывает ссылку на материалы
+      // автора в новой вкладке, если она есть. Биндим один раз.
+      try {
+        if (!img.dataset.boundAuthorLink) {
+          img.dataset.boundAuthorLink = '1';
+          img.addEventListener('click', (e) => {
+            try {
+              const url = String(dictationModalState.authorMaterialsUrl || '').trim();
+              if (!url) return;
+              e.preventDefault();
+              e.stopPropagation();
+              window.open(url, '_blank', 'noopener,noreferrer');
+            } catch (e2) {
+            }
+          });
+        }
+        const authorUrl = String(dictationModalState.authorMaterialsUrl || '').trim();
+        if (authorUrl) {
+          img.style.cursor = 'pointer';
+          img.setAttribute('title', authorUrl);
+          img.setAttribute('role', 'link');
+          img.setAttribute('tabindex', '0');
+        } else {
+          img.style.cursor = '';
+          img.removeAttribute('title');
+          img.removeAttribute('role');
+          img.removeAttribute('tabindex');
+        }
+      } catch (e3) {
+      }
     } catch (e) {
     }
   }
@@ -6120,6 +6165,13 @@
       dictationData.setAttribute('data-lang-notice', '');
       dictationData.setAttribute('data-is-dialog', 'false');
       dictationData.setAttribute('data-speakers', '[]');
+      try {
+        const authorUrl = cardEl ? String(cardEl.getAttribute('data-author-materials-url') || '') : '';
+        dictationModalState.authorMaterialsUrl = authorUrl;
+        dictationData.setAttribute('data-author-materials-url', authorUrl);
+      } catch (e) {
+        dictationModalState.authorMaterialsUrl = '';
+      }
 
       try {
         let title = '';
@@ -6366,6 +6418,90 @@
     } catch (e) {}
   }
 
+  // Режим распознавания, который реально используется в текущем диктанте:
+  // локальный override (клик по иконке) имеет приоритет над сохранённым дефолтом.
+  function _getEffectiveSpeechRecMode() {
+    try {
+      if (dictationModalState._speechRecModeOverride) {
+        return String(dictationModalState._speechRecModeOverride);
+      }
+    } catch (e) {}
+    return _readSpeechRecModeFromLS();
+  }
+
+  function _applySpeechRecModeToPanel(mode) {
+    try {
+      const panel = dictationModalState._speechPanel;
+      if (panel && typeof panel.setMode === 'function') {
+        panel.setMode(mode);
+      }
+    } catch (e) {}
+  }
+
+  // Клик по иконке режима распознавания в диктанте: циклически переключает режимы.
+  // В отличие от профиля НЕ пишет в localStorage — значение живёт только в рамках
+  // текущего диктанта (dictationModalState._speechRecModeOverride).
+  function cycleDictationSpeechRecMode() {
+    var ALL_MODES = ['route', 'server', 'route-off|tiny'];
+    var MODE_ICONS = {
+      'route': 'route',
+      'server': 'server',
+      'route-off|tiny': 'house-heart',
+    };
+    var MODE_LABELS = {
+      'route': dictationT('models.method_google', 'Google Сервіси'),
+      'server': dictationT('models.method_server_whisper_tiny', 'На сервері Whisper Tiny'),
+      'route-off|tiny': dictationT('models.method_device_whisper_tiny', 'На пристрої Whisper Tiny') + ' · 75 MB',
+    };
+
+    var current = _getEffectiveSpeechRecMode();
+    var idx = ALL_MODES.indexOf(current);
+    if (idx === -1 || idx >= ALL_MODES.length - 1) {
+      idx = 0;
+    } else {
+      idx = idx + 1;
+    }
+    var next = ALL_MODES[idx];
+
+    try {
+      dictationModalState._speechRecModeOverride = next;
+    } catch (e) {}
+
+    _applySpeechRecModeToPanel(next);
+
+    // Обновляем иконку и подсказку
+    try {
+      var modeIcon = document.getElementById('recognitionModeIcon');
+      if (modeIcon) {
+        var iconName = MODE_ICONS[next] || 'route';
+        var label = MODE_LABELS[next] || 'Google Сервіси';
+        modeIcon.title = label;
+        modeIcon.innerHTML = '<i data-lucide="' + iconName + '"></i>';
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      }
+    } catch (e) {}
+  }
+
+  function bindRecognitionModeIconClick() {
+    try {
+      const icon = document.getElementById('recognitionModeIcon');
+      if (!icon) return;
+      if (icon.dataset.boundDictationModeCycle === '1') return;
+      icon.dataset.boundDictationModeCycle = '1';
+      icon.style.cursor = 'pointer';
+      icon.setAttribute('role', 'button');
+      icon.addEventListener('click', (e) => {
+        try {
+          e.preventDefault();
+          e.stopPropagation();
+        } catch (e0) {}
+        cycleDictationSpeechRecMode();
+      });
+    } catch (e) {}
+  }
+
   function _getDownloadedWhisperSizes() {
     try {
       // LanguageSelector хранит downloaded_models_v2, а не dictafan_downloaded_models_v2
@@ -6584,12 +6720,16 @@
           const speechRecMode = _getSelectedSpeechRecMode();
           _writeSpeechRecModeToLS(speechRecMode);
 
-          // Обновляем иконку режима распознавания в панели диктанта
+          // Обновляем иконку режима распознавания в панели диктанта.
+          // Сброс локального override: сохранение дефолта из настроек имеет приоритет.
+          try {
+            dictationModalState._speechRecModeOverride = null;
+          } catch (eOverride) {
+          }
           try {
             const panel = dictationModalState._speechPanel;
             if (panel && typeof panel.setMode === 'function') {
-              const normalized = speechRecMode.startsWith('route-off') ? 'route-off' : speechRecMode;
-              panel.setMode(normalized);
+              panel.setMode(speechRecMode);
             }
           } catch (ePanel) {
           }
@@ -7576,6 +7716,19 @@
       try {
         window.__dictationModalActiveSession = null;
       } catch (e0s) {
+      }
+
+      // Сбрасываем локальный (в рамках диктанта) override режима распознавания —
+      // эксперимент с иконкой не должен переходить на следующий диктант.
+      try {
+        dictationModalState._speechRecModeOverride = null;
+      } catch (eOverrideReset) {
+      }
+
+      // Привязываем клик по иконке режима распознавания (если ещё не привязан)
+      try {
+        bindRecognitionModeIconClick();
+      } catch (eBindIcon) {
       }
 
       try {

@@ -440,7 +440,13 @@
       "activity_report": "Aktivite raporu",
       "rating": "Derecelendirme",
       "plan_fact": "Plan-gerçek raporu",
-      "support": "Bana kahve ısmarla"
+      "support": "Bana kahve ısmarla",
+      "license": "Erişim satın al",
+      "tracker": "Aktivite takibi",
+      "ratings": "Derecelendirmeler",
+      "dictation_report": "Dikte raporu",
+      "coffee": "Bana kahve ısmarla",
+      "admin_panel": "Yönetici paneli"
     },
     "delete_modal": {
       "title": "Dikteyi sil",

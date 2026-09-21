@@ -90,7 +90,7 @@ def api_desk_items():
             WHERE (table_name = 'dictations'
               AND column_name IN ('tr_en','tr_uk','tr_sv','tr_be','tr_ru',
                                   'tr_de','tr_fr','tr_es','tr_it','tr_tr',
-                                  'tr_ar','tr_pl','sentences_count','audio_order'))
+                                  'tr_ar','tr_pl','sentences_count','audio_order','author_materials_url'))
               OR (table_name = 'desk_items'
               AND column_name IN ('planned_date'))
             """
@@ -125,6 +125,11 @@ def api_desk_items():
             if "audio_order" in dictation_cols
             else "'' AS audio_order"
         )
+        author_materials_url_sql = (
+            "d.author_materials_url AS author_materials_url"
+            if "author_materials_url" in dictation_cols
+            else "NULL AS author_materials_url"
+        )
         planned_date_sql = (
             "di.planned_date"
             if "planned_date" in desk_items_cols
@@ -144,6 +149,7 @@ def api_desk_items():
                 {', '.join(tr_cols_sql)},
                 {sentences_count_sql},
                 {audio_order_sql},
+                {author_materials_url_sql},
                 (SELECT DISTINCT language_code
                  FROM dictation_sentences
                  WHERE dictation_id = d.id AND language_code != d.language_code
@@ -203,6 +209,7 @@ def api_desk_items():
                     "level": row["level"],
                     "sentences_count": row["sentences_count"] or 0,
                     "audio_order": row.get("audio_order") or '',
+                    "author_materials_url": row.get("author_materials_url") or '',
                     "cover_url": cover_url,
                     "tr_en": bool(row.get("tr_en")),
                     "tr_uk": bool(row.get("tr_uk")),

@@ -906,6 +906,11 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   color: var(--color-text, #1f2933);
 }
 
+#audioSettingsModal #modal-playSequenceStart::placeholder {
+  color: var(--color-text-placeholder, #9ca3af);
+  opacity: 1;
+}
+
 #audioSettingsModal #modal-playSequenceStart:focus {
   outline: none;
   border-color: var(--color-button-text-pink);
@@ -1464,6 +1469,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal .recognition-mode-icon,
 #dictationModal #recognitionModeIcon {
   color: var(--color-button-purple);
+  cursor: pointer;
 }
 
 #dictationModal .audio-user-indicator,
