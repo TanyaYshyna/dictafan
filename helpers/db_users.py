@@ -107,6 +107,9 @@ def create_user(
                     "show_text": False,
                     "speech_recognition_mode": "route",
                 },
+                # Способ учёта звёзд: "star" — перфекционист (добиваться целой звезды),
+                # "half" — достаточно полузвезды (сразу переходить к аудио и далее).
+                "star_counting": "star",
             },
             ensure_ascii=False,
         )

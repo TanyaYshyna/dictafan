@@ -279,6 +279,20 @@
                                     </tr>
                                 </table>
                             </div>
+
+                            <div class="dictation-settings-card dictation-settings-card-star-counting">
+                                <div class="dictation-settings-title">{{ t('profile.star_counting.label') }}</div>
+                                <div class="dictation-settings-star-counting-modes">
+                                    <label class="dictation-settings-star-counting-mode">
+                                        <input type="radio" name="starCountingMode" id="starCountingModeStar" value="star" />
+                                        <span class="dictation-settings-inline"><i data-lucide="star"></i><span>{{ t('profile.star_counting.star') }}</span></span>
+                                    </label>
+                                    <label class="dictation-settings-star-counting-mode">
+                                        <input type="radio" name="starCountingMode" id="starCountingModeHalf" value="half" />
+                                        <span class="dictation-settings-inline"><i data-lucide="star-half"></i><span>{{ t('profile.star_counting.half') }}</span></span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

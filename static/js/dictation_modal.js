@@ -2147,14 +2147,44 @@
                 checkBtn.focus();
               }
             } else if (textOk && corrected > 0 && perfect < 1 && !dictationModalState._completionShown) {
-              // Полузвезда — фокус на checkBtn (кнопка повтора в режиме half)
-              const checkBtn = document.getElementById('checkBtn');
-              if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
-                try {
-                  dictationModalState._skipNavigatorFocusOnce = true;
-                } catch (e0skip) {
+              // Есть полузвезда. Куда ведём фокус — зависит от способа учёта звёзд:
+              // - 'star' (перфекционист): фокус на checkBtn (кнопка повтора), чтобы добиться целой звезды.
+              // - 'half': полузвезды достаточно — сразу переходим к записи аудио или кнопке "Далее".
+              const starCounting = getStarCountingMode();
+              if (starCounting === 'half') {
+                if (!audioOk && requiresAudio > 0) {
+                  try {
+                    updateAudioUserPanelVisibilityFromSession(session);
+                  } catch (e00) {
+                  }
+                  const rb = document.getElementById('recordButton');
+                  if (rb && typeof rb.focus === 'function') {
+                    try {
+                      dictationModalState._skipNavigatorFocusOnce = true;
+                    } catch (e0x) {
+                    }
+                    rb.focus();
+                  }
+                } else {
+                  const nb = document.getElementById('resultNextBtn');
+                  if (nb && !nb.disabled && typeof nb.focus === 'function') {
+                    try {
+                      dictationModalState._skipNavigatorFocusOnce = true;
+                    } catch (e0y) {
+                    }
+                    nb.focus();
+                  }
                 }
-                checkBtn.focus();
+              } else {
+                // Полузвезда — фокус на checkBtn (кнопка повтора в режиме half)
+                const checkBtn = document.getElementById('checkBtn');
+                if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
+                  try {
+                    dictationModalState._skipNavigatorFocusOnce = true;
+                  } catch (e0skip) {
+                  }
+                  checkBtn.focus();
+                }
               }
             } else if (textOk && !audioOk && requiresAudio > 0) {
               try {
@@ -3952,6 +3982,25 @@
     return 'oto';
   }
 
+  function getStarCountingMode() {
+    // Возвращает предпочитаемый пользователем способ учёта звёзд:
+    // 'star' — перфекционист (добиваться целой звезды, полузвезда не считается),
+    // 'half' — достаточно полузвезды (сразу переходить к аудио и далее).
+    try {
+      const um = window.UM;
+      if (um && um.userData && um.userData.settings_json) {
+        const raw = String(um.userData.settings_json || '');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const mode = parsed && parsed.star_counting != null ? String(parsed.star_counting).trim() : '';
+          if (mode === 'half') return 'half';
+        }
+      }
+    } catch (e) {
+    }
+    return 'star';
+  }
+
   function loadPlaySequenceStartFromUser() {
     try {
       const um = window.UM;
@@ -4294,12 +4343,27 @@
                 const checkBtn = document.getElementById('checkBtn');
                 const nextBtn = document.getElementById('resultNextBtn');
 
-                if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
-                  checkBtn.focus();
-                } else if (nextBtn && !nextBtn.disabled && typeof nextBtn.focus === 'function') {
-                  nextBtn.focus();
-                } else if (checkBtn && typeof checkBtn.focus === 'function') {
-                  checkBtn.focus();
+                // Способ учёта звёзд:
+                // - 'star' (перфекционист): после записи аудио возвращаем фокус на полузвезду
+                //   (checkBtn), чтобы добиться целой звезды.
+                // - 'half': полузвезды достаточно — после аудио ведём на кнопку "Далее".
+                const starCounting = getStarCountingMode();
+                if (starCounting === 'half') {
+                  if (nextBtn && !nextBtn.disabled && typeof nextBtn.focus === 'function') {
+                    nextBtn.focus();
+                  } else if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
+                    checkBtn.focus();
+                  } else if (nextBtn && typeof nextBtn.focus === 'function') {
+                    nextBtn.focus();
+                  }
+                } else {
+                  if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
+                    checkBtn.focus();
+                  } else if (nextBtn && !nextBtn.disabled && typeof nextBtn.focus === 'function') {
+                    nextBtn.focus();
+                  } else if (checkBtn && typeof checkBtn.focus === 'function') {
+                    checkBtn.focus();
+                  }
                 }
               } else if (!completionShown) {
                 const rb = document.getElementById('recordButton');
@@ -6681,12 +6745,15 @@
       const rbNoRecord = document.getElementById('modal-audioExerciseModeNoRecord');
       const rbOnlyNoHint = document.getElementById('modal-audioExerciseModeOnlyNoHint');
       const rbOnlyHint = document.getElementById('modal-audioExerciseModeOnlyHint');
+      const rbStarCountingStar = document.getElementById('modal-starCountingStar');
+      const rbStarCountingHalf = document.getElementById('modal-starCountingHalf');
       const star = document.getElementById('audioSettingsDirtyStar');
       const saveBtn = document.getElementById('saveAudioSettingsModalBtn');
 
       const defaults = {
         start: 'oto',
         exercise_mode: 'record',
+        star_counting: 'star',
       };
 
       const readFromUser = () => {
@@ -6696,9 +6763,11 @@
           if (raw) {
             const parsed = JSON.parse(raw);
             const audio = parsed && parsed.audio && typeof parsed.audio === 'object' ? parsed.audio : {};
+            const starCounting = parsed && parsed.star_counting != null ? String(parsed.star_counting || '') : '';
             return {
               start: audio.start != null ? String(audio.start || '') : defaults.start,
               exercise_mode: audio.exercise_mode != null ? String(audio.exercise_mode || '') : defaults.exercise_mode,
+              star_counting: starCounting === 'half' ? 'half' : defaults.star_counting,
             };
           }
         } catch (e) {
@@ -6706,6 +6775,7 @@
         return {
           start: defaults.start,
           exercise_mode: defaults.exercise_mode,
+          star_counting: defaults.star_counting,
         };
       };
 
@@ -6733,6 +6803,16 @@
           return v || defaults.exercise_mode;
         } catch (e) {
           return defaults.exercise_mode;
+        }
+      };
+
+      const getSelectedStarCounting = () => {
+        try {
+          const el = m.querySelector('input[name="modal-starCountingMode"]:checked');
+          const v = el ? String(el.value || '') : '';
+          return v === 'half' ? 'half' : defaults.star_counting;
+        } catch (e) {
+          return defaults.star_counting;
         }
       };
 
@@ -6769,6 +6849,13 @@
           if (rbOnlyNoHint) rbOnlyNoHint.checked = mode === 'audio-only-no-hint';
           if (rbOnlyHint) rbOnlyHint.checked = mode === 'audio-only-hint';
         } catch (e2) {
+        }
+
+        const starCounting = (settings && settings.star_counting) ? String(settings.star_counting || '') : defaults.star_counting;
+        try {
+          if (rbStarCountingStar) rbStarCountingStar.checked = starCounting !== 'half';
+          if (rbStarCountingHalf) rbStarCountingHalf.checked = starCounting === 'half';
+        } catch (e3) {
         }
 
         // Применяем режим распознавания из localStorage
@@ -6847,6 +6934,7 @@
           const settings = {
             start: startInput ? String(startInput.value || '') : defaults.start,
             exercise_mode: getSelectedExerciseMode(),
+            star_counting: getSelectedStarCounting(),
           };
 
           let merged = {};
@@ -6862,6 +6950,7 @@
           if (!merged.audio || typeof merged.audio !== 'object') merged.audio = {};
           merged.audio.start = settings.start || defaults.start;
           merged.audio.exercise_mode = settings.exercise_mode || defaults.exercise_mode;
+          merged.star_counting = settings.star_counting || defaults.star_counting;
 
           await um.updateProfile({
             settings_json: JSON.stringify(merged),
@@ -6870,7 +6959,11 @@
           });
 
           try {
-            settingsState.snapshot = { start: merged.audio.start, exercise_mode: merged.audio.exercise_mode };
+            settingsState.snapshot = {
+              start: merged.audio.start,
+              exercise_mode: merged.audio.exercise_mode,
+              star_counting: merged.star_counting || defaults.star_counting,
+            };
           } catch (e1) {
           }
           setDirty(false);
@@ -6916,6 +7009,14 @@
 
       try {
         [rbRecord, rbNoRecord, rbOnlyNoHint, rbOnlyHint].forEach((rb) => {
+          if (!rb) return;
+          rb.addEventListener('change', () => onAnyChange());
+        });
+      } catch (e) {
+      }
+
+      try {
+        [rbStarCountingStar, rbStarCountingHalf].forEach((rb) => {
           if (!rb) return;
           rb.addEventListener('change', () => onAnyChange());
         });

@@ -843,18 +843,35 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 }
 
 #audioSettingsModal .dictation-settings-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas: "order params" "speech-rec speech-rec";
-  gap: 16px;
+display: grid;
+grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+grid-template-areas: "order params" "speech-rec speech-rec" "star-counting star-counting";
+gap: 16px;
 }
 
 #audioSettingsModal .dictation-settings-card-order {
-  grid-area: order;
+grid-area: order;
 }
 
 #audioSettingsModal .dictation-settings-card-params {
-  grid-area: params;
+grid-area: params;
+}
+
+#audioSettingsModal .dictation-settings-card-star-counting {
+grid-area: star-counting;
+}
+
+#audioSettingsModal .dictation-settings-star-counting-modes {
+display: flex;
+flex-direction: row;
+flex-wrap: wrap;
+gap: 10px;
+}
+
+#audioSettingsModal .dictation-settings-star-counting-mode {
+display: flex;
+align-items: center;
+gap: 10px;
 }
 
 #audioSettingsModal .dictation-settings-card {
@@ -1001,13 +1018,14 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 }
 
 @media (max-width: 780px) {
-  #audioSettingsModal .dictation-settings-grid {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "order"
-      "params"
-      "speech-rec";
-  }
+#audioSettingsModal .dictation-settings-grid {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "order"
+    "params"
+    "speech-rec"
+    "star-counting";
+}
 }
 
 #audioSettingsModal .dictation-settings-card-speech-rec {

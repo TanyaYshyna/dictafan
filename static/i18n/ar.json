@@ -117,6 +117,11 @@
         "no_record": "عدم تسجيل الصوت",
         "audio_only_no_hint": "صوت فقط (بدون تلميح)",
         "audio_only_hint": "صوت فقط (مع تلميح)"
+      },
+      "star_counting": {
+        "label": "طريقة حساب النجوم",
+        "star": "نجمة (لوسيلدا)",
+        "half": "نصف نجمة (لوسيلدا أيضًا)"
       }
     },
     "assignment_history": {

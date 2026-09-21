@@ -122,6 +122,11 @@
         "no_record": "sesi kaydetme",
         "audio_only_no_hint": "yalnızca ses (ipucu yok)",
         "audio_only_hint": "yalnızca ses (ipucu ile)"
+      },
+      "star_counting": {
+        "label": "Yıldız sayma yöntemi",
+        "star": "yıldız (Lucilda)",
+        "half": "yarım yıldız (yine Lucilda)"
       }
     },
     "assignment_history": {

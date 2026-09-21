@@ -1721,9 +1721,13 @@ function getAudioSettingsFromDom() {
     const modeRadios = document.querySelectorAll('input[name="audioExerciseMode"]');
     let exercise_mode = 'record';
     modeRadios.forEach(r => { if (r.checked) exercise_mode = r.value; });
+    const starCountingRadios = document.querySelectorAll('input[name="starCountingMode"]');
+    let star_counting = 'star';
+    starCountingRadios.forEach(r => { if (r.checked) star_counting = r.value; });
     return {
         start,
         exercise_mode,
+        star_counting,
         typo: 'o',
         success: 'ot',
         repeats: 3,
@@ -1747,6 +1751,7 @@ async function initializeAudioSettings() {
         } catch (e) { }
 
         let userSettings = {};
+        let starCounting = 'star';
         if (UM.userData.settings_json) {
             try {
                 const settings = JSON.parse(UM.userData.settings_json);
@@ -1755,6 +1760,7 @@ async function initializeAudioSettings() {
                     audio_start: audioSettings.start,
                     audio_exercise_mode: audioSettings.exercise_mode,
                 };
+                if (settings.star_counting === 'half') starCounting = 'half';
             } catch (e) {
                 userSettings = {
                     audio_start: UM.userData.audio_start,
@@ -1788,6 +1794,15 @@ async function initializeAudioSettings() {
         } catch (e) { }
 
         try {
+            const setStarChecked = (id, v) => {
+                const el = document.getElementById(id);
+                if (el) el.checked = (starCounting === v);
+            };
+            setStarChecked('starCountingModeStar', 'star');
+            setStarChecked('starCountingModeHalf', 'half');
+        } catch (e) { }
+
+        try {
             const bindInput = (id) => {
                 const el = document.getElementById(id);
                 if (!el) return;
@@ -1795,7 +1810,7 @@ async function initializeAudioSettings() {
                 el.addEventListener('change', () => checkForChanges());
             };
             bindInput('playSequenceStart');
-            ['audioExerciseModeRecord', 'audioExerciseModeNoRecord', 'audioExerciseModeOnlyNoHint', 'audioExerciseModeOnlyHint'].forEach((id) => {
+            ['audioExerciseModeRecord', 'audioExerciseModeNoRecord', 'audioExerciseModeOnlyNoHint', 'audioExerciseModeOnlyHint', 'starCountingModeStar', 'starCountingModeHalf'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.addEventListener('change', () => checkForChanges());
@@ -1909,6 +1924,7 @@ try { window.checkForChanges = checkForChanges; } catch (e) {}
         audio_required_passed_star_half: currentValues.audio_required_passed_star_half !== (originalData.audio_required_passed_star_half || 3),
         without_entering_text: Boolean(currentValues.without_entering_text) !== Boolean(originalData.without_entering_text),
         show_text: Boolean(currentValues.show_text) !== Boolean(originalData.show_text),
+        star_counting: (currentValues.star_counting || 'star') !== (originalData.star_counting || 'star'),
         assignment_history_retention_days: currentValues.assignment_history_retention_days !== (originalData.assignment_history_retention_days ?? 7),
         daily_activity_goal: currentValues.daily_activity_goal !== (originalData.daily_activity_goal ?? 100),
         daily_time_plan: currentValues.daily_time_plan !== (originalData.daily_time_plan ?? 10),
@@ -1957,6 +1973,7 @@ function getCurrentFormValues() {
         audio_required_passed_star_half: settings.required_passed_star_half || 3,
         without_entering_text: Boolean(settings.without_entering_text),
         show_text: Boolean(settings.show_text),
+        star_counting: settings.star_counting || 'star',
     };
     return {
         username: document.getElementById('username').value,
@@ -1972,6 +1989,7 @@ function getCurrentFormValues() {
         audio_required_passed_star_half: audioSettings.audio_required_passed_star_half,
         without_entering_text: audioSettings.without_entering_text,
         show_text: audioSettings.show_text,
+        star_counting: audioSettings.star_counting,
         assignment_history_retention_days: (() => {
             try {
                 const el = document.getElementById('assignmentHistoryRetentionDays');
@@ -2033,6 +2051,17 @@ function loadUserData() {
         } catch (e2) { return 'record'; }
     })();
 
+    const initialStarCounting = (() => {
+        try {
+            if (userData && userData.settings_json) {
+                const parsed = JSON.parse(userData.settings_json);
+                const v = parsed && parsed.star_counting != null ? String(parsed.star_counting).trim() : '';
+                if (v === 'half' || v === 'star') return v;
+            }
+        } catch (e) { }
+        return 'star';
+    })();
+
     const normalizeLangs = (langs) => {
         try {
             return (Array.isArray(langs) ? langs : [])
@@ -2053,6 +2082,7 @@ function loadUserData() {
         audio_typo: userData.audio_typo || '',
         audio_success: userData.audio_success || '',
         audio_exercise_mode: initialAudioExerciseMode,
+        star_counting: initialStarCounting,
         audio_repeats: userData.audio_repeats || 3,
         audio_required_passed_star_half: userData.audio_required_passed_star_half || 3,
         without_entering_text: Boolean(userData.without_entering_text),
@@ -2148,7 +2178,8 @@ async function saveProfile(options = {}) {
         (formValues.audio_typo || '') !== (originalData.audio_typo || '') ||
         (formValues.audio_success || '') !== (originalData.audio_success || '') ||
         (formValues.audio_repeats || 3) !== (originalData.audio_repeats || 3) ||
-        (formValues.audio_required_passed_star_half || 3) !== (originalData.audio_required_passed_star_half || 3)
+        (formValues.audio_required_passed_star_half || 3) !== (originalData.audio_required_passed_star_half || 3) ||
+        (formValues.star_counting || 'star') !== (originalData.star_counting || 'star')
         );
         
     if (!hasUnsavedChanges && !hasAudioChanges) {
@@ -2201,6 +2232,7 @@ async function saveProfile(options = {}) {
                 if (!merged.audio || typeof merged.audio !== 'object') merged.audio = {};
                 merged.audio.start = (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto';
                 merged.audio.exercise_mode = (settings.exercise_mode !== undefined && settings.exercise_mode !== null) ? settings.exercise_mode : 'record';
+                merged.star_counting = (settings.star_counting !== undefined && settings.star_counting !== null) ? settings.star_counting : 'star';
             } catch (e) { }
 
             try { updateData.settings_json = JSON.stringify(merged); } catch (e) { }
@@ -2258,6 +2290,13 @@ async function saveProfile(options = {}) {
             current_learning: updatedUser.current_learning,
             audio_start: audioSettings.audio_start,
             audio_exercise_mode: audioSettings.audio_exercise_mode,
+            star_counting: (() => {
+                try {
+                    const s = JSON.parse(updatedUser.settings_json || '{}');
+                    const v = s && s.star_counting != null ? String(s.star_counting).trim() : '';
+                    return (v === 'half' || v === 'star') ? v : 'star';
+                } catch (e) { return 'star'; }
+            })(),
             audio_typo: audioSettings.audio_typo,
             audio_success: audioSettings.audio_success,
             audio_repeats: audioSettings.audio_repeats,
