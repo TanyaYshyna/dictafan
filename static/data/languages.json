@@ -4,6 +4,9 @@
     "country_cod_url": "en-US",
     "language_ru": "Английский",
     "language_en": "English",
+    "language_uk": "Англійська",
+    "language_tr": "İngilizce",
+    "language_ar": "الإنجليزية",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
       "transformer_asr:Xenova/wav2vec2-base-960h",
@@ -15,6 +18,9 @@
     "country_cod_url": "uk-UA",
     "language_ru": "Украинский",
     "language_en": "Ukrainian",
+    "language_uk": "Українська",
+    "language_tr": "Ukraynaca",
+    "language_ar": "الأوكرانية",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
       "transformer_asr:Xenova/mms-1b-fl102",
@@ -26,6 +32,10 @@
     "country_cod_url": "sv-SE",
     "language_ru": "Шведский",
     "language_en": "Swedish",
+    "language_uk": "Шведська",
+    "language_tr": "İsveççe",
+    "language_ar": "السويدية",
+    "language_sv": "Svenska",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
       "transformer_asr:Xenova/mms-1b-fl102",
@@ -37,6 +47,10 @@
     "country_cod_url": "be-BY",
     "language_ru": "Белорусский",
     "language_en": "Belarusian",
+    "language_uk": "Білоруська",
+    "language_tr": "Belarusça",
+    "language_ar": "البيلاروسية",
+    "language_be": "Беларуская",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
       "transformer_asr:Xenova/mms-1b-fl102",
@@ -48,6 +62,9 @@
     "country_cod_url": "ru-RU",
     "language_ru": "Русский",
     "language_en": "Russian",
+    "language_uk": "Російська",
+    "language_tr": "Rusça",
+    "language_ar": "الروسية",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
       "transformer_asr:Xenova/mms-1b-fl102",
@@ -59,6 +76,10 @@
     "country_cod_url": "de-DE",
     "language_ru": "Немецкий",
     "language_en": "German",
+    "language_uk": "Німецька",
+    "language_tr": "Almanca",
+    "language_ar": "الألمانية",
+    "language_de": "Deutsch",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
       "transformer_asr:Xenova/mms-1b-fl102",
@@ -70,6 +91,10 @@
     "country_cod_url": "fr-FR",
     "language_ru": "Французский",
     "language_en": "French",
+    "language_uk": "Французька",
+    "language_tr": "Fransızca",
+    "language_ar": "الفرنسية",
+    "language_fr": "Français",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
       "transformer_asr:Xenova/mms-1b-fl102",
@@ -81,6 +106,10 @@
     "country_cod_url": "es-ES",
     "language_ru": "Испанский",
     "language_en": "Spanish",
+    "language_uk": "Іспанська",
+    "language_tr": "İspanyolca",
+    "language_ar": "الإسبانية",
+    "language_es": "Español",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
       "transformer_asr:Xenova/mms-1b-fl102",
@@ -92,6 +121,10 @@
     "country_cod_url": "it-IT",
     "language_ru": "Итальянский",
     "language_en": "Italian",
+    "language_uk": "Італійська",
+    "language_tr": "İtalyanca",
+    "language_ar": "الإيطالية",
+    "language_it": "Italiano",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny"
     ]
@@ -101,6 +134,9 @@
     "country_cod_url": "tr-TR",
     "language_ru": "Турецкий",
     "language_en": "Turkish",
+    "language_uk": "Турецька",
+    "language_tr": "Türkçe",
+    "language_ar": "التركية",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny",
       "transformer_asr:Xenova/mms-1b-fl102",
@@ -112,6 +148,9 @@
     "country_cod_url": "ar-SA",
     "language_ru": "Арабский",
     "language_en": "Arabic",
+    "language_uk": "Арабська",
+    "language_tr": "Arapça",
+    "language_ar": "العربية",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny"
     ]
@@ -121,6 +160,10 @@
     "country_cod_url": "pl-PL",
     "language_ru": "Польский",
     "language_en": "Polish",
+    "language_uk": "Польська",
+    "language_tr": "Lehçe",
+    "language_ar": "البولندية",
+    "language_pl": "Polski",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny"
     ]
@@ -130,6 +173,10 @@
     "country_cod_url": "la-VA",
     "language_ru": "Латинский",
     "language_en": "Latin",
+    "language_uk": "Латинська",
+    "language_tr": "Latince",
+    "language_ar": "اللاتينية",
+    "language_la": "Latina",
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny"
     ]

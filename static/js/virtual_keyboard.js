@@ -242,7 +242,7 @@
             }
             try {
                 if (typeof this.languageManager.getLanguageName === 'function') {
-                    return this.languageManager.getLanguageName(langCode, 'ru');
+                    return this.languageManager.getLanguageName(langCode);
                 }
             } catch (_) {
                 // игнорируем — вернём пустую строку

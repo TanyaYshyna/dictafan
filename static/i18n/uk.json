@@ -115,6 +115,13 @@
         "label": "Тест запису:",
         "record": "Записати",
         "placeholder": "Розпізнаний текст з’явиться тут"
+      },
+      "exercise_mode": {
+        "label": "Аудіо",
+        "record": "записувати аудіо",
+        "no_record": "не записувати аудіо",
+        "audio_only_no_hint": "лише аудіо (без підказки)",
+        "audio_only_hint": "лише аудіо (з підказкою)"
       }
     },
     "assignment_history": {

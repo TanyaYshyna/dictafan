@@ -6384,10 +6384,24 @@
     }
   }
 
-  // Конфигурация device-режимов: размер → { icon, label }
+  // Конфигурация device-режимов: размер → { icon, i18nKey, sizeLabel }
+  // Поддерживается только одна модель — tiny. Название берётся из i18n
+  // (profile.models.method_device_whisper_tiny), размер дописывается отдельно.
   var DEVICE_MODE_CONFIG = {
-    tiny:  { icon: 'house-heart', label: 'Whisper Tiny · 75 MB' },
+    tiny:  { icon: 'house-heart', i18nKey: 'profile.models.method_device_whisper_tiny', sizeLabel: '· 75 MB' },
   };
+
+  function _deviceModeLabel(cfg) {
+    var name = '';
+    try {
+      if (window.I18n && typeof window.I18n.t === 'function') {
+        name = window.I18n.t(cfg.i18nKey);
+        if (!name || name === cfg.i18nKey) name = '';
+      }
+    } catch (e) {}
+    if (!name) name = 'Whisper Tiny';
+    return name + ' ' + (cfg.sizeLabel || '');
+  }
 
   function _renderDeviceModes() {
     try {
@@ -6402,7 +6416,7 @@
         var value = 'route-off|' + size;
         html += '<label class="dictation-settings-speech-rec-mode dictation-settings-speech-rec-mode-device" data-mode="route-off" data-model-size="' + size + '">';
         html += '<input type="radio" name="modal-speechRecMode" value="' + value + '" />';
-        html += '<span class="dictation-settings-inline"><i data-lucide="' + cfg.icon + '"></i><span>На пристрої ' + cfg.label + '</span></span>';
+        html += '<span class="dictation-settings-inline"><i data-lucide="' + cfg.icon + '"></i><span>' + escapeHtml(_deviceModeLabel(cfg)) + '</span></span>';
         html += '</label>';
       }
       container.innerHTML = html;

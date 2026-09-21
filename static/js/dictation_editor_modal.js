@@ -6312,7 +6312,7 @@ window.NewDictationFillModal = {
         try {
           if (window.USER_LANGUAGE_DATA) {
             if (window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage) {
-              defaultLearning = String(window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage);
+              defaultLearning = String(window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage).toLowerCase();
             }
             if (window.USER_LANGUAGE_DATA.nativeLanguage || window.USER_LANGUAGE_DATA.nativeLang) {
               nativeLang = String(window.USER_LANGUAGE_DATA.nativeLanguage || window.USER_LANGUAGE_DATA.nativeLang).toLowerCase();
@@ -6329,6 +6329,41 @@ window.NewDictationFillModal = {
           nativeLang = 'ru';
         }
 
+        // При перезаполнении существующего диктанта языки уже заданы в конфиге редактора.
+        // Подставляем их вместо профильных значений по умолчанию.
+        // Для нового диктанта config содержит пустые языки — остаёмся на профильных (en => uk и т.п.).
+        var cfg = self._editorConfig || {};
+        var cfgOrig = String(cfg.originalLanguage || '').trim().toLowerCase();
+        var cfgTrList = (Array.isArray(cfg.translationLanguages) && cfg.translationLanguages.length > 0)
+          ? cfg.translationLanguages.map(function (x) { return String(x || '').trim().toLowerCase(); }).filter(Boolean)
+          : [];
+        // Если массив языков перевода не передан, восстанавливаем его из langBlocks контента
+        // (в config для существующего диктанта приходит только активный translationLanguage,
+        // а языков перевода может быть несколько).
+        if (cfgTrList.length === 0 && state.content && Array.isArray(state.content.langBlocks)) {
+          var trLangsFromContent = [];
+          for (var bi = 1; bi < state.content.langBlocks.length; bi++) {
+            var bl = state.content.langBlocks[bi];
+            if (bl && bl.lang) trLangsFromContent.push(String(bl.lang).trim().toLowerCase());
+          }
+          trLangsFromContent = trLangsFromContent.filter(Boolean);
+          if (trLangsFromContent.length > 0) cfgTrList = trLangsFromContent;
+        }
+        var cfgTr = String(cfg.translationLanguage || '').trim().toLowerCase();
+        if (!cfgTr && cfgTrList.length > 0) cfgTr = cfgTrList[0];
+
+        if (cfgOrig) defaultLearning = cfgOrig;
+        if (cfgTrList.length > 0) {
+          nativeLang = cfgTr;
+        } else if (cfgTr) {
+          nativeLang = cfgTr;
+        }
+
+        var initialNativeLanguages = cfgTrList.length > 0 ? cfgTrList.slice() : [nativeLang];
+        if (nativeLang && initialNativeLanguages.indexOf(nativeLang) === -1) {
+          initialNativeLanguages.unshift(nativeLang);
+        }
+
         container.innerHTML = '';
 
         self._languageSelector = window.initLanguageSelector('newDictationFillLangPair', {
@@ -6336,7 +6371,7 @@ window.NewDictationFillModal = {
           leftDropdown: true,  // левый флаг открывает список всех языков
           currentLearning: defaultLearning,
           nativeLanguage: nativeLang,
-          nativeLanguages: [nativeLang],  // по умолчанию только родной язык
+          nativeLanguages: initialNativeLanguages,  // языки диктанта при перезаполнении, иначе только родной
           languageData: languageData,
           onLanguageChange: function (values) {
             try {

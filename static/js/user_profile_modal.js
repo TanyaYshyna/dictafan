@@ -2446,9 +2446,9 @@ function cycleSpeechRecMode() {
         'route-off|tiny': 'house-heart',
     };
     var MODE_LABELS = {
-        'route': 'Google Сервіси',
-        'server': 'На сервері Whisper Tiny',
-        'route-off|tiny': 'На пристрої Whisper Tiny · 75 MB',
+        'route': profileT('profile.models.method_google', null, 'Google Сервіси'),
+        'server': profileT('profile.models.method_server_whisper_tiny', null, 'На сервері Whisper Tiny'),
+        'route-off|tiny': profileT('profile.models.method_device_whisper_tiny', null, 'На пристрої Whisper Tiny') + ' · 75 MB',
     };
 
     function readMode() {
@@ -2495,9 +2495,9 @@ function bindProfileTestRecording() {
     if (!btn || !statusEl || !resultEl) return;
 
     var MODE_LABELS = {
-        'route': 'Google Сервіси',
-        'server': 'На сервері Whisper Tiny',
-        'route-off|tiny': 'На пристрої Whisper Tiny · 75 MB',
+        'route': profileT('profile.models.method_google', null, 'Google Сервіси'),
+        'server': profileT('profile.models.method_server_whisper_tiny', null, 'На сервері Whisper Tiny'),
+        'route-off|tiny': profileT('profile.models.method_device_whisper_tiny', null, 'На пристрої Whisper Tiny') + ' · 75 MB',
     };
 
     function readMode() {
@@ -2713,16 +2713,11 @@ async function initUserProfilePageOrModal() {
 
     try {
         checkAppCacheRevision().catch(() => { });
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                try {
-                    const key = 'profile_controllerchange_reload';
-                    if (sessionStorage.getItem(key) === '1') return;
-                    sessionStorage.setItem(key, '1');
-                } catch (e) { }
-                location.reload();
-            });
-        }
+        // НЕ перезагружаем страницу при смене контроллера Service Worker.
+        // Ранее здесь стоял location.reload(), который срабатывал при
+        // skipWaiting + clients.claim (sw.js) во время первого открытия
+        // профиля и сбрасывал несохранённые правки. Новый SW начнёт
+        // обслуживать страницу при следующей навигации без потери данных.
     } catch (e) { }
 
     try {

@@ -4,6 +4,11 @@ class LanguageManager {
         this.modelsData = this._initializeModelsData();
         this.isInitialized = Object.keys(this.languageData).length > 0;
 
+        // Локализованные имена языков кешируются один раз для каждого языка
+        // интерфейса, чтобы не пересобирать их при каждом обращении к списку.
+        this._localizedNameCache = {};
+        this._nativeNameCache = {};
+
         this._hydrateLanguageModels();
 
         try {
@@ -198,6 +203,10 @@ class LanguageManager {
                     window.LANGUAGE_DATA = this.languageData;
                 }
 
+                // После обновления данных сбрасываем кеш локализованных имён,
+                // чтобы списки языков пересобрались с новыми переводами.
+                this.invalidateNameCaches();
+
                 this._hydrateLanguageModels();
 
                 try {
@@ -270,14 +279,50 @@ class LanguageManager {
         return list.find(m => m && String(m.modelKey) === key) || null;
     }
 
-    getLanguageName(langCode, interfaceLang = 'ru') {
+    getCurrentInterfaceLang() {
+        try {
+            if (window.I18n && typeof window.I18n.getLang === 'function') {
+                const l = window.I18n.getLang();
+                if (l) return String(l).trim().toLowerCase();
+            }
+        } catch (e) {
+        }
+        try {
+            const l = (document.documentElement && document.documentElement.lang)
+                ? String(document.documentElement.lang).trim().toLowerCase()
+                : '';
+            if (l) return l;
+        } catch (e) {
+        }
+        return 'en';
+    }
+
+    invalidateNameCaches() {
+        this._localizedNameCache = {};
+        this._nativeNameCache = {};
+    }
+
+    getLanguageName(langCode, interfaceLang) {
+        const uiLang = (interfaceLang ? String(interfaceLang).trim().toLowerCase() : this.getCurrentInterfaceLang()) || 'en';
         const language = this._getLanguage(langCode);
         if (!language) {
             return langCode;
         }
 
-        const key = `language_${interfaceLang}`;
-        return language[key] || language.language_en || langCode;
+        // Имена языков локализуются один раз на каждый язык интерфейса
+        // и кешируются, чтобы не пересобирать списки при каждом обращении.
+        if (!this._localizedNameCache[uiLang]) {
+            this._localizedNameCache[uiLang] = new Map();
+        }
+        const cache = this._localizedNameCache[uiLang];
+        if (cache.has(langCode.toLowerCase())) {
+            return cache.get(langCode.toLowerCase());
+        }
+
+        const key = `language_${uiLang}`;
+        const name = language[key] || language.language_en || langCode;
+        cache.set(langCode.toLowerCase(), name);
+        return name;
     }
 
     getNativeLanguageName(langCode) {
@@ -286,8 +331,13 @@ class LanguageManager {
             return langCode;
         }
 
-        const nativeKey = `language_${langCode}`;
-        return language[nativeKey] || language.language_en || langCode;
+        const codeLc = langCode.toLowerCase();
+        if (!this._nativeNameCache[codeLc]) {
+            const nativeKey = `language_${codeLc}`;
+            const name = language[nativeKey] || language.language_en || langCode;
+            this._nativeNameCache[codeLc] = name;
+        }
+        return this._nativeNameCache[codeLc];
     }
 
     getCountryCode(langCode) {

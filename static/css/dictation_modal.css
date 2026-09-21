@@ -1058,7 +1058,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 }
 
 #audioSettingsModal .dictation-settings-speech-rec-mode-device {
-  padding-left: 32px;
+  padding-left: 0;
 }
 
 #dictationModal .dictation-modal__header {

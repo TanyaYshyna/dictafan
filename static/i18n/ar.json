@@ -110,6 +110,13 @@
         "label": "اختبار التسجيل:",
         "record": "تسجيل",
         "placeholder": "سيظهر النص المُتعرَّف عليه هنا"
+      },
+      "exercise_mode": {
+        "label": "الصوت",
+        "record": "تسجيل الصوت",
+        "no_record": "عدم تسجيل الصوت",
+        "audio_only_no_hint": "صوت فقط (بدون تلميح)",
+        "audio_only_hint": "صوت فقط (مع تلميح)"
       }
     },
     "assignment_history": {

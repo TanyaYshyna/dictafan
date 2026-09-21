@@ -194,7 +194,7 @@
 
                             <div class="models-centric-test-recording" data-role="models-centric-test-recording">
                                 <div class="models-centric-test-recording-left">
-                                    <span id="profileSpeechRecModeIcon" class="profile-speech-rec-mode-icon" title="Google Сервіси" onclick="cycleSpeechRecMode()">
+                                    <span id="profileSpeechRecModeIcon" class="profile-speech-rec-mode-icon" title="{{ t('profile.models.method_google') }}" onclick="cycleSpeechRecMode()">
                                         <i data-lucide="route"></i>
                                     </span>
                                     <button type="button" id="profileTestRecordingBtn" class="button-color-purple">
@@ -256,23 +256,23 @@
                                     <tr>
                                         <td class="dictation-settings-td-label"></td>
                                         <td class="dictation-settings-td-input">
-                                            <div class="dictation-settings-title">Аудио</div>
+                                            <div class="dictation-settings-title">{{ t('profile.audio.exercise_mode.label') }}</div>
                                             <div style="display:flex; flex-direction:column; gap:10px;">
                                                 <label style="display:flex; align-items:center; gap:10px;">
                                                     <input type="radio" name="audioExerciseMode" id="audioExerciseModeRecord" value="record" />
-                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic"></i><span>записывать аудио</span></span>
+                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic"></i><span>{{ t('profile.audio.exercise_mode.record') }}</span></span>
                                                 </label>
                                                 <label style="display:flex; align-items:center; gap:10px;">
                                                     <input type="radio" name="audioExerciseMode" id="audioExerciseModeNoRecord" value="no-record" />
-                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic-off"></i><span>не записывать аудио</span></span>
+                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic-off"></i><span>{{ t('profile.audio.exercise_mode.no_record') }}</span></span>
                                                 </label>
                                                 <label style="display:flex; align-items:center; gap:10px;">
                                                     <input type="radio" name="audioExerciseMode" id="audioExerciseModeOnlyNoHint" value="audio-only-no-hint" />
-                                                    <span>только аудио (без подсказки)</span>
+                                                    <span>{{ t('profile.audio.exercise_mode.audio_only_no_hint') }}</span>
                                                 </label>
                                                 <label style="display:flex; align-items:center; gap:10px;">
                                                     <input type="radio" name="audioExerciseMode" id="audioExerciseModeOnlyHint" value="audio-only-hint" />
-                                                    <span>только аудио (с подсказкой)</span>
+                                                    <span>{{ t('profile.audio.exercise_mode.audio_only_hint') }}</span>
                                                 </label>
                                             </div>
                                         </td>

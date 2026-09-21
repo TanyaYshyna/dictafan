@@ -115,6 +115,13 @@
         "label": "Recording test:",
         "record": "Record",
         "placeholder": "Recognized text will appear here"
+      },
+      "exercise_mode": {
+        "label": "Audio",
+        "record": "record audio",
+        "no_record": "don't record audio",
+        "audio_only_no_hint": "audio only (no hint)",
+        "audio_only_hint": "audio only (with hint)"
       }
     },
     "assignment_history": {

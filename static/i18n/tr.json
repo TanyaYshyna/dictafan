@@ -115,6 +115,13 @@
         "label": "Kayıt testi:",
         "record": "Kaydet",
         "placeholder": "Tanınan metin burada görünecek"
+      },
+      "exercise_mode": {
+        "label": "Ses",
+        "record": "sesi kaydet",
+        "no_record": "sesi kaydetme",
+        "audio_only_no_hint": "yalnızca ses (ipucu yok)",
+        "audio_only_hint": "yalnızca ses (ipucu ile)"
       }
     },
     "assignment_history": {

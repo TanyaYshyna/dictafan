@@ -456,23 +456,23 @@
                   <tr>
                     <td class="dictation-settings-td-label"></td>
                     <td class="dictation-settings-td-input">
-                      <div class="dictation-settings-title">Аудио</div>
+                      <div class="dictation-settings-title">{{ t('profile.audio.exercise_mode.label') }}</div>
                       <div class="dictation-settings-audio-modes">
                         <label class="dictation-settings-audio-mode">
                           <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeRecord" value="record" />
-                          <span class="dictation-settings-inline"><i data-lucide="mic"></i><span>записывать аудио</span></span>
+                          <span class="dictation-settings-inline"><i data-lucide="mic"></i><span>{{ t('profile.audio.exercise_mode.record') }}</span></span>
                         </label>
                         <label class="dictation-settings-audio-mode">
                           <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeNoRecord" value="no-record" />
-                          <span class="dictation-settings-inline"><i data-lucide="mic-off"></i><span>не записывать аудио</span></span>
+                          <span class="dictation-settings-inline"><i data-lucide="mic-off"></i><span>{{ t('profile.audio.exercise_mode.no_record') }}</span></span>
                         </label>
                         <label class="dictation-settings-audio-mode">
                           <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeOnlyNoHint" value="audio-only-no-hint" />
-                          <span>только аудио (без подсказки)</span>
+                          <span>{{ t('profile.audio.exercise_mode.audio_only_no_hint') }}</span>
                         </label>
                         <label class="dictation-settings-audio-mode">
                           <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeOnlyHint" value="audio-only-hint" />
-                          <span>только аудио (с подсказкой)</span>
+                          <span>{{ t('profile.audio.exercise_mode.audio_only_hint') }}</span>
                         </label>
                       </div>
                     </td>
@@ -481,15 +481,15 @@
               </div>
 
               <div class="dictation-settings-card dictation-settings-card-speech-rec">
-                <div class="dictation-settings-title">Вид распознавання</div>
+                <div class="dictation-settings-title">{{ t('dictation.main.recognition_mode') }}</div>
                 <div class="dictation-settings-speech-rec-modes" data-role="speech-rec-modes">
                   <label class="dictation-settings-speech-rec-mode" data-mode="route">
                     <input type="radio" name="modal-speechRecMode" value="route" />
-                    <span class="dictation-settings-inline"><i data-lucide="route"></i><span>Google Сервіси</span></span>
+                    <span class="dictation-settings-inline"><i data-lucide="route"></i><span>{{ t('profile.models.method_google') }}</span></span>
                   </label>
                   <label class="dictation-settings-speech-rec-mode" data-mode="server">
                     <input type="radio" name="modal-speechRecMode" value="server" />
-                    <span class="dictation-settings-inline"><i data-lucide="server"></i><span>На сервері Whisper Tiny</span></span>
+                    <span class="dictation-settings-inline"><i data-lucide="server"></i><span>{{ t('profile.models.method_server_whisper_tiny') }}</span></span>
                   </label>
                   <!-- Device-режимы (Whisper на пристрої) генеруються динамічно в JS -->
                   <div data-role="device-modes-container"></div>

@@ -207,20 +207,54 @@ def create_user(
         # Очищаем и заполняем user_learning_languages
         # Сначала гарантируем, что все нужные языки есть в таблице languages,
         # иначе вставка упадёт по внешнему ключу (language_code_fkey).
-        _ensure_languages_exist(cur, learning_languages)
+        normalized_langs = [
+            str(x).strip().lower()
+            for x in learning_languages
+            if isinstance(x, str) and str(x).strip()
+        ]
+        _ensure_languages_exist(cur, normalized_langs)
         cur.execute(
             "DELETE FROM user_learning_languages WHERE user_id = %s",
             (user_row["id"],),
         )
-        for lang_code in learning_languages:
+        for lang_code in normalized_langs:
             cur.execute(
                 """
                 INSERT INTO user_learning_languages (user_id, language_code)
                 VALUES (%s, %s)
                 ON CONFLICT DO NOTHING
                 """,
-                (user_row["id"], lang_code.lower()),
+                (user_row["id"], lang_code),
             )
+
+        # Устанавливаем tr_* флаги изучаемых языков (аналогично update_user),
+        # чтобы у новых пользователей в профиле не появлялся английский вместо
+        # выбранных языков изучения.
+        tr_columns = []
+        selected_langs = set(normalized_langs)
+        try:
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name='users' AND column_name LIKE 'tr\_%' ESCAPE '\\'
+                ORDER BY column_name
+            """)
+            tr_rows = cur.fetchall()
+            tr_columns = [r['column_name'] if isinstance(r, dict) else r[0] for r in tr_rows]
+            if tr_columns:
+                parts = []
+                vals = []
+                for col in tr_columns:
+                    code = col[3:]
+                    parts.append(f"{col} = %s")
+                    vals.append(code in selected_langs)
+                vals.append(user_row["id"])
+                cur.execute(
+                    f"UPDATE users SET {', '.join(parts)} WHERE id = %s",
+                    tuple(vals),
+                )
+        except Exception:
+            pass
 
         conn.commit()
 
@@ -230,7 +264,7 @@ def create_user(
             from .db_books import add_default_dictations_to_desk
             add_default_dictations_to_desk(
                 int(user_row["id"]),
-                [str(x).lower() for x in learning_languages],
+                normalized_langs,
             )
         except Exception:
             pass
@@ -241,6 +275,7 @@ def create_user(
             "email": user_row["email"],
             "native_language": user_row["native_language"],
             "current_learning": user_row["current_learning"],
+            "learning_languages": normalized_langs,
             "streak_days": user_row["streak_days"],
             "role": user_row["role"],
             "created_at": user_row["created_at"].isoformat() if user_row["created_at"] else None,
@@ -248,6 +283,11 @@ def create_user(
         }
         if has_settings_json and "settings_json" in user_row:
             result["settings_json"] = user_row.get("settings_json")
+        # Добавляем tr_* флаги в ответ регистрации, чтобы фронтенд получил
+        # полные данные пользователя сразу после создания аккаунта.
+        for col in tr_columns:
+            code = col[3:]
+            result[col] = code in selected_langs
         return result
     finally:
         cur.close()

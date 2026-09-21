@@ -536,6 +536,60 @@ self.addEventListener('fetch', (event) => {
   } catch (e) {
   }
 
+  // ASR-ассеты Transformers.js + модели Whisper с внешних CDN.
+  // ВАЖНО: раньше эти запросы попадали в cacheFirstBounded, где `await cache.put(response.clone())`
+  // перед `return response` заставлял Service Worker полностью буферизовать большой .onnx файл
+  // (десятки МБ) до того, как отдать ответ странице. Из-за этого загрузка модели «висела»
+  // без прогресса: page не получал поток, а transformators.js ждал событий прогресса.
+  // Теперь сетевой ответ возвращается сразу, а кеширование выполняется в фоне через waitUntil,
+  // поэтому стрим не блокируется, и модель скачивается до конца.
+  try {
+    const url = new URL(request.url);
+    if (url.hostname === 'huggingface.co' || url.hostname === 'cdn.jsdelivr.net') {
+      const label = `sw#${reqId} asr-asset ${reqPath}`;
+      swTimeStart(label);
+      event.respondWith((async () => {
+        try {
+          const cacheKey = normalizeCacheKey(request);
+          const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+
+          // Если файл уже закеширован — отдаём из кеша (офлайн-режим).
+          let cached = await cache.match(cacheKey);
+          if (!cached) {
+            cached = await cache.match(request, { ignoreSearch: true });
+          }
+          if (cached) return cached;
+
+          const netRes = await fetch(request);
+          if (netRes && netRes.ok) {
+            // Кешируем в фоне, НЕ дожидаясь завершения записи — иначе стрим блокируется.
+            if (event && event.waitUntil) {
+              event.waitUntil((async () => {
+                try {
+                  await cache.put(cacheKey, netRes.clone());
+                } catch (e) {
+                  // Игнорируем ошибки квоты/кеша: модель всё равно уйдёт в HTTP-кеш браузера.
+                }
+              })());
+            }
+            return netRes;
+          }
+          if (netRes) return netRes;
+        } catch (e) {
+        }
+
+        return new Response('Offline', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })().finally(() => {
+        swTimeEnd(label);
+      }));
+      return;
+    }
+  } catch (e) {
+  }
+
   // Коверы диктантов тоже должны работать офлайн (MEDIA_CACHE_PERSIST).
   try {
     const url = new URL(request.url);
