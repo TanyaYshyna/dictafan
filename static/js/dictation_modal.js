@@ -4344,7 +4344,20 @@
       // (например 'route-off|tiny'), т.к. speech_recognition_unified.js проверяет
       // offline именно по префиксу 'route-off|'.
       const speechRecMode = _getEffectiveSpeechRecMode();
-      panel.setMode(speechRecMode);
+      // Если сохранённый/override режим сейчас недоступен (нет сети / нет модели),
+      // подставляем первый доступный. При полном отсутствии доступных способов
+      // показываем предупреждающую иконку.
+      const available = _computeAvailableSpeechRecModes();
+      if (!available.length) {
+        panel.setMode('route');
+        _renderDictationRecModeWarning();
+      } else if (available.indexOf(speechRecMode) === -1) {
+        panel.setMode(available[0]);
+        _renderDictationRecModeIcon(available[0]);
+      } else {
+        panel.setMode(speechRecMode);
+        _renderDictationRecModeIcon(speechRecMode);
+      }
     } catch (eSm2) {
     }
 
@@ -6438,50 +6451,133 @@
     } catch (e) {}
   }
 
+  function _isDictationOffline() {
+    try {
+      return typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
+    } catch (e) {}
+    return false;
+  }
+
+  // Проверяет, загружена ли модель Whisper на устройство (по любому из источников).
+  function _isWhisperModelDownloaded() {
+    // 1) Модель в памяти
+    try {
+      if (window.WhisperModels && window.WhisperModels.get) {
+        const inMem = window.WhisperModels.get('whisper_model_tiny');
+        if (inMem && (inMem.isReady || inMem.recognizer)) return true;
+      }
+    } catch (e) {}
+    // 2) Маркер статуса в localStorage (whisper-model-manager.js)
+    try {
+      const status = localStorage.getItem('whisper_model_tiny');
+      if (status === 'downloaded' || status === 'ready') return true;
+    } catch (e) {}
+    // 3) Model-centric список downloaded_models_v2 (LanguageSelector)
+    try {
+      const raw = localStorage.getItem('downloaded_models_v2');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          for (const key of Object.keys(parsed)) {
+            if (String(key).includes('whisper-')) return true;
+          }
+        }
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  // Список режимов распознавания, доступных прямо сейчас:
+  // без интернета недоступны 'route' и 'server'; без загруженной модели
+  // недоступен локальный 'route-off|tiny'.
+  function _computeAvailableSpeechRecModes() {
+    var online = !_isDictationOffline();
+    var hasDevice = _isWhisperModelDownloaded();
+    var available = [];
+    if (online) available.push('route', 'server');
+    if (hasDevice) available.push('route-off|tiny');
+    return available;
+  }
+
+  function _dictationRecModeIconName(mode) {
+    if (mode === 'server') return 'server';
+    if (String(mode).startsWith('route-off')) return 'house-heart';
+    return 'route';
+  }
+
+  function _dictationRecModeLabel(mode) {
+    if (mode === 'server') return dictationT('models.method_server_whisper_tiny', 'На сервері Whisper Tiny');
+    if (String(mode).startsWith('route-off')) return dictationT('models.method_device_whisper_tiny', 'На пристрої Whisper Tiny') + ' · 75 MB';
+    return dictationT('models.method_google', 'Google Сервіси');
+  }
+
+  // Отрисовывает иконку и подсказку конкретного режима распознавания.
+  function _renderDictationRecModeIcon(mode) {
+    try {
+      var modeIcon = document.getElementById('recognitionModeIcon');
+      if (!modeIcon) return;
+      var iconName = _dictationRecModeIconName(mode);
+      var label = _dictationRecModeLabel(mode);
+      modeIcon.title = label;
+      modeIcon.innerHTML = '<i data-lucide="' + iconName + '"></i>';
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    } catch (e) {}
+  }
+
+  // Показывает предупреждение, что распознавание сейчас недоступно
+  // (нет интернета и не загружена локальная модель).
+  function _renderDictationRecModeWarning() {
+    try {
+      var warnIcon = document.getElementById('recognitionModeIcon');
+      if (warnIcon) {
+        warnIcon.title = 'Нет доступных способов распознавания';
+        warnIcon.innerHTML = '<i data-lucide="circle-alert"></i>';
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      }
+    } catch (e) {}
+  }
+
   // Клик по иконке режима распознавания в диктанте: циклически переключает режимы.
   // В отличие от профиля НЕ пишет в localStorage — значение живёт только в рамках
   // текущего диктанта (dictationModalState._speechRecModeOverride).
   function cycleDictationSpeechRecMode() {
-    var ALL_MODES = ['route', 'server', 'route-off|tiny'];
-    var MODE_ICONS = {
-      'route': 'route',
-      'server': 'server',
-      'route-off|tiny': 'house-heart',
-    };
-    var MODE_LABELS = {
-      'route': dictationT('models.method_google', 'Google Сервіси'),
-      'server': dictationT('models.method_server_whisper_tiny', 'На сервері Whisper Tiny'),
-      'route-off|tiny': dictationT('models.method_device_whisper_tiny', 'На пристрої Whisper Tiny') + ' · 75 MB',
-    };
-
+    var available = _computeAvailableSpeechRecModes();
     var current = _getEffectiveSpeechRecMode();
-    var idx = ALL_MODES.indexOf(current);
-    if (idx === -1 || idx >= ALL_MODES.length - 1) {
+
+    // Нет интернета и не загружена модель — распознавание недоступно: показываем предупреждение.
+    if (!available.length) {
+      try {
+        dictationModalState._speechRecModeOverride = null;
+      } catch (e) {}
+      try {
+        _applySpeechRecModeToPanel('route');
+      } catch (e) {}
+      _renderDictationRecModeWarning();
+      try {
+        showDictationToast('Нет доступных способов распознавания');
+      } catch (e) {}
+      return;
+    }
+
+    // Если текущий режим недоступен в текущих условиях — начинаем с первого доступного.
+    var idx = available.indexOf(current);
+    if (idx === -1 || idx >= available.length - 1) {
       idx = 0;
     } else {
       idx = idx + 1;
     }
-    var next = ALL_MODES[idx];
+    var next = available[idx];
 
     try {
       dictationModalState._speechRecModeOverride = next;
     } catch (e) {}
 
     _applySpeechRecModeToPanel(next);
-
-    // Обновляем иконку и подсказку
-    try {
-      var modeIcon = document.getElementById('recognitionModeIcon');
-      if (modeIcon) {
-        var iconName = MODE_ICONS[next] || 'route';
-        var label = MODE_LABELS[next] || 'Google Сервіси';
-        modeIcon.title = label;
-        modeIcon.innerHTML = '<i data-lucide="' + iconName + '"></i>';
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-          window.lucide.createIcons();
-        }
-      }
-    } catch (e) {}
+    _renderDictationRecModeIcon(next);
   }
 
   function bindRecognitionModeIconClick() {
@@ -6729,7 +6825,17 @@
           try {
             const panel = dictationModalState._speechPanel;
             if (panel && typeof panel.setMode === 'function') {
-              panel.setMode(speechRecMode);
+              const available = _computeAvailableSpeechRecModes();
+              if (!available.length) {
+                panel.setMode('route');
+                _renderDictationRecModeWarning();
+              } else if (available.indexOf(speechRecMode) === -1) {
+                panel.setMode(available[0]);
+                _renderDictationRecModeIcon(available[0]);
+              } else {
+                panel.setMode(speechRecMode);
+                _renderDictationRecModeIcon(speechRecMode);
+              }
             }
           } catch (ePanel) {
           }
