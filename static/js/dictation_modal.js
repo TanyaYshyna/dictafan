@@ -6721,6 +6721,8 @@
 
   function _getSelectedSpeechRecMode() {
     try {
+      const sel = _getDictationSpeechRecModeSelector();
+      if (sel) return sel.getValue();
       const m = document.getElementById('audioSettingsModal');
       if (!m) return 'route';
       const checked = m.querySelector('input[name="modal-speechRecMode"]:checked');
@@ -6728,6 +6730,27 @@
     } catch (e) {
       return 'route';
     }
+  }
+
+  // Общий радио-блок выбора режима распознавания (тот же класс, что и в профиле).
+  // В настройках диктанта блок НЕ пишет в localStorage при клике — режим сохраняется
+  // только при нажатии кнопки "Сохранить" (__dictafanSaveAudioSettingsModal).
+  let _dictationSpeechRecModeSelector = null;
+  function _getDictationSpeechRecModeSelector() {
+    try {
+      if (!_dictationSpeechRecModeSelector) {
+        const container = document.querySelector('#audioSettingsModal [data-role="speech-rec-mode-selector"]');
+        if (container && window.SpeechRecognitionModeSelector) {
+          _dictationSpeechRecModeSelector = new window.SpeechRecognitionModeSelector({
+            container: container,
+            radioName: 'modal-speechRecMode',
+            autoPersist: false,
+            onChange: null,
+          });
+        }
+      }
+    } catch (e) {}
+    return _dictationSpeechRecModeSelector || null;
   }
 
   function initAudioSettingsModal() {
@@ -6818,20 +6841,24 @@
 
       const applySpeechRecModeToUI = () => {
         try {
-          const mode = _readSpeechRecModeFromLS();
-          const radios = m.querySelectorAll('input[name="modal-speechRecMode"]');
-          let found = false;
-          radios.forEach((r) => {
-            if (String(r.value) === mode) {
-              r.checked = true;
-              found = true;
+          const sel = _getDictationSpeechRecModeSelector();
+          if (sel) {
+            sel.refresh();
+          } else {
+            const mode = _readSpeechRecModeFromLS();
+            const radios = m.querySelectorAll('input[name="modal-speechRecMode"]');
+            let found = false;
+            radios.forEach((r) => {
+              if (String(r.value) === mode) {
+                r.checked = true;
+                found = true;
+              }
+            });
+            if (!found) {
+              const first = m.querySelector('input[name="modal-speechRecMode"][value="route"]');
+              if (first) first.checked = true;
+              _writeSpeechRecModeToLS('route');
             }
-          });
-          if (!found) {
-            // Fallback: если сохранённый режим не найден (например, модель удалена из кеша), ставим 'route'
-            const first = m.querySelector('input[name="modal-speechRecMode"][value="route"]');
-            if (first) first.checked = true;
-            _writeSpeechRecModeToLS('route');
           }
         } catch (e) {}
       };
@@ -6859,7 +6886,7 @@
         }
 
         // Применяем режим распознавания из localStorage
-        _renderDeviceModes();
+        _getDictationSpeechRecModeSelector();
         applySpeechRecModeToUI();
       };
 
@@ -7023,14 +7050,22 @@
       } catch (e) {
       }
 
-      // Слушаем изменения радио для speech_recognition_mode
+      // Слушаем изменения радио для speech_recognition_mode.
+      // Радио рендерится динамически классом SpeechRecognitionModeSelector,
+      // поэтому используем делегирование на контейнер модального окна.
       try {
-        const speechRecRadios = m.querySelectorAll('input[name="modal-speechRecMode"]');
-        speechRecRadios.forEach((r) => {
-          r.addEventListener('change', () => {
-            setDirty(true);
+        if (!m.dataset.boundDictafanSpeechRecModeChange) {
+          m.dataset.boundDictafanSpeechRecModeChange = '1';
+          m.addEventListener('change', (e) => {
+            try {
+              const t = e && e.target;
+              if (t && t.matches && t.matches('input[name="modal-speechRecMode"]')) {
+                setDirty(true);
+              }
+            } catch (e2) {
+            }
           });
-        });
+        }
       } catch (e) {
       }
 
@@ -7073,8 +7108,9 @@
     try {
       const m = document.getElementById('audioSettingsModal');
       if (!m) return;
-      // Перерендериваем device-режимы при каждом открытии (модели могли измениться)
-      _renderDeviceModes();
+      // Обновляем доступность device-режимов при каждом открытии (модели могли измениться)
+      const sel = _getDictationSpeechRecModeSelector();
+      if (sel && typeof sel.refresh === 'function') sel.refresh();
       m.style.display = 'flex';
       renderLucide(m);
     } catch (e) {

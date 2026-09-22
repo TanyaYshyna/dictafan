@@ -2476,53 +2476,29 @@ try { window.saveProfile = saveProfile; } catch (e) { }
 
 // ==================== BIND PROFILE TEST RECORDING ====================
 
-// Глобальная функция для карусели режимов распознавания (вызывается из HTML onclick)
+// Инициализация общего радио-блока выбора режима распознавания (профиль).
+// Заменяет старую карусель cycleSpeechRecMode() — режим теперь выбирается радио,
+// данные хранятся только в localStorage.
+function initializeProfileSpeechRecModeSelector() {
+    const container = document.querySelector('#user-profile-modal [data-role="speech-rec-mode-selector"]');
+    if (!container) return;
+    if (window.SpeechRecognitionModeSelector && !window.profileSpeechRecModeSelector) {
+        window.profileSpeechRecModeSelector = new window.SpeechRecognitionModeSelector({
+            container: container,
+            radioName: 'profile-speechRecMode',
+            autoPersist: true,
+            onChange: function () {
+                // Режим пишется в localStorage внутри класса; здесь можно обновить UI тестовой записи.
+            }
+        });
+    }
+}
+
+// Сохраняем обратную совместимость для любых внешних вызовов onclick (если остались).
 function cycleSpeechRecMode() {
-    var ALL_MODES = ['route', 'server', 'route-off|tiny'];
-    var MODE_ICONS = {
-        'route': 'route',
-        'server': 'server',
-        'route-off|tiny': 'house-heart',
-    };
-    var MODE_LABELS = {
-        'route': profileT('profile.models.method_google', null, 'Google Сервіси'),
-        'server': profileT('profile.models.method_server_whisper_tiny', null, 'На сервері Whisper Tiny'),
-        'route-off|tiny': profileT('profile.models.method_device_whisper_tiny', null, 'На пристрої Whisper Tiny') + ' · 75 MB',
-    };
-
-    function readMode() {
-        try {
-            var v = localStorage.getItem('dictafan_speech_rec_mode');
-            if (v) return String(v);
-        } catch (e) {}
-        return 'route';
-    }
-
-    function writeMode(mode) {
-        try {
-            localStorage.setItem('dictafan_speech_rec_mode', mode);
-        } catch (e) {}
-    }
-
-    var current = readMode();
-    var idx = ALL_MODES.indexOf(current);
-    if (idx === -1 || idx >= ALL_MODES.length - 1) {
-        idx = 0;
-    } else {
-        idx = idx + 1;
-    }
-    writeMode(ALL_MODES[idx]);
-
-    // Обновляем иконку
-    var modeIcon = document.getElementById('profileSpeechRecModeIcon');
-    if (modeIcon) {
-        var iconName = MODE_ICONS[ALL_MODES[idx]] || 'route';
-        var label = MODE_LABELS[ALL_MODES[idx]] || 'Google Сервіси';
-        modeIcon.title = label;
-        modeIcon.innerHTML = '<i data-lucide="' + iconName + '"></i>';
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            window.lucide.createIcons();
-        }
+    const sel = window.profileSpeechRecModeSelector;
+    if (sel && typeof sel.refresh === 'function') {
+        sel.refresh();
     }
 }
 
@@ -2530,14 +2506,7 @@ function bindProfileTestRecording() {
     var btn = document.getElementById('profileTestRecordingBtn');
     var statusEl = document.getElementById('profileTestRecordingStatus');
     var resultEl = document.getElementById('profileTestRecordingResult');
-    var modeIcon = document.getElementById('profileSpeechRecModeIcon');
     if (!btn || !statusEl || !resultEl) return;
-
-    var MODE_LABELS = {
-        'route': profileT('profile.models.method_google', null, 'Google Сервіси'),
-        'server': profileT('profile.models.method_server_whisper_tiny', null, 'На сервері Whisper Tiny'),
-        'route-off|tiny': profileT('profile.models.method_device_whisper_tiny', null, 'На пристрої Whisper Tiny') + ' · 75 MB',
-    };
 
     function readMode() {
         try {
@@ -2552,27 +2521,6 @@ function bindProfileTestRecording() {
             if (originalData && originalData.current_learning) return String(originalData.current_learning);
         } catch (e) {}
         return 'en';
-    }
-
-    // Инициализируем иконку при загрузке
-    if (modeIcon) {
-        var mode = readMode();
-        // Устаревшие режимы base/small нормализуем к единственной поддерживаемой модели tiny.
-        if (mode === 'route-off|base' || mode === 'route-off|small') {
-            mode = 'route-off|tiny';
-            try { localStorage.setItem('dictafan_speech_rec_mode', mode); } catch (e) {}
-        }
-        var iconName = {
-            'route': 'route',
-            'server': 'server',
-            'route-off|tiny': 'house-heart',
-        }[mode] || 'route';
-        var label = MODE_LABELS[mode] || 'Google Сервіси';
-        modeIcon.title = label;
-        modeIcon.innerHTML = '<i data-lucide="' + iconName + '"></i>';
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            window.lucide.createIcons();
-        }
     }
 
     var setStatus = function(text, color) {
@@ -2783,6 +2731,8 @@ async function initUserProfilePageOrModal() {
         initializeRefreshLanguagesListButton();
         console.log('=== LOG #1d: calling initializeLanguageModelsSelector');
         initializeLanguageModelsSelector();
+        console.log('=== LOG #1d1: calling initializeProfileSpeechRecModeSelector');
+        initializeProfileSpeechRecModeSelector();
         console.log('=== LOG #1e: calling initializeAudioSettings');
         await initializeAudioSettings();
         console.log('=== LOG #1f: calling initializeGroupsSection');

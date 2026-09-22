@@ -54,6 +54,12 @@ class LanguageSelector {
         this._modelsCentricModalTextEl = null;
         this._modelsCentricModalBarEl = null;
 
+        // Глобальный маркер загрузки Whisper-модели на устройстве.
+        // Используется общим классом SpeechRecognitionModeSelector для спиннера/доступности.
+        if (!window.__dictafanWhisperDownloadsInFlight) {
+            window.__dictafanWhisperDownloadsInFlight = new Set();
+        }
+
         this._learningFlagsClickBound = false;
 
         this.init();
@@ -439,10 +445,25 @@ class LanguageSelector {
 
             this._modelsCentricDownloadsInFlight.set(modelKey, p);
             try {
+                if (window.__dictafanWhisperDownloadsInFlight) {
+                    window.__dictafanWhisperDownloadsInFlight.add(modelKey);
+                }
+                try {
+                    window.dispatchEvent(new CustomEvent('dictafan:whisper-download-change', { detail: { modelKey, downloading: true } }));
+                } catch (e) {}
+            } catch (e) {}
+
+            try {
                 await p;
             } catch (e) {
             } finally {
                 this._modelsCentricDownloadsInFlight.delete(modelKey);
+                try {
+                    if (window.__dictafanWhisperDownloadsInFlight) {
+                        window.__dictafanWhisperDownloadsInFlight.delete(modelKey);
+                    }
+                    window.dispatchEvent(new CustomEvent('dictafan:whisper-download-change', { detail: { modelKey, downloading: false } }));
+                } catch (e) {}
             }
 
             this.render();

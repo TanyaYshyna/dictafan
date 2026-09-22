@@ -58,7 +58,7 @@
     "sections": {
       "languages": "Мови",
       "activity_goal": "План активності",
-      "local_models": "Види розпізнавання мовлення",
+      "local_models": "Режим розпізнавання мовлення на поточному пристрої",
       "dictation_settings": "Налаштування диктантів",
       "assignment_history": "Історія завдань",
       "groups": "Групи"
@@ -122,12 +122,12 @@
         "no_record": "не записувати аудіо",
         "audio_only_no_hint": "лише аудіо (без підказки)",
         "audio_only_hint": "лише аудіо (з підказкою)"
-      },
-      "star_counting": {
-        "label": "Спосіб обліку зірок",
-        "star": "зірка (Люсільда)",
-        "half": "півзірка (теж Люсільда)"
       }
+    },
+    "star_counting": {
+      "label": "Спосіб обліку зірок",
+      "star": "зірка (Люсільда)",
+      "half": "півзірка (теж Люсільда)"
     },
     "assignment_history": {
       "retention": {

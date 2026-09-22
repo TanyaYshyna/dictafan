@@ -482,18 +482,7 @@
 
               <div class="dictation-settings-card dictation-settings-card-speech-rec">
                 <div class="dictation-settings-title">{{ t('dictation.main.recognition_mode') }}</div>
-                <div class="dictation-settings-speech-rec-modes" data-role="speech-rec-modes">
-                  <label class="dictation-settings-speech-rec-mode" data-mode="route">
-                    <input type="radio" name="modal-speechRecMode" value="route" />
-                    <span class="dictation-settings-inline"><i data-lucide="route"></i><span>{{ t('profile.models.method_google') }}</span></span>
-                  </label>
-                  <label class="dictation-settings-speech-rec-mode" data-mode="server">
-                    <input type="radio" name="modal-speechRecMode" value="server" />
-                    <span class="dictation-settings-inline"><i data-lucide="server"></i><span>{{ t('profile.models.method_server_whisper_tiny') }}</span></span>
-                  </label>
-                  <!-- Device-режимы (Whisper на пристрої) генеруються динамічно в JS -->
-                  <div data-role="device-modes-container"></div>
-                </div>
+                <div class="speech-rec-mode-selector" data-role="speech-rec-mode-selector"></div>
               </div>
 
               <div class="dictation-settings-card dictation-settings-card-star-counting">

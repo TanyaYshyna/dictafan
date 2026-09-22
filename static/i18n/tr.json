@@ -58,7 +58,7 @@
     "sections": {
       "languages": "Diller",
       "activity_goal": "Günlük aktivite hedefi",
-      "local_models": "Konuşma tanıma türleri",
+      "local_models": "Geçerli cihazda konuşma tanıma modu",
       "dictation_settings": "Dikte ayarları",
       "assignment_history": "Ödev geçmişi",
       "groups": "Gruplar"
@@ -122,12 +122,12 @@
         "no_record": "sesi kaydetme",
         "audio_only_no_hint": "yalnızca ses (ipucu yok)",
         "audio_only_hint": "yalnızca ses (ipucu ile)"
-      },
-      "star_counting": {
-        "label": "Yıldız sayma yöntemi",
-        "star": "yıldız (Lucilda)",
-        "half": "yarım yıldız (yine Lucilda)"
       }
+    },
+    "star_counting": {
+      "label": "Yıldız sayma yöntemi",
+      "star": "yıldız (Lucilda)",
+      "half": "yarım yıldız (yine Lucilda)"
     },
     "assignment_history": {
       "retention": {

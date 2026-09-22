@@ -319,6 +319,41 @@
   outline-offset: 2px;
 }
 
+#user-profile-modal input[type="radio"][name="starCountingMode"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(17, 24, 39, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: #fff;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+#user-profile-modal input[type="radio"][name="starCountingMode"]::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.85);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+#user-profile-modal input[type="radio"][name="starCountingMode"]:checked::after {
+  transform: scale(1);
+}
+
+#user-profile-modal input[type="radio"][name="starCountingMode"]:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
+}
+
 #user-profile-modal #activityGoalSection,
 #user-profile-modal #languageSelectorModelsContainer,
 #user-profile-modal #userAudioSettingsContainer,
@@ -682,6 +717,19 @@
   align-items: center;
   gap: 8px;
   flex-wrap: nowrap;
+}
+
+#user-profile-modal .models-centric-rec-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+
+#user-profile-modal .models-centric-rec-mode-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
 }
 
 #user-profile-modal .profile-speech-rec-mode-icon {
@@ -1312,8 +1360,7 @@
 
 #user-profile-modal .dictation-settings-star-counting-modes {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 10px;
 }
 

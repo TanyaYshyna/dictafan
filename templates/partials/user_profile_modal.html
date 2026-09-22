@@ -192,11 +192,13 @@
                                 </tbody>
                             </table>
 
+                            <div class="models-centric-rec-mode">
+                                <div class="models-centric-rec-mode-title">{{ t('dictation.main.recognition_mode') }}</div>
+                                <div class="speech-rec-mode-selector" data-role="speech-rec-mode-selector"></div>
+                            </div>
+
                             <div class="models-centric-test-recording" data-role="models-centric-test-recording">
                                 <div class="models-centric-test-recording-left">
-                                    <span id="profileSpeechRecModeIcon" class="profile-speech-rec-mode-icon" title="{{ t('profile.models.method_google') }}" onclick="cycleSpeechRecMode()">
-                                        <i data-lucide="route"></i>
-                                    </span>
                                     <button type="button" id="profileTestRecordingBtn" class="button-color-purple">
                                         <i data-lucide="mic"></i>
                                         {{ t('profile.audio.test_recording.record') }}

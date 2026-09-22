@@ -58,7 +58,7 @@
     "sections": {
       "languages": "Languages",
       "activity_goal": "Daily Activity Goal",
-      "local_models": "Speech recognition types",
+      "local_models": "Speech recognition mode on current device",
       "dictation_settings": "Dictation settings",
       "assignment_history": "Assignment history",
       "groups": "Groups"
@@ -122,12 +122,12 @@
         "no_record": "don't record audio",
         "audio_only_no_hint": "audio only (no hint)",
         "audio_only_hint": "audio only (with hint)"
-      },
-      "star_counting": {
-        "label": "Star counting method",
-        "star": "star (Lucilda)",
-        "half": "half star (also Lucilda)"
       }
+    },
+    "star_counting": {
+      "label": "Star counting method",
+      "star": "star (Lucilda)",
+      "half": "half star (also Lucilda)"
     },
     "assignment_history": {
       "retention": {

@@ -863,8 +863,7 @@ grid-area: star-counting;
 
 #audioSettingsModal .dictation-settings-star-counting-modes {
 display: flex;
-flex-direction: row;
-flex-wrap: wrap;
+flex-direction: column;
 gap: 10px;
 }
 
@@ -965,6 +964,41 @@ gap: 10px;
 }
 
 #audioSettingsModal input[type="radio"][name="modal-audioExerciseMode"]:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
+}
+
+#audioSettingsModal input[type="radio"][name="modal-starCountingMode"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(17, 24, 39, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: #fff;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+#audioSettingsModal input[type="radio"][name="modal-starCountingMode"]::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.85);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+#audioSettingsModal input[type="radio"][name="modal-starCountingMode"]:checked::after {
+  transform: scale(1);
+}
+
+#audioSettingsModal input[type="radio"][name="modal-starCountingMode"]:focus-visible {
   outline: 3px solid rgba(245, 158, 11, 0.35);
   outline-offset: 2px;
 }

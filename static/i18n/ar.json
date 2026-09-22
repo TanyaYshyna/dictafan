@@ -53,7 +53,7 @@
     "sections": {
       "languages": "اللغات",
       "activity_goal": "هدف النشاط اليومي",
-      "local_models": "أنواع التعرف على الكلام",
+      "local_models": "وضع التعرف على الكلام على الجهاز الحالي",
       "dictation_settings": "إعدادات الإملاء",
       "assignment_history": "سجل الواجبات",
       "groups": "المجموعات"
@@ -117,12 +117,12 @@
         "no_record": "عدم تسجيل الصوت",
         "audio_only_no_hint": "صوت فقط (بدون تلميح)",
         "audio_only_hint": "صوت فقط (مع تلميح)"
-      },
-      "star_counting": {
-        "label": "طريقة حساب النجوم",
-        "star": "نجمة (لوسيلدا)",
-        "half": "نصف نجمة (لوسيلدا أيضًا)"
       }
+    },
+    "star_counting": {
+      "label": "طريقة حساب النجوم",
+      "star": "نجمة (لوسيلدا)",
+      "half": "نصف نجمة (لوسيلدا أيضًا)"
     },
     "assignment_history": {
       "retention": {
