@@ -146,7 +146,13 @@
       '<label class="speech-rec-mode-option speech-rec-mode-option-device" data-mode="route-off">' +
         '<input type="radio" name="' + name + '" value="' + DEVICE_MODE_VALUE + '" />' +
         '<span class="speech-rec-mode-inline"><i data-lucide="house-heart"></i><span>' + escapeHtml(deviceLabel) + '</span></span>' +
-        '<span class="speech-rec-mode-spinner" data-role="spinner" aria-hidden="true"></span>' +
+        '<span class="speech-rec-mode-device-control">' +
+          '<span class="speech-rec-mode-spinner" data-role="spinner" aria-hidden="true"></span>' +
+          '<span class="speech-rec-mode-download-toggle" data-role="download-toggle" role="switch" aria-checked="false" aria-label="' + escapeHtml(deviceLabel) + '" tabindex="0">' +
+            '<span class="speech-rec-mode-download-toggle-track"></span>' +
+            '<span class="speech-rec-mode-download-toggle-thumb"></span>' +
+          '</span>' +
+        '</span>' +
       '</label>';
 
     this.container.innerHTML = html;
@@ -155,6 +161,68 @@
         window.lucide.createIcons({ root: this.container });
       }
     } catch (e) {}
+  };
+
+  SpeechRecognitionModeSelector.prototype._setDeviceControlState = function (state) {
+    var toggle = this.container.querySelector('[data-role="download-toggle"]');
+    var spinner = this.container.querySelector('[data-role="spinner"]');
+    if (toggle) {
+      toggle.classList.toggle('is-on', state === 'on');
+      toggle.classList.toggle('is-loading', state === 'loading');
+      toggle.setAttribute('aria-checked', state === 'on' ? 'true' : 'false');
+    }
+    if (spinner) {
+      spinner.style.display = state === 'loading' ? 'inline-flex' : 'none';
+    }
+  };
+
+  SpeechRecognitionModeSelector.prototype._markDeviceModelDownloaded = function () {
+    try {
+      var raw = localStorage.getItem('downloaded_models_v2');
+      var all = raw ? JSON.parse(raw) : {};
+      if (!all || typeof all !== 'object' || Array.isArray(all)) all = {};
+      all[DEVICE_MODEL_KEY] = all[DEVICE_MODEL_KEY] || {};
+      all[DEVICE_MODEL_KEY].modelType = 'whisper';
+      all[DEVICE_MODEL_KEY].hf_repo = 'Xenova/whisper-tiny';
+      all[DEVICE_MODEL_KEY].size = 'tiny';
+      all[DEVICE_MODEL_KEY].downloadedAt = new Date().toISOString();
+      localStorage.setItem('downloaded_models_v2', JSON.stringify(all));
+      if (!localStorage.getItem('primary_model_key_v2')) {
+        localStorage.setItem('primary_model_key_v2', DEVICE_MODEL_KEY);
+      }
+    } catch (e) {}
+  };
+
+  SpeechRecognitionModeSelector.prototype._downloadDeviceModel = function () {
+    var self = this;
+    if (this._deviceDownloadInFlight) return Promise.resolve();
+    if (this._isWhisperDownloaded()) return Promise.resolve();
+    this._deviceDownloadInFlight = true;
+    this._setDeviceControlState('loading');
+
+    var p = Promise.resolve().then(function () {
+      if (!window.WhisperModelManager) {
+        throw new Error('WhisperModelManager not available');
+      }
+      var mm = new window.WhisperModelManager();
+      return mm.loadLanguageModel('en', 'tiny', null).then(function () {
+        self._markDeviceModelDownloaded();
+      });
+    });
+
+    p.then(
+      function () {
+        self._deviceDownloadInFlight = false;
+        self.refresh();
+      },
+      function (err) {
+        try { console.warn('❌ Whisper download failed:', err); } catch (e) {}
+        self._deviceDownloadInFlight = false;
+        self.refresh();
+      }
+    );
+
+    return p;
   };
 
   SpeechRecognitionModeSelector.prototype.refresh = function () {
@@ -170,7 +238,6 @@
     var serverInput = serverEl ? serverEl.querySelector('input') : null;
     var deviceEl = this.container.querySelector('[data-mode="route-off"]');
     var deviceInput = deviceEl ? deviceEl.querySelector('input') : null;
-    var spinner = this.container.querySelector('[data-role="spinner"]');
 
     // server доступен только при наличии интернета
     if (serverInput) {
@@ -193,9 +260,15 @@
           deviceEl.title = '';
         }
       }
-      if (spinner) {
-        spinner.style.display = downloading ? 'inline-flex' : 'none';
-      }
+    }
+
+    // Состояние «бигунка» (тумблера загрузки) справа от пункта устройства.
+    if (downloading) {
+      this._setDeviceControlState('loading');
+    } else if (downloaded) {
+      this._setDeviceControlState('on');
+    } else {
+      this._setDeviceControlState('off');
     }
 
     // Устанавливаем выбранный режим из localStorage
@@ -250,6 +323,25 @@
       window.addEventListener(DOWNLOAD_CHANGE_EVENT, function () {
         self.refresh();
       });
+    } catch (e) {}
+
+    // «Бигунок» загрузки устройства: клик запускает загрузку модели,
+    // повторный клик во время загрузки ничего не делает.
+    try {
+      var toggle = this.container.querySelector('[data-role="download-toggle"]');
+      if (toggle) {
+        var activate = function (e) {
+          if (e) { try { e.preventDefault(); e.stopPropagation(); } catch (e1) {} }
+          self._downloadDeviceModel();
+        };
+        toggle.addEventListener('click', activate);
+        toggle.addEventListener('keydown', function (e) {
+          var code = e && (e.key || e.code);
+          if (code === 'Enter' || code === 'Space' || code === 'Spacebar' || code === ' ') {
+            activate(e);
+          }
+        });
+      }
     } catch (e) {}
   };
 

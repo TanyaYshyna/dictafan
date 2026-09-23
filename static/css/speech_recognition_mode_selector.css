@@ -84,6 +84,20 @@
   color: var(--color-text-muted, #6b7280);
 }
 
+/* Контейнер правого элемента строки устройства: спиннер + «бигунок» */
+.speech-rec-mode-device-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+[dir="rtl"] .speech-rec-mode-device-control {
+  margin-left: 0;
+  margin-right: auto;
+}
+
 /* Спиннер загрузки рядом со строкой устройства */
 .speech-rec-mode-spinner {
   display: none;
@@ -103,8 +117,69 @@
   }
 }
 
+/* «Бигунок» (тумблер загрузки) устройства */
+.speech-rec-mode-download-toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex: 0 0 auto;
+  cursor: pointer;
+  border-radius: 999px;
+  background-color: #cbd5e1;
+  transition: background-color 0.2s ease;
+  outline: none;
+}
+
+.speech-rec-mode-download-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+}
+
+.speech-rec-mode-download-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.35);
+  transition: transform 0.2s ease;
+}
+
+/* Включено (модель загружена) */
+.speech-rec-mode-download-toggle.is-on {
+  background-color: var(--color-button-purple, #7c3aed);
+}
+
+.speech-rec-mode-download-toggle.is-on .speech-rec-mode-download-toggle-thumb {
+  transform: translateX(18px);
+}
+
+/* Идёт загрузка */
+.speech-rec-mode-download-toggle.is-loading {
+  cursor: wait;
+  background-color: rgba(124, 58, 237, 0.35);
+}
+
+.speech-rec-mode-download-toggle:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
+}
+
 /* RTL-поддержка: спиннер должен стоять в правильной стороне */
 [dir="rtl"] .speech-rec-mode-spinner {
   margin-left: 0;
   margin-right: 2px;
+}
+
+[dir="rtl"] .speech-rec-mode-download-toggle-thumb {
+  left: auto;
+  right: 3px;
+}
+
+[dir="rtl"] .speech-rec-mode-download-toggle.is-on .speech-rec-mode-download-toggle-thumb {
+  transform: translateX(-18px);
 }

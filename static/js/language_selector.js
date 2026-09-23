@@ -1728,6 +1728,18 @@ class LanguageSelector {
                     }, 100);
                     return;
                 }
+
+                // Таблица моделей удалена: контейнер теперь содержит статичную разметку
+                // (радио-блок SpeechRecognitionModeSelector, тестовая запись, хранилище).
+                // НЕ перезаписываем innerHTML — иначе сотрём весь блок «Режим распознавания».
+                this.bindEvents();
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+                setTimeout(() => {
+                    this.updateStorageInfoV2();
+                }, 100);
+                return;
             } catch (e) {
             }
         }
