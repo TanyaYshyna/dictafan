@@ -114,6 +114,7 @@
       "test_recording": {
         "label": "Kayıt testi:",
         "record": "Kaydet",
+        "stop": "Durdur",
         "placeholder": "Tanınan metin burada görünecek"
       },
       "exercise_mode": {

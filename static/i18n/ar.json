@@ -109,6 +109,7 @@
       "test_recording": {
         "label": "اختبار التسجيل:",
         "record": "تسجيل",
+        "stop": "إيقاف",
         "placeholder": "سيظهر النص المُتعرَّف عليه هنا"
       },
       "exercise_mode": {

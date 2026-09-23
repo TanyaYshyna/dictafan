@@ -114,6 +114,7 @@
       "test_recording": {
         "label": "Тест запису:",
         "record": "Записати",
+        "stop": "Зупинити",
         "placeholder": "Розпізнаний текст з’явиться тут"
       },
       "exercise_mode": {

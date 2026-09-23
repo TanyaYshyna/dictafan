@@ -341,7 +341,17 @@ class WhisperModelManager {
         }
 
         console.log(`🚀 Начинаем загрузку модели ${languageCode} (${modelSize}) через Transformers.js...`);
-        
+
+        // Отмечаем загрузку в глобальном реестре, чтобы радио-блок
+        // SpeechRecognitionModeSelector показывал спиннер во всех местах (профиль, диктант).
+        try {
+            if (!window.__dictafanWhisperDownloadsInFlight) {
+                window.__dictafanWhisperDownloadsInFlight = new Set();
+            }
+            window.__dictafanWhisperDownloadsInFlight.add(modelKey);
+            window.dispatchEvent(new CustomEvent('dictafan:whisper-download-change', { detail: { modelKey, downloading: true } }));
+        } catch (e) {}
+
         try {
             const pipeline = this.getPipeline();
             const modelName = this.modelNames[modelSize] || this.modelNames.tiny;
@@ -459,6 +469,13 @@ class WhisperModelManager {
         } catch (error) {
             console.error(`❌ Ошибка загрузки модели ${languageCode}:`, error);
             throw error;
+        } finally {
+            try {
+                if (window.__dictafanWhisperDownloadsInFlight) {
+                    window.__dictafanWhisperDownloadsInFlight.delete(modelKey);
+                }
+                window.dispatchEvent(new CustomEvent('dictafan:whisper-download-change', { detail: { modelKey, downloading: false } }));
+            } catch (e) {}
         }
     }
     

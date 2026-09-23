@@ -114,6 +114,7 @@
       "test_recording": {
         "label": "Recording test:",
         "record": "Record",
+        "stop": "Stop",
         "placeholder": "Recognized text will appear here"
       },
       "exercise_mode": {

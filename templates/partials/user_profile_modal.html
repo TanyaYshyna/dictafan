@@ -171,27 +171,6 @@
                     </h3>
                     <div id="languageSelectorModelsContainer" class="profile-panel profile-panel-flat-top">
                         <div class="models-centric" data-role="models-centric-root">
-                            <table class="models-centric-table" data-role="models-centric-table">
-                                <tbody>
-                                    <tr class="models-centric-tr" data-method="route-off" data-model-size="tiny">
-                                        <td class="models-centric-td-icon">
-                                            <i data-lucide="house-heart" class="models-centric-method-icon"></i>
-                                        </td>
-                                        <td class="models-centric-td-title">
-                                            <span class="models-centric-method-text">{{ t('profile.models.method_device_whisper_tiny') }}</span>
-                                            <span class="models-centric-size" data-role="model-size"></span>
-                                        </td>
-                                        <td class="models-centric-td-toggle">
-                                            <label class="model-switch">
-                                                <input type="checkbox" class="model-download-toggle-v2" data-model-type="whisper" data-model-size="tiny" />
-                                                <span class="model-slider"><span class="model-slider-circle"></span></span>
-                                            </label>
-                                        </td>
-                                    </tr>
-
-                                </tbody>
-                            </table>
-
                             <div class="models-centric-rec-mode">
                                 <div class="models-centric-rec-mode-title">{{ t('dictation.main.recognition_mode') }}</div>
                                 <div class="speech-rec-mode-selector" data-role="speech-rec-mode-selector"></div>
@@ -201,7 +180,7 @@
                                 <div class="models-centric-test-recording-left">
                                     <button type="button" id="profileTestRecordingBtn" class="button-color-purple">
                                         <i data-lucide="mic"></i>
-                                        {{ t('profile.audio.test_recording.record') }}
+                                        <span data-role="profile-test-recording-label">{{ t('profile.audio.test_recording.record') }}</span>
                                     </button>
                                     <span id="profileTestRecordingStatus"></span>
                                 </div>

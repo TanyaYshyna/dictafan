@@ -1581,7 +1581,10 @@ function initializeLanguageSelector() {
             currentLearning: originalData.current_learning,
             learningAvailableLanguages: originalData.learning_languages,
             languageData: languageData,
-            onLanguageChange: function () { checkForChanges(); }
+            onLanguageChange: function () {
+                checkForChanges();
+                if (window.updateProfileTestRecordingLabel) window.updateProfileTestRecordingLabel();
+            }
         });
 
         const refreshLearningDropdownAvailable = () => {
@@ -1622,6 +1625,7 @@ function initializeLanguageSelector() {
                         try { refreshLearningDropdownAvailable(); } catch (e2) { }
                     }
                     checkForChanges();
+                    if (window.updateProfileTestRecordingLabel) window.updateProfileTestRecordingLabel();
                 }
             });
         }
@@ -2508,6 +2512,9 @@ function bindProfileTestRecording() {
     var resultEl = document.getElementById('profileTestRecordingResult');
     if (!btn || !statusEl || !resultEl) return;
 
+    var labelEl = btn.querySelector('[data-role="profile-test-recording-label"]') || btn;
+    var recordLabel = profileT('profile.audio.test_recording.record', null, 'Записати');
+
     function readMode() {
         try {
             var v = localStorage.getItem('dictafan_speech_rec_mode');
@@ -2518,7 +2525,13 @@ function bindProfileTestRecording() {
 
     function getLearningLang() {
         try {
-            if (originalData && originalData.current_learning) return String(originalData.current_learning);
+            if (window.languageSelector && typeof window.languageSelector.getValues === 'function') {
+                var vals = window.languageSelector.getValues();
+                if (vals && vals.currentLearning) return String(vals.currentLearning).toLowerCase();
+            }
+        } catch (e) {}
+        try {
+            if (originalData && originalData.current_learning) return String(originalData.current_learning).toLowerCase();
         } catch (e) {}
         return 'en';
     }
@@ -2531,6 +2544,15 @@ function bindProfileTestRecording() {
 
     var setResult = function(text) { resultEl.textContent = text || ''; };
 
+    var setBtnText = function(text) {
+        if (labelEl === btn) { btn.textContent = text; }
+        else { labelEl.textContent = text; }
+    };
+
+    var renderIdleLabel = function() {
+        setBtnText(recordLabel + ' ' + getLearningLang());
+    };
+
     var profileTestRec = null;
     var profileTestIsRecording = false;
     var profileTestTimerId = null;
@@ -2541,7 +2563,8 @@ function bindProfileTestRecording() {
         if (profileTestAutoStopId) { clearTimeout(profileTestAutoStopId); profileTestAutoStopId = null; }
         profileTestRec = null;
         profileTestIsRecording = false;
-        btn.textContent = 'Записать';
+        try { btn.dataset.profileTestRecording = '0'; } catch (e) {}
+        renderIdleLabel();
     };
 
     btn.onclick = async function() {
@@ -2604,7 +2627,8 @@ function bindProfileTestRecording() {
 
             profileTestRec.callbacks.onRecordingStart = function() {
                 profileTestIsRecording = true;
-                btn.textContent = 'Стоп';
+                try { btn.dataset.profileTestRecording = '1'; } catch (e) {}
+                setBtnText(profileT('profile.audio.test_recording.stop', null, 'Стоп'));
                 var startAt = Date.now();
                 var maxSeconds = 12;
 
@@ -2642,6 +2666,14 @@ function bindProfileTestRecording() {
             var msg = (e && e.message) ? String(e.message) : 'Не вдалося почати запис';
             setStatus(msg, '#b00020');
         }
+    };
+
+    renderIdleLabel();
+    window.updateProfileTestRecordingLabel = function() {
+        try {
+            if (!btn || btn.dataset.profileTestRecording === '1') return;
+            renderIdleLabel();
+        } catch (e) {}
     };
 }
 
