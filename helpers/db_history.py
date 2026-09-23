@@ -231,7 +231,7 @@ def _update_history_current_successes_only(cur, user_id: int, dictation_id: int,
             %s AS user_id,
             %s AS dictation_id,
             %s AS positions,
-            COALESCE(SUM(successes), 0) AS number_successes,
+            COUNT(*) FILTER (WHERE COALESCE(successes, 0) > 0) AS number_successes,
             CURRENT_TIMESTAMP AS created_at,
             CURRENT_TIMESTAMP AS updated_at
         FROM history_by_day
@@ -241,7 +241,7 @@ def _update_history_current_successes_only(cur, user_id: int, dictation_id: int,
         ON CONFLICT (user_id, dictation_id, positions)
         DO UPDATE SET
             number_successes = (
-                SELECT COALESCE(SUM(successes), 0)
+                SELECT COUNT(*) FILTER (WHERE COALESCE(successes, 0) > 0)
                 FROM history_by_day
                 WHERE user_id = %s
                   AND dictation_id = %s
@@ -267,7 +267,8 @@ def _upsert_history_current(
     """Обновить или создать запись в history_current для (user_id, dictation_id, positions).
 
     Обновляет:
-      - number_successes = полная сумма successes из history_by_day для этого упражнения
+      - number_successes = количество завершённых проходов (строк с successes > 0)
+        в history_by_day для этого упражнения (совпадает с нумерацией колонок отчёта)
       - mistake_count, lead_time — данные рекорда
     """
     cur.execute(
@@ -279,7 +280,7 @@ def _upsert_history_current(
             %s AS user_id,
             %s AS dictation_id,
             %s AS positions,
-            COALESCE(SUM(successes), 0) AS number_successes,
+            COUNT(*) FILTER (WHERE COALESCE(successes, 0) > 0) AS number_successes,
             %s AS mistake_count,
             %s AS lead_time,
             CURRENT_TIMESTAMP AS created_at,
@@ -291,7 +292,7 @@ def _upsert_history_current(
         ON CONFLICT (user_id, dictation_id, positions)
         DO UPDATE SET
             number_successes = (
-                SELECT COALESCE(SUM(successes), 0)
+                SELECT COUNT(*) FILTER (WHERE COALESCE(successes, 0) > 0)
                 FROM history_by_day
                 WHERE user_id = %s
                   AND dictation_id = %s
@@ -396,7 +397,7 @@ def recalc_history_current_for_user(user_id: int) -> None:
                     hbd.user_id,
                     hbd.dictation_id,
                     hbd.positions,
-                    SUM(hbd.successes) AS number_successes,
+                    COUNT(*) FILTER (WHERE COALESCE(hbd.successes, 0) > 0) AS number_successes,
                     0 AS mistake_count,
                     0 AS lead_time,
                     MIN(hbd.created_at) AS created_at,
@@ -479,9 +480,10 @@ def recalc_number_successes_all() -> int:
 def recalc_history_current_all() -> int:
     """Пересчитать history_current для ВСЕХ пользователей из history_by_day.
 
-    Удаляет все записи history_current и пересоздаёт их агрегацией SUM(successes)
-    из history_by_day. number_successes в history_current — это и есть
-    количество проходов (медаль 🥇) для упражнения.
+    Удаляет все записи history_current и пересоздаёт их, считая количество
+    завершённых проходов (строк с successes > 0) из history_by_day.
+    number_successes в history_current — это и есть количество проходов
+    (медаль 🥇) для упражнения, совпадающее с нумерацией колонок отчёта.
 
     Поля рекорда (mistake_count, lead_time) не восстанавливаются при пересчёте —
     они будут установлены при следующих прохождениях диктанта
@@ -503,7 +505,7 @@ def recalc_history_current_all() -> int:
                     hbd.user_id,
                     hbd.dictation_id,
                     hbd.positions,
-                    SUM(hbd.successes) AS number_successes,
+                    COUNT(*) FILTER (WHERE COALESCE(hbd.successes, 0) > 0) AS number_successes,
                     0 AS mistake_count,
                     0 AS lead_time,
                     MIN(hbd.created_at) AS created_at,

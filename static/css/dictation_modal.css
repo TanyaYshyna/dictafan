@@ -845,7 +845,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 #audioSettingsModal .dictation-settings-grid {
 display: grid;
 grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-grid-template-areas: "order params" "speech-rec speech-rec" "star-counting star-counting";
+grid-template-areas: "order params" "speech-rec star-counting";
 gap: 16px;
 }
 
