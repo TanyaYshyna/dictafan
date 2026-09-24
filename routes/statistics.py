@@ -1269,7 +1269,7 @@ def api_activity_report():
             if not _can_teacher_view_student_activity(
                 teacher_user_id=current_user_id,
                 student_user_id=target_user_id,
-            ):
+            ) and not _is_admin_user(current_user_id):
                 return jsonify({"success": False, "error": "Forbidden"}), 403
 
         rows = get_activity_totals_by_period(target_user_id, start_date, end_date, language_code=language_code)
@@ -1306,7 +1306,7 @@ def api_activity_tracker():
             if not _can_teacher_view_student_activity(
                 teacher_user_id=current_user_id,
                 student_user_id=target_user_id,
-            ):
+            ) and not _is_admin_user(current_user_id):
                 return jsonify({"success": False, "error": "Forbidden"}), 403
 
         language_code_norm = None
@@ -2213,7 +2213,7 @@ def api_dictation_report_languages():
 
         # Учитель может смотреть языки только тех учеников, к которым есть доступ.
         if target_user_id != current_user_id:
-            if not _can_teacher_view_student_activity(current_user_id, target_user_id):
+            if not _can_teacher_view_student_activity(current_user_id, target_user_id) and not _is_admin_user(current_user_id):
                 return jsonify({"success": False, "error": "Forbidden"}), 403
 
         conn = get_db_connection()
@@ -3068,7 +3068,7 @@ def api_dictation_report_data():
             return jsonify({"success": False, "error": "start_date and end_date required"}), 400
 
         if target_user_id != current_user_id:
-            if not _can_teacher_view_student_activity(current_user_id, target_user_id):
+            if not _can_teacher_view_student_activity(current_user_id, target_user_id) and not _is_admin_user(current_user_id):
                 return jsonify({"success": False, "error": "Forbidden"}), 403
 
         def _col(r, idx, key):

@@ -848,3 +848,109 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* --- Единая панель отборов с закладками (ReportFilterPanel) --- */
+.report-filter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.report-filter-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid rgba(31, 41, 51, 0.12);
+}
+
+.report-filter-tab {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(31, 41, 51, 0.55);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.report-filter-tab:hover {
+  color: rgba(31, 41, 51, 0.85);
+}
+
+.report-filter-tab.is-active {
+  color: var(--color-button-blue, #4a90d9);
+  border-bottom-color: var(--color-button-blue, #4a90d9);
+}
+
+.report-filter-tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Админ: строка поиска (по аналогии с admin-license) */
+.report-filter-panel .admin-license-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.report-filter-panel .admin-license-search-row .text-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.report-filter-admin-result {
+  margin-top: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.report-filter-admin-result .user-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(31, 41, 51, 0.04);
+  border-radius: 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.report-filter-admin-result .user-item:hover {
+  background: rgba(31, 41, 51, 0.09);
+}
+
+.report-filter-admin-result .user-item .user-email {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(31, 41, 51, 0.85);
+}
+
+.report-filter-admin-result .user-item .user-name {
+  font-size: 12px;
+  color: rgba(31, 41, 51, 0.55);
+}
+
+.report-filter-admin-selected {
+  font-size: 14px;
+  color: rgba(31, 41, 51, 0.85);
+  min-height: 18px;
+}
+
+.report-filter-admin-selected strong {
+  font-weight: 600;
+}
+
+.report-filter-hint {
+  color: rgba(31, 41, 51, 0.5);
+  font-size: 14px;
+  margin: 0;
+}
+
+.report-filter-admin-lang {
+  margin-top: 2px;
+}

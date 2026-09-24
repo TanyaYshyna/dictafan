@@ -534,6 +534,29 @@ class StatisticsReport {
         container.appendChild(userSel);
     }
 
+    async _mountFilterPanel(container) {
+        if (!container || typeof ReportFilterPanel === 'undefined') return;
+        if (this._filterPanel) {
+            this._filterPanel.render();
+            return;
+        }
+        this._filterPanel = new ReportFilterPanel({
+            container,
+            withLanguage: false,
+            onChange: ({ userId }) => {
+                this.selectedUserId = (userId != null) ? Number(userId) : null;
+                this.updateStatistics();
+            }
+        });
+        await this._filterPanel.init({
+            userId: this.selectedUserId,
+            groupId: this._selectedGroupId,
+        });
+        this.selectedUserId = (this._filterPanel.getSelectedUserId() != null)
+            ? Number(this._filterPanel.getSelectedUserId())
+            : null;
+    }
+
     _renderFlagOptions() {
         const container = document.getElementById('activityFlagOptions');
         if (!container) return;
@@ -681,7 +704,7 @@ class StatisticsReport {
             await this.ensureGroupsLoaded();
             const picker = document.getElementById('activityUserPicker');
             if (picker) {
-                this._renderSelects(picker);
+                await this._mountFilterPanel(picker);
             }
         } catch (e) {
         }
@@ -3346,6 +3369,34 @@ class ActivityTrackerReport {
         container.appendChild(langSel);
     }
 
+    async _mountFilterPanel(container) {
+        const target = container || document.getElementById('activityTrackerSelects');
+        if (!target || typeof ReportFilterPanel === 'undefined') return;
+        if (this._filterPanel) {
+            this._filterPanel.render();
+            return;
+        }
+        this._filterPanel = new ReportFilterPanel({
+            container: target,
+            withLanguage: true,
+            onChange: ({ userId, languageCode }) => {
+                this._selectedUserId = (userId != null) ? Number(userId) : null;
+                this._selectedLanguageCode = languageCode || '';
+                this._languagesData = null;
+                this.reloadData({ force: true });
+            }
+        });
+        await this._filterPanel.init({
+            userId: this._selectedUserId,
+            groupId: this._selectedGroupId,
+            languageCode: this._selectedLanguageCode,
+        });
+        this._selectedUserId = (this._filterPanel.getSelectedUserId() != null)
+            ? Number(this._filterPanel.getSelectedUserId())
+            : null;
+        this._selectedLanguageCode = this._filterPanel.getSelectedLanguageCode() || '';
+    }
+
     renderYear() {
         const year = Number(this.selectedYear) || (new Date()).getFullYear();
         const yearLabel = document.getElementById('activityTrackerYearLabel');
@@ -3486,11 +3537,11 @@ class ActivityTrackerReport {
         } catch (e) {
         }
 
-        // Load groups and render cascading selects (group → user → language).
+        // Load groups and render the unified filter panel (group → user → language + admin tab).
         (async () => {
             try {
                 await this.ensureGroupsLoaded();
-                await this.renderSelects();
+                await this._mountFilterPanel();
             } catch (e) {
             }
 
@@ -3760,6 +3811,34 @@ class DictationReport {
         container.appendChild(wrapper);
     }
 
+    async _mountFilterPanel(container) {
+        const target = container || this._userPickerContainer;
+        if (!target || typeof ReportFilterPanel === 'undefined') return;
+        if (this._filterPanel) {
+            this._filterPanel.render();
+            return;
+        }
+        this._filterPanel = new ReportFilterPanel({
+            container: target,
+            withLanguage: true,
+            onChange: ({ userId, languageCode }) => {
+                this._selectedUserId = (userId != null) ? Number(userId) : null;
+                this._selectedLanguageCode = languageCode || '';
+                this._languagesData = null;
+                this._loadData();
+            }
+        });
+        await this._filterPanel.init({
+            userId: this._selectedUserId,
+            groupId: this._selectedGroupId,
+            languageCode: this._selectedLanguageCode,
+        });
+        this._selectedUserId = (this._filterPanel.getSelectedUserId() != null)
+            ? Number(this._filterPanel.getSelectedUserId())
+            : null;
+        this._selectedLanguageCode = this._filterPanel.getSelectedLanguageCode() || '';
+    }
+
     /* ---------- modal ---------- */
 
     createModal() {
@@ -3954,9 +4033,12 @@ if (typeof lucide !== 'undefined') {
         this.createModal();
         this._modal.style.display = 'flex';
 
-        // Load groups and render cascading selects
+        // Load groups and render the unified filter panel (group → user → language + admin tab).
         await this.ensureGroupsLoaded();
-        this._renderSelects(this._userPickerContainer);
+        try {
+            await this._mountFilterPanel(this._userPickerContainer);
+        } catch (e) {
+        }
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
