@@ -160,6 +160,143 @@
   padding: 20px;
 }
 
+/* ===== КАРТОЧКИ ИНСТРУМЕНТОВ В ЗАКЛАДКАХ ===== */
+.admin-tool-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-tool-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px;
+  background: var(--color-bg-secondary, #f8fafc);
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-radius: 10px;
+}
+
+.admin-tool-card .admin-toolbar__btn {
+  flex: 0 0 auto;
+}
+
+.admin-tool-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-tool-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+}
+
+.admin-tool-card__desc {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+  line-height: 1.45;
+}
+
+/* ===== ЗАКЛАДКА "ВРЕМЯ": КОРРЕКЦИЯ lead_time ===== */
+.admin-time-tool {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border-light, #e2e8f0);
+}
+
+.admin-time-tool__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+  margin-bottom: 16px;
+}
+
+.admin-time-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.admin-time-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.admin-time-filter .admin-license-search-row {
+  margin: 0;
+}
+
+.admin-time-selected {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--color-text, #1f2933);
+}
+
+.admin-time-records {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.admin-time-record {
+  padding: 9px 12px;
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.admin-time-record:hover {
+  background: var(--color-hover, #f5f5f5);
+}
+
+.admin-time-record.selected {
+  background: var(--color-bg-secondary, #eef2ff);
+  border-color: var(--color-accent, #f5b301);
+}
+
+.admin-time-editor {
+  margin-top: 16px;
+  padding: 14px;
+  background: var(--color-bg-secondary, #f8fafc);
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-radius: 10px;
+}
+
+.admin-time-editor__hint {
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b7280);
+  margin-bottom: 10px;
+}
+
+.admin-time-editor__fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-time-editor__input {
+  width: 64px;
+  text-align: center;
+}
+
+.admin-time-editor__sep {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+}
+
 /* ===== ВКЛАДКА "ПРАВА ПОЛЬЗОВАТЕЛЕЙ" ===== */
 .admin-permissions-role-badge {
   display: inline-block;

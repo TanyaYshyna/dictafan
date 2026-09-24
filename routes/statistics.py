@@ -2688,6 +2688,356 @@ def recalc_history_current_all_users():
         return jsonify({'success': False, 'error': 'Ошибка глобального пересчёта количества проходов'}), 500
 
 
+# ============================================================
+# Админ: инструмент точечной коррекции времени (lead_time)
+# ============================================================
+
+def _fmt_dhms(ms) -> str:
+    """Формат дд:чч:мм:сс (дни:часы:минуты:секунды)."""
+    try:
+        ms = int(ms or 0)
+    except Exception:
+        ms = 0
+    if ms < 0:
+        ms = 0
+    total_sec = ms // 1000
+    days = total_sec // 86400
+    hours = (total_sec % 86400) // 3600
+    minutes = (total_sec % 3600) // 60
+    seconds = total_sec % 60
+    return f"{days:02d}:{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _col_value(r, idx, key):
+    """Вернуть значение колонки из строки (dict или tuple)."""
+    if isinstance(r, dict):
+        return r.get(key)
+    return r[idx]
+
+
+@statistics_bp.route('/admin/time/users', methods=['GET'])
+@jwt_required()
+def api_admin_time_users():
+    """Поиск пользователя по email/username (админ, глобально — не только свои группы)."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+        if not _is_admin_user(int(user['id'])):
+            return jsonify({'success': False, 'error': 'Forbidden: только для администратора'}), 403
+
+        email = (request.args.get('email') or '').strip().lower()
+        if not email:
+            return jsonify({'success': False, 'error': 'Email обязателен'}), 400
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, email, username FROM users WHERE email ILIKE %s OR username ILIKE %s LIMIT 20",
+                    (f"%{email}%", f"%{email}%"),
+                )
+                rows = cur.fetchall() or []
+        finally:
+            conn.close()
+
+        users = []
+        for r in rows:
+            users.append({
+                'id': int(_col_value(r, 0, 'id') or 0),
+                'email': str(_col_value(r, 1, 'email') or ''),
+                'username': str(_col_value(r, 2, 'username') or ''),
+            })
+        return jsonify({'success': True, 'users': users})
+    except Exception as exc:
+        print(f'❌ [ADMIN_TIME_USERS] Ошибка: {exc}')
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+
+@statistics_bp.route('/admin/time/languages', methods=['GET'])
+@jwt_required()
+def api_admin_time_languages():
+    """Языки, по которым у выбранного пользователя есть записи в history_by_day."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+        if not _is_admin_user(int(user['id'])):
+            return jsonify({'success': False, 'error': 'Forbidden: только для администратора'}), 403
+
+        try:
+            target_user_id = int(request.args.get('user_id') or 0)
+        except Exception:
+            target_user_id = 0
+        if not target_user_id:
+            return jsonify({'success': False, 'error': 'user_id обязателен'}), 400
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT DISTINCT
+                        COALESCE(NULLIF(hbd.dictation_language_code, ''), d.language_code) AS language_code
+                    FROM history_by_day hbd
+                    LEFT JOIN dictations d ON d.id = hbd.dictation_id
+                    WHERE hbd.user_id = %s
+                      AND COALESCE(NULLIF(hbd.dictation_language_code, ''), d.language_code) IS NOT NULL
+                      AND COALESCE(NULLIF(hbd.dictation_language_code, ''), d.language_code) <> ''
+                    ORDER BY 1 ASC
+                    """,
+                    (target_user_id,),
+                )
+                rows = cur.fetchall() or []
+        finally:
+            conn.close()
+
+        languages = []
+        for r in rows:
+            code = _col_value(r, 0, 'language_code')
+            if not code:
+                continue
+            code = str(code).strip().lower()
+            languages.append({
+                'code': code,
+                'label': get_language_name(code, 'language_ru') or code.upper(),
+            })
+        return jsonify({'success': True, 'languages': languages})
+    except Exception as exc:
+        print(f'❌ [ADMIN_TIME_LANGUAGES] Ошибка: {exc}')
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+
+@statistics_bp.route('/admin/time/dictations', methods=['POST'])
+@jwt_required()
+def api_admin_time_dictations():
+    """Список диктантов, по которым у пользователя есть записи за выбранную дату/язык."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+        if not _is_admin_user(int(user['id'])):
+            return jsonify({'success': False, 'error': 'Forbidden: только для администратора'}), 403
+
+        body = request.get_json(silent=True) or {}
+        try:
+            target_user_id = int(body.get('user_id') or 0)
+        except Exception:
+            target_user_id = 0
+        if not target_user_id:
+            return jsonify({'success': False, 'error': 'user_id обязателен'}), 400
+
+        date_val = body.get('date')  # YYYY-MM-DD
+        language_code = str(body.get('language_code') or '').strip().lower() or None
+
+        where = ['hbd.user_id = %s']
+        params = [target_user_id]
+        if date_val:
+            where.append('hbd.date_fact = %s::date')
+            params.append(date_val)
+        if language_code:
+            where.append("COALESCE(NULLIF(hbd.dictation_language_code, ''), d.language_code) = %s")
+            params.append(language_code)
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT DISTINCT
+                        hbd.dictation_id,
+                        d.title,
+                        d.level,
+                        COALESCE(NULLIF(hbd.dictation_language_code, ''), d.language_code) AS language_code
+                    FROM history_by_day hbd
+                    LEFT JOIN dictations d ON d.id = hbd.dictation_id
+                    WHERE {' AND '.join(where)}
+                    ORDER BY d.title ASC
+                    """,
+                    tuple(params),
+                )
+                rows = cur.fetchall() or []
+        finally:
+            conn.close()
+
+        dictations = []
+        for r in rows:
+            did = int(_col_value(r, 0, 'dictation_id') or 0)
+            if not did:
+                continue
+            title = str(_col_value(r, 1, 'title') or '') or f'Диктант #{did}'
+            level = _col_value(r, 2, 'level') or ''
+            lang = str(_col_value(r, 3, 'language_code') or '').strip().lower()
+            label = title
+            if level:
+                label = f"{title} ({level})"
+            dictations.append({
+                'id': did,
+                'title': title,
+                'level': level,
+                'language_code': lang,
+                'label': label,
+            })
+        return jsonify({'success': True, 'dictations': dictations})
+    except Exception as exc:
+        print(f'❌ [ADMIN_TIME_DICTATIONS] Ошибка: {exc}')
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+
+@statistics_bp.route('/admin/time/records', methods=['POST'])
+@jwt_required()
+def api_admin_time_records():
+    """Записи history_by_day по фильтрам (для точечной коррекции времени)."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+        if not _is_admin_user(int(user['id'])):
+            return jsonify({'success': False, 'error': 'Forbidden: только для администратора'}), 403
+
+        body = request.get_json(silent=True) or {}
+        try:
+            target_user_id = int(body.get('user_id') or 0)
+        except Exception:
+            target_user_id = 0
+        if not target_user_id:
+            return jsonify({'success': False, 'error': 'user_id обязателен'}), 400
+
+        date_val = body.get('date')
+        language_code = str(body.get('language_code') or '').strip().lower() or None
+        try:
+            dictation_id = int(body.get('dictation_id') or 0)
+        except Exception:
+            dictation_id = 0
+
+        where = ['hbd.user_id = %s']
+        params = [target_user_id]
+        if date_val:
+            where.append('hbd.date_fact = %s::date')
+            params.append(date_val)
+        if language_code:
+            where.append("COALESCE(NULLIF(hbd.dictation_language_code, ''), d.language_code) = %s")
+            params.append(language_code)
+        if dictation_id:
+            where.append('hbd.dictation_id = %s')
+            params.append(dictation_id)
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    SELECT
+                        hbd.id,
+                        hbd.dictation_id,
+                        hbd.date_start,
+                        hbd.date_fact,
+                        hbd.lead_time,
+                        hbd.positions,
+                        COALESCE(NULLIF(hbd.dictation_language_code, ''), d.language_code) AS language_code
+                    FROM history_by_day hbd
+                    LEFT JOIN dictations d ON d.id = hbd.dictation_id
+                    WHERE {' AND '.join(where)}
+                    ORDER BY hbd.date_start DESC, hbd.id DESC
+                    LIMIT 500
+                    """,
+                    tuple(params),
+                )
+                rows = cur.fetchall() or []
+        finally:
+            conn.close()
+
+        def _fmt_dt(v):
+            if v is None:
+                return ''
+            if isinstance(v, str):
+                return v
+            try:
+                return v.isoformat()
+            except Exception:
+                return str(v)
+
+        records = []
+        for r in rows:
+            rid = int(_col_value(r, 0, 'id') or 0)
+            lead_ms = int(_col_value(r, 4, 'lead_time') or 0)
+            date_start = _col_value(r, 2, 'date_start')
+            date_fact = _col_value(r, 3, 'date_fact')
+            positions = _col_value(r, 5, 'positions')
+            records.append({
+                'id': rid,
+                'dictation_id': int(_col_value(r, 1, 'dictation_id') or 0),
+                'date_start': _fmt_dt(date_start),
+                'date_fact': _fmt_dt(date_fact),
+                'lead_time_ms': lead_ms,
+                'lead_time_dhms': _fmt_dhms(lead_ms),
+                'positions': list(positions) if positions else [],
+                'language_code': str(_col_value(r, 6, 'language_code') or '').strip().lower(),
+            })
+        return jsonify({'success': True, 'records': records})
+    except Exception as exc:
+        print(f'❌ [ADMIN_TIME_RECORDS] Ошибка: {exc}')
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+
+@statistics_bp.route('/admin/time/record/update', methods=['POST'])
+@jwt_required()
+def api_admin_time_record_update():
+    """Точечно меняет lead_time в ОДНОЙ записи history_by_day."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+        if not _is_admin_user(int(user['id'])):
+            return jsonify({'success': False, 'error': 'Forbidden: только для администратора'}), 403
+
+        body = request.get_json(silent=True) or {}
+        try:
+            record_id = int(body.get('record_id') or 0)
+        except Exception:
+            record_id = 0
+        if not record_id:
+            return jsonify({'success': False, 'error': 'record_id обязателен'}), 400
+
+        try:
+            lead_time_ms = int(body.get('lead_time_ms') or 0)
+        except Exception:
+            lead_time_ms = 0
+        if lead_time_ms < 0:
+            lead_time_ms = 0
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE history_by_day SET lead_time = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (lead_time_ms, record_id),
+                )
+                updated = cur.rowcount
+            conn.commit()
+        finally:
+            conn.close()
+
+        if not updated:
+            return jsonify({'success': False, 'error': 'Запись не найдена'}), 404
+
+        return jsonify({
+            'success': True,
+            'message': f'Время записи #{record_id} обновлено',
+            'record_id': record_id,
+            'lead_time_ms': lead_time_ms,
+            'lead_time_dhms': _fmt_dhms(lead_time_ms),
+        })
+    except Exception as exc:
+        print(f'❌ [ADMIN_TIME_RECORD_UPDATE] Ошибка: {exc}')
+        return jsonify({'success': False, 'error': str(exc)}), 500
+
+
 @statistics_bp.route('/dictation-report/data', methods=['POST'])
 @jwt_required()
 def api_dictation_report_data():

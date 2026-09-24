@@ -186,7 +186,13 @@
         return false;
       }
 
-      const dateFact = date || _getLocalDateId();
+      // date_fact на клиенте используется только для ключа outbox-записи.
+      // Если брать текущую локальную дату, то сессия, пересекающая полночь,
+      // создаст НОВУЮ запись с synced_lead_time_ms_total=0, и при следующем
+      // flush отправится ПОЛНОЕ кумулятивное время ещё раз (двойной учёт).
+      // Поэтому фиксируем дату по дате старта сессии (dateStart), которая
+      // не меняется на протяжении всей сессии.
+      const dateFact = date || (dateStart ? String(dateStart).slice(0, 10).replace(/[^0-9]/g, '') : _getLocalDateId());
       const datePlanVal = planDate || dateFact; // если planDate нет, datePlan = dateFact
       const dateStartStr = dateStart ? dateStart.replace(/[^0-9\-: ]/g, '') : '';
       const key = _buildHbdKey({

@@ -44,30 +44,20 @@
         </div>
 
         <div class="admin-panel__body" id="adminPanelBody" style="display: none;">
-            <!-- Панель инструментов (кнопки, перенесённые с рабочего стола) -->
-            <div class="admin-toolbar" id="adminToolbar">
-                <span class="admin-toolbar__label">Инструменты</span>
-                <div class="admin-toolbar__group">
-                    <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-mult-preview" title="Просмотр мультфильмов">
-                        <i data-lucide="film"></i>
-                    </button>
-                    <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-recalc-history" title="Пересчитать history_current из history_by_day">
-                        <i data-lucide="refresh-cw"></i>
-                    </button>
-                    <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-recalc-all" title="Пересчитать количество проходов по всем диктантам (вся база)">
-                        <i data-lucide="medal"></i>
-                    </button>
-                    <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-active-dictations" title="Активные диктанты">
-                        <i data-lucide="database"></i>
-                    </button>
-                    <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-audio-cache" title="Аудио в кэше">
-                        <i data-lucide="music"></i>
-                    </button>
-                </div>
-            </div>
-
             <!-- Панель с закладками -->
             <div class="admin-panel__tabs-header">
+                <button class="admin-panel__tab-btn" data-tab="mult" type="button">
+                    <i data-lucide="film"></i>
+                    <span>Мультфильмы</span>
+                </button>
+                <button class="admin-panel__tab-btn" data-tab="time" type="button">
+                    <i data-lucide="clock"></i>
+                    <span>Время</span>
+                </button>
+                <button class="admin-panel__tab-btn" data-tab="tools" type="button">
+                    <i data-lucide="wrench"></i>
+                    <span>Инструменты</span>
+                </button>
                 <button class="admin-panel__tab-btn active" data-tab="licenses" type="button">
                     <i data-lucide="shield-check"></i>
                     <span>Управление лицензиями</span>
@@ -79,6 +69,132 @@
             </div>
 
             <div class="admin-panel__tabs-body">
+                <!-- Вкладка: мультфильмы -->
+                <div id="admin-tab-mult" class="admin-panel__tab-content">
+                    <div class="admin-panel__tab-inner">
+                        <div class="admin-tool-card">
+                            <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-mult-preview" title="Просмотр мультфильмов">
+                                <i data-lucide="film"></i>
+                            </button>
+                            <div class="admin-tool-card__text">
+                                <div class="admin-tool-card__title">Просмотр мультфильмов</div>
+                                <div class="admin-tool-card__desc">Открыть галерею мультфильмов для предпросмотра.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка: время -->
+                <div id="admin-tab-time" class="admin-panel__tab-content">
+                    <div class="admin-panel__tab-inner">
+                        <div class="admin-tool-cards">
+                            <div class="admin-tool-card">
+                                <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-recalc-history" title="Пересчитать историю по дням">
+                                    <i data-lucide="refresh-cw"></i>
+                                </button>
+                                <div class="admin-tool-card__text">
+                                    <div class="admin-tool-card__title">Пересчитать историю по дням</div>
+                                    <div class="admin-tool-card__desc">Пересчитывает сводную таблицу history_current из истории по дням history_by_day.</div>
+                                </div>
+                            </div>
+                            <div class="admin-tool-card">
+                                <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-recalc-all" title="Пересчитать вторую таблицу">
+                                    <i data-lucide="medal"></i>
+                                </button>
+                                <div class="admin-tool-card__text">
+                                    <div class="admin-tool-card__title">Пересчитать вторую таблицу</div>
+                                    <div class="admin-tool-card__desc">Пересчитывает количество проходов по всем диктантам и пересоздаёт history_current (вторую таблицу).</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Точечная коррекция времени -->
+                        <div class="admin-time-tool">
+                            <div class="admin-time-tool__title">Точечная коррекция времени записи</div>
+
+                            <div class="admin-time-filters">
+                                <div class="admin-time-filter">
+                                    <label class="admin-license-label">Дата</label>
+                                    <input type="date" id="adminTimeDate" class="text-input">
+                                </div>
+                                <div class="admin-time-filter">
+                                    <label class="admin-license-label">Пользователь</label>
+                                    <div class="admin-license-search-row">
+                                        <input type="text" id="adminTimeUserSearch" class="text-input" placeholder="email или имя">
+                                        <button id="adminTimeUserSearchBtn" class="button-color-yellow">
+                                            <i data-lucide="search"></i>
+                                            <span>Найти</span>
+                                        </button>
+                                    </div>
+                                    <div id="adminTimeUserSearchResult" class="admin-license-search-result" style="display: none;"></div>
+                                    <div id="adminTimeSelectedUser" class="admin-time-selected" style="display: none;"></div>
+                                </div>
+                                <div class="admin-time-filter">
+                                    <label class="admin-license-label">Язык</label>
+                                    <select id="adminTimeLanguageSelect" class="text-input">
+                                        <option value="">Все языки</option>
+                                    </select>
+                                </div>
+                                <div class="admin-time-filter">
+                                    <label class="admin-license-label">Диктант</label>
+                                    <select id="adminTimeDictationSelect" class="text-input">
+                                        <option value="">Все диктанты</option>
+                                    </select>
+                                </div>
+                                <button id="adminTimeApplyFiltersBtn" class="button-color-green">
+                                    <i data-lucide="filter"></i>
+                                    <span>Применить</span>
+                                </button>
+                            </div>
+
+                            <div class="admin-time-records" id="adminTimeRecords"></div>
+
+                            <div class="admin-time-editor" id="adminTimeEditor" style="display: none;">
+                                <div class="admin-time-editor__hint">дни часы минуты секунды — дд:чч:мм:сс</div>
+                                <div class="admin-time-editor__fields">
+                                    <input type="number" id="adminTimeDays" class="text-input admin-time-editor__input" placeholder="00" min="0">
+                                    <span class="admin-time-editor__sep">:</span>
+                                    <input type="number" id="adminTimeHours" class="text-input admin-time-editor__input" placeholder="00" min="0" max="23">
+                                    <span class="admin-time-editor__sep">:</span>
+                                    <input type="number" id="adminTimeMinutes" class="text-input admin-time-editor__input" placeholder="00" min="0" max="59">
+                                    <span class="admin-time-editor__sep">:</span>
+                                    <input type="number" id="adminTimeSeconds" class="text-input admin-time-editor__input" placeholder="00" min="0" max="59">
+                                    <button id="adminTimeSaveBtn" class="button-color-yellow">
+                                        <i data-lucide="save"></i>
+                                        <span>Сохранить</span>
+                                    </button>
+                                </div>
+                                <div id="adminTimeEditorMessage" class="admin-license-message" style="display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка: инструменты -->
+                <div id="admin-tab-tools" class="admin-panel__tab-content">
+                    <div class="admin-panel__tab-inner">
+                        <div class="admin-tool-cards">
+                            <div class="admin-tool-card">
+                                <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-active-dictations" title="Активные диктанты">
+                                    <i data-lucide="database"></i>
+                                </button>
+                                <div class="admin-tool-card__text">
+                                    <div class="admin-tool-card__title">Активные диктанты</div>
+                                    <div class="admin-tool-card__desc">Показать список активных (незавершённых) диктантов пользователей.</div>
+                                </div>
+                            </div>
+                            <div class="admin-tool-card">
+                                <button class="tool-palette-btn admin-toolbar__btn" type="button" data-action="admin-audio-cache" title="Аудио в кэше">
+                                    <i data-lucide="music"></i>
+                                </button>
+                                <div class="admin-tool-card__text">
+                                    <div class="admin-tool-card__title">Аудио в кэше</div>
+                                    <div class="admin-tool-card__desc">Показать аудиофайлы, сохранённые в кэше приложения.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- Вкладка: управление лицензиями -->
                 <div id="admin-tab-licenses" class="admin-panel__tab-content active">
                     <div class="admin-panel__tab-inner">

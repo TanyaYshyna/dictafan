@@ -912,11 +912,12 @@ class ProgressPanel {
             if (event && typeof event.detail === 'number' && event.detail > 1) {
                 return;
             }
-            const pauseModal = document.getElementById('pauseModal');
-            if (pauseModal && pauseModal.style.display === 'flex') {
-                if (typeof window.resumeGame === 'function') window.resumeGame();
-            } else {
+            // Переключаем паузу по фактическому состоянию таймера (без модалки).
+            const isRunning = !!(this.timerState && this.timerState.sessionActive);
+            if (isRunning) {
                 if (typeof window.pauseGame === 'function') window.pauseGame();
+            } else {
+                if (typeof window.resumeGame === 'function') window.resumeGame();
             }
         });
         button.dataset.timerSetup = '1';

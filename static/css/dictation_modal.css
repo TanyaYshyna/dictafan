@@ -439,52 +439,6 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   inset: 0;
 }
 
-#dictationModal #pauseModal {
-  position: fixed;
-  inset: 0;
-}
-
-#dictationModal #pauseModal .modal-content {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 18px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
-  border: none;
-  max-width: 420px;
-  width: calc(100vw - 32px);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-#dictationModal #pauseModal .pause-timer {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: center;
-  width: 100%;
-  color: var(--color-button-shadow-pink);
-}
-
-#dictationModal #pauseModal #pauseTimer {
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-#dictationModal #pauseModal #resumeBtn {
-  align-self: flex-end;
-  min-height: 44px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding-top: 0;
-  padding-bottom: 0;
-  padding-left: 8px;
-  padding-right: 8px;
-}
-
 #dictationModal .audio-players-wrapper {
   margin-top: 8px;
 }

@@ -136,16 +136,23 @@
     }
   }
 
-  function _getSessionLeadTimeMs(session) {
+  /**
+   * Суммарное время диктанта по предложениям (sum of st.time_count) —
+   * ровно то, что отображается в колонке «Время» модалки выбора предложений.
+   * Это ЕДИНСТВЕННЫЙ источник времени для отчёта (lead_time в history_by_day).
+   */
+  function _getSessionSentenceTimeTotalMs(session) {
     try {
       if (!session) return 0;
-      if (typeof session.getElapsedMs === 'function') {
-        return Math.floor(session.getElapsedMs());
+      const keys = (session.activeKeys && session.activeKeys.length > 0)
+        ? session.activeKeys
+        : (session.content ? session.content.getAllKeys() : []);
+      let total = 0;
+      for (const k of keys) {
+        const st = session.getState ? session.getState(k) : null;
+        total += Number(st && st.time_count) || 0;
       }
-      if (session.timer && session.timer.accumulatedMs) {
-        return Math.floor(Number(session.timer.accumulatedMs) || 0);
-      }
-      return 0;
+      return Math.floor(total);
     } catch (e) {
       return 0;
     }
@@ -1024,6 +1031,15 @@
     } catch (e1c) {
     }
 
+    // Останавливаем таймер СЕССИИ тоже. Раньше останавливался только
+    // progressPanel, а session.timer продолжал тикать (настенное время),
+    // из-за чего getElapsedMs() «раздувал» lead_time после завершения.
+    try {
+      const session = window.__dictationModalActiveSession;
+      if (session && typeof session.stopTimer === 'function') session.stopTimer();
+    } catch (e1d) {
+    }
+
     try {
       const rewardIcon = document.getElementById('completionRewardIcon');
       if (rewardIcon) rewardIcon.setAttribute('data-lucide', 'award');
@@ -1471,7 +1487,7 @@
     // Сбрасываем флаг _completionShown при переходе на новое предложение.
     // Это нужно, чтобы при завершении всех предложений (allDictationCompleted)
     // модалка victory могла появиться, даже если updateTaskProgressFromSession
-    // уже пыталась её показать ранее (но не показала из-за isPauseModalOpen или isStartModalOpen).
+    // уже пыталась её показать ранее (но не показала из-за открытой start-modal).
     try {
       dictationModalState._completionShown = false;
     } catch (eResetCompletion) {
@@ -2470,7 +2486,8 @@
 
     input.addEventListener('input', () => {
       try {
-        resetInactivityTimer();
+        // Начало набора текста возобновляет таймер, если он был остановлен бездействием
+        _autoResumeTimer();
       } catch (e0) {
       }
 
@@ -2542,15 +2559,6 @@
     }
   }
 
-  function isPauseModalOpen() {
-    try {
-      const m = document.getElementById('pauseModal');
-      return !!(m && (m.style.display === 'flex' || m.style.display === 'block'));
-    } catch (e) {
-      return false;
-    }
-  }
-
   function clearInactivityTimer() {
     try {
       if (dictationModalState._inactivityTimer) clearTimeout(dictationModalState._inactivityTimer);
@@ -2581,7 +2589,7 @@
         return;
       }
       clearInactivityTimer();
-      if (isPauseModalOpen() || isStartModalOpen()) return;
+      if (isStartModalOpen()) return;
       const timeout = Number(dictationModalState._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
       dictationModalState._inactivityTimer = setTimeout(() => {
         try {
@@ -2614,66 +2622,37 @@
     try {
       if (!dictationModalState.dictationStarted) return;
       if (dictationModalState._pauseDisabled) return;
-      const pauseModal = document.getElementById('pauseModal');
-      if (!pauseModal) return;
-      if (pauseModal.style.display === 'flex') return;
 
       const snap = getProgressTimerSnapshot();
       if (!snap || !snap.isRunning) return;
 
-      // Останавливаем таймер через общую процедуру
+      // Тихо останавливаем таймер (часы становятся серыми), без модального окна.
       _pauseDictationTimer();
 
       if (isInactivityPause) {
         try {
-          const p = getProgressPanelInstance();
           const inactivityTime = Number(dictationModalState._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
+          const p = getProgressPanelInstance();
           if (p && p.timerState) {
             p.timerState.dictationAccumulatedMs = Math.max(0, (Number(p.timerState.dictationAccumulatedMs) || 0) - inactivityTime);
+          }
+          // Убираем лишнюю минуту и из сессионного таймера, чтобы время предложений
+          // и сохраняемое время тоже не учитывали бездействие.
+          const session = window.__dictationModalActiveSession;
+          if (session && session.timer) {
+            session.timer.accumulatedMs = Math.max(0, (Number(session.timer.accumulatedMs) || 0) - inactivityTime);
           }
         } catch (e) {
         }
       }
 
       clearAllRecordingTimers();
-      stopAllAudios();
-
-      // Останавливаем активную запись речи, если она идёт
-      try {
-        const panel = dictationModalState._speechPanel;
-        if (panel && typeof panel.stopRecording === 'function') {
-          panel.stopRecording('pause');
-        }
-      } catch (eSpeech) {
-      }
-
-      try {
-        const el = document.getElementById('pauseTimer');
-        if (el) el.textContent = formatHhMmSs(getTimerDisplayMs(getProgressTimerSnapshot()));
-      } catch (e) {
-      }
-
-      pauseModal.style.display = 'flex';
-      // Ставим фокус на кнопку "Продолжить" после того, как модалка отрисовалась
-      try {
-        requestAnimationFrame(() => {
-          const resumeBtn = document.getElementById('resumeBtn');
-          if (resumeBtn) resumeBtn.focus();
-        });
-      } catch (e) {
-      }
     } catch (e) {
     }
   }
 
   function resumeGame() {
-    try {
-      const pauseModal = document.getElementById('pauseModal');
-      if (pauseModal) pauseModal.style.display = 'none';
-    } catch (e) {
-    }
-
-    // Возобновляем таймер через общую процедуру
+    // Возобновляем таймер через общую процедуру (часы снова жёлтые и работают).
     _resumeDictationTimer();
 
     try {
@@ -2684,6 +2663,20 @@
     try {
       const input = document.getElementById('userInput');
       if (input && typeof input.focus === 'function') input.focus();
+    } catch (e) {
+    }
+  }
+
+  function _autoResumeTimer() {
+    try {
+      const snap = getProgressTimerSnapshot();
+      if (!snap || !snap.isRunning) {
+        _resumeDictationTimer();
+      }
+    } catch (e) {
+    }
+    try {
+      resetInactivityTimer();
     } catch (e) {
     }
   }
@@ -2815,7 +2808,7 @@
           try {
             if (!dictationModalState.dictationStarted) return;
             if (!document.hidden) return;
-            if (isPauseModalOpen() || isStartModalOpen()) return;
+            if (isStartModalOpen()) return;
             pauseGame(true);
           } catch (e) {
           }
@@ -3709,7 +3702,7 @@
 
       try {
         if (allCompleted && dictationModalState.dictationStarted && !dictationModalState._completionShown) {
-          if (!isPauseModalOpen() && !isStartModalOpen()) {
+          if (!isStartModalOpen()) {
             // Если выполнены все предложения диктанта — показываем окно успеха
             if (allDictationCompleted) {
               dictationModalState._completionShown = true;
@@ -3827,6 +3820,11 @@
         return;
       }
       
+      // Фиксируем время текущего предложения ПЕРЕД отправкой, чтобы lead_time
+      // в отчёте был равен сумме time_count из модалки выбора предложений
+      // (и не зависел от «сырого» таймера сессии, который мог разойтись с модалкой).
+      try { _saveSentenceTime(session); } catch (eSaveTime) {}
+
       const ob = window.OutboxBatcher;
      if (ob && typeof ob.enqueueActivity === 'function') {
         const dictationId = getCurrentDictationIdForDb();
@@ -3843,7 +3841,7 @@
         const enqueued = await ob.enqueueActivity({
           type: type,
           count: 1,
-          leadTimeMs: _getSessionLeadTimeMs(session),
+          leadTimeMs: _getSessionSentenceTimeTotalMs(session),
           dictationId,
           date: null,
           dictationLanguageCode,
@@ -4243,9 +4241,10 @@
           }
           // При старте записи запускаем оба таймера:
           // - таймер аудио (30с) — проверяет аудио через 30 секунд
-          // - таймер бездействия (60с) — ставит паузу через 60 секунд бездействия
+          // - таймер бездействия (60с) — тихо останавливает часы через 60 секунд бездействия
+          // Начало записи также возобновляет таймер, если он был остановлен бездействием.
+          _autoResumeTimer();
           startAudioCheckTimer();
-          resetInactivityTimer();
         },
         onRecognitionComplete: async ({ ok, percent, cause, audioBlob }) => {
           // Сохраняем последнюю запись пользователя (единственный blob).
@@ -6028,7 +6027,7 @@
     }
 
     try {
-      if (dictationModalState.dictationStarted && !isPauseModalOpen() && !isStartModalOpen()) {
+      if (dictationModalState.dictationStarted && !isStartModalOpen()) {
         // Если показано победное окно — фокус уже на его кнопках
         // (showCompletionModal фокусирует completionResultsBtn).
         // Не перебиваем его фокусом на поле ввода / кнопки диктанта.
@@ -8313,12 +8312,6 @@
       clearAllRecordingTimers();
     } catch (e0) {
     }
-    try {
-      const pm = document.getElementById('pauseModal');
-      if (pm) pm.style.display = 'none';
-    } catch (e1) {
-    }
-
     if (clearSession) {
       // При выходе из завершённого диктанта удаляем сессию из store и из IDB,
       // чтобы при повторном открытии не подхватывалась старая сессия
