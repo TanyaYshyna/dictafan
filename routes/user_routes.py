@@ -530,6 +530,13 @@ def api_get_current_user():
                 conn2.close()
     except Exception:
         pass
+
+    # Добавляем действующий тип лицензии (пакет) для инфостроки
+    try:
+        from helpers.db_license import get_user_current_license
+        user_copy['license_type'] = get_user_current_license(int(user_data['id']))
+    except Exception:
+        user_copy['license_type'] = None
     
     return jsonify(user_copy)
 

@@ -300,6 +300,41 @@ def get_user_current_role(user_id: int) -> Optional[dict]:
     return get_user_role_for_date(user_id, date.today())
 
 
+def get_user_current_license(user_id: int) -> Optional[str]:
+    """
+    Возвращает действующий тип лицензии (пакет) пользователя на сегодня.
+
+    Тип лицензии определяется по записи license_operations, на которую
+    указывает user_access_calendar.source_document_id за сегодняшний день.
+    Если источник не найден (например, manual-переопределение роли) — возвращает None.
+    """
+    conn, cur = get_db_cursor()
+    try:
+        today = date.today()
+        cur.execute(
+            """
+            SELECT lo.license_type
+            FROM user_access_calendar uac
+            JOIN license_operations lo ON lo.id::text = uac.source_document_id
+            WHERE uac.user_id = %s
+              AND uac.date = %s
+              AND uac.source_document_id IS NOT NULL
+              AND uac.source_document_id <> ''
+            LIMIT 1
+            """,
+            (user_id, today),
+        )
+        row = cur.fetchone()
+        if row:
+            val = row.get("license_type") if isinstance(row, dict) else row[0]
+            if val:
+                return str(val)
+        return None
+    finally:
+        cur.close()
+        conn.close()
+
+
 def update_user_role_by_id(user_id: int, role_code: str) -> bool:
     """
     Напрямую устанавливает роль пользователя в users.role_id и синхронизирует

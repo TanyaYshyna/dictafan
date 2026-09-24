@@ -15,6 +15,7 @@ from helpers.db_license import (
     get_user_role_for_date,
     get_user_access_for_range,
     get_user_current_role,
+    get_user_current_license,
     update_user_role_by_id,
 )
 from helpers.license_manager import license_manager
@@ -122,10 +123,12 @@ def license_status():
     role = get_user_role_for_date(user_id, today)
     permissions = get_user_permissions_for_today(user_id)
     calendar = get_user_access_for_range(user_id, today, date(2099, 12, 31))
+    license_type = get_user_current_license(user_id)
 
     return jsonify({
         "success": True,
         "role": role,
+        "license_type": license_type,
         "permissions": permissions,
         "upcoming_access": calendar[:90],  # следующие 90 дней
     })

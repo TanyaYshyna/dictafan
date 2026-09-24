@@ -1464,29 +1464,64 @@ window.DictationKart = window.DictationKart || {
 
   },
 
-  buildMenuItems(context) {
+  /**
+   * Определяет, может ли текущий пользователь редактировать диктант.
+   * Редактировать можно только СВОИ диктанты (владелец) либо любые — если админ.
+   * Данные берутся из оперативной памяти (window.UM.userData), без запросов к серверу.
+   * @param {number|string|null|undefined} ownerId - owner_id диктанта
+   * @returns {boolean}
+   */
+  _canEditDictation(ownerId) {
+    try {
+      const ud = (window.UM && window.UM.userData) || null;
+      if (!ud) return false;
+
+      const isAdmin = String(ud.role_code || '').toLowerCase() === 'admin';
+      if (isAdmin) return true;
+
+      const currentUserId = (ud.id === null || ud.id === undefined) ? null : Number(ud.id);
+      if (currentUserId === null || !isFinite(currentUserId)) return false;
+
+      const oid = (ownerId === null || ownerId === undefined || ownerId === '') ? null : Number(ownerId);
+      if (oid === null || !isFinite(oid)) return false;
+
+      return currentUserId === oid;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  buildMenuItems(context, opts = {}) {
+    const canEdit = this._canEditDictation(opts.ownerId);
+    const editItem = { action: 'edit-dictation-v2', icon: 'sparkles', labelKey: 'private_library.dictation_card_actions.editor', labelFallback: 'Редактор' };
+
     if (context === 'desk') {
-      return [
+      const items = [
         { action: 'create-assignment', icon: 'clipboard-list', labelKey: 'private_library.dictation_card_actions.create_assignment_new', labelFallback: 'Все упражнения' },
         { action: 'plan-tasks', icon: 'calendar-plus', labelKey: 'private_library.dictation_card_actions.plan', labelFallback: 'Запланировать' },
         { action: 'prefetch-dictation-cache', icon: 'download', labelKey: 'private_library.dictation_card_actions.cache', labelFallback: 'Скачать в кэш' },
-        { action: 'edit-dictation-v2', icon: 'sparkles', labelKey: 'private_library.dictation_card_actions.editor', labelFallback: 'Редактор' },
+      ];
+      if (canEdit) items.push(editItem);
+      items.push(
         { action: 'show-in-book', icon: 'book-marked', labelKey: 'private_library.dictation_card_actions.show_in_book', labelFallback: 'Показать в книге' },
         { action: 'remove-from-desk', icon: 'arrow-big-down-dash', labelKey: 'private_library.dictation_card_actions.remove_from_desk', labelFallback: 'Убрать со стола' },
-      ];
+      );
+      return items;
     }
 
-    return [
-      { action: 'edit-dictation-v2', icon: 'sparkles', labelKey: 'private_library.dictation_card_actions.editor', labelFallback: 'Редактор' },
+    const items = [];
+    if (canEdit) items.push(editItem);
+    items.push(
       { action: 'create-assignment', icon: 'clipboard-list', labelKey: 'private_library.dictation_card_actions.create_assignment', labelFallback: 'Все упражнения' },
       { action: 'plan-tasks', icon: 'calendar-plus', labelKey: 'private_library.dictation_card_actions.plan', labelFallback: 'Запланировать' },
       { action: 'move-dictation', icon: 'folder-symlink', labelKey: 'private_library.dictation_card_actions.move', labelFallback: 'Переместить' },
       { action: 'delete-dictation', icon: 'trash-2', labelKey: 'private_library.dictation_card_actions.delete', labelFallback: 'Удалить', danger: true },
-    ];
+    );
+    return items;
   },
 
-  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation, isDialog, audioOrder, isFirstLoad, authorMaterialsUrl }) {
-    const items = this.buildMenuItems(context);
+  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation, isDialog, audioOrder, isFirstLoad, authorMaterialsUrl, ownerId }) {
+    const items = this.buildMenuItems(context, { ownerId });
 
     const t = (key, fallback) => {
       try {
@@ -1601,6 +1636,7 @@ window.DictationKart = window.DictationKart || {
       audioOrder: item.audio_order,
       isFirstLoad: item.is_first_load,
       authorMaterialsUrl: item.author_materials_url,
+      ownerId: item.owner_id,
     });
 
     return `
@@ -1681,6 +1717,7 @@ window.DictationKart = window.DictationKart || {
       audioOrder: d.audio_order,
       isFirstLoad: d.is_first_load,
       authorMaterialsUrl: d.author_materials_url,
+      ownerId: d.owner_id,
     });
 
     return `
@@ -1819,6 +1856,7 @@ window.DictationKart = window.DictationKart || {
         audioOrder: item.audio_order,
         isFirstLoad: item.is_first_load,
         authorMaterialsUrl: item.author_materials_url,
+        ownerId: item.owner_id,
       });
     }
 
@@ -1923,6 +1961,7 @@ window.DictationKart = window.DictationKart || {
         audioOrder: d.audio_order,
         isFirstLoad: d.is_first_load,
         authorMaterialsUrl: d.author_materials_url,
+        ownerId: d.owner_id,
       });
     }
 

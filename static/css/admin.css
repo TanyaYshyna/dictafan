@@ -200,6 +200,15 @@
 }
 
 /* ===== ЗАКЛАДКА "ВРЕМЯ": КОРРЕКЦИЯ lead_time ===== */
+/* Вкладка «Время» прокручивается, чтобы при работающих отборах
+   блок изменения записи не уходил в невидимую зону. */
+#admin-tab-time .admin-panel__tab-inner {
+  max-height: calc(100vh - 230px);
+  overflow-y: auto;
+  padding-right: 14px;
+  scrollbar-width: thin;
+}
+
 .admin-time-tool {
   margin-top: 24px;
   padding-top: 20px;
@@ -295,6 +304,41 @@
   font-size: 18px;
   font-weight: 600;
   color: var(--color-text-secondary, #6b7280);
+}
+
+/* Кнопки «Найти» и «Сохранить»: высота 44 + отступы по ширине */
+#adminTimeUserSearchBtn,
+#adminTimeSaveBtn {
+  height: 44px;
+  padding-left: 22px;
+  padding-right: 22px;
+  flex: 0 0 auto;
+}
+
+/* Зелёная кнопка «Применить» — стиль не определён глобально (button-color-green),
+   поэтому задаём видимое оформление в палитре lightgreen. */
+#adminTimeApplyFiltersBtn {
+  height: 44px;
+  padding-left: 22px;
+  padding-right: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: #bbf1ca;
+  color: #366f40;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+#adminTimeApplyFiltersBtn:hover {
+  border: 1px solid #59b86b;
+  box-shadow: 0 3px 0 0 #59b86b;
+}
+
+#adminTimeApplyFiltersBtn:focus {
+  outline: 2px solid #366f40;
+  outline-offset: 2px;
 }
 
 /* ===== ВКЛАДКА "ПРАВА ПОЛЬЗОВАТЕЛЕЙ" ===== */

@@ -349,6 +349,7 @@ def get_book_dictations(book_id: int) -> List[Dict[str, Any]]:
             "d.title",
             "d.language_code",
             "d.level",
+            "d.owner_id",
             "d.is_public",
         ]
         if has_author_materials_url:
@@ -376,6 +377,7 @@ def get_book_dictations(book_id: int) -> List[Dict[str, Any]]:
                 "title": row["title"],
                 "language_code": row["language_code"],
                 "level": row["level"],
+                "owner_id": row["owner_id"],
                 "is_public": row["is_public"],
                 "order_index": row["order_index"],
             }
@@ -1384,6 +1386,7 @@ def get_orphan_dictations(user_id: int) -> List[Dict[str, Any]]:
             "d.title",
             "d.language_code",
             "d.level",
+            "d.owner_id",
             "d.is_public",
         ]
         if has_author_materials_url:
@@ -1417,6 +1420,7 @@ def get_orphan_dictations(user_id: int) -> List[Dict[str, Any]]:
                 "title": row["title"],
                 "language_code": row["language_code"],
                 "level": row["level"],
+                "owner_id": row["owner_id"],
                 "is_public": row["is_public"],
                 "created_at": row["created_at"].isoformat() if row["created_at"] else None,
             }

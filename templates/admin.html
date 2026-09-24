@@ -27,9 +27,6 @@
                         <div class="user-avatar-small"></div>
                         <span class="username-text"></span>
                     </button>
-                    <button id="logoutBtn" class="logout-btn" title="Выйти">
-                        <i data-lucide="log-out"></i>
-                    </button>
                 </div>
             </div>
         </div>
@@ -114,13 +111,9 @@
 
                             <div class="admin-time-filters">
                                 <div class="admin-time-filter">
-                                    <label class="admin-license-label">Дата</label>
-                                    <input type="date" id="adminTimeDate" class="text-input">
-                                </div>
-                                <div class="admin-time-filter">
-                                    <label class="admin-license-label">Пользователь</label>
+                                    <label class="admin-license-label">Почта</label>
                                     <div class="admin-license-search-row">
-                                        <input type="text" id="adminTimeUserSearch" class="text-input" placeholder="email или имя">
+                                        <input type="text" id="adminTimeUserSearch" class="text-input" placeholder="email">
                                         <button id="adminTimeUserSearchBtn" class="button-color-yellow">
                                             <i data-lucide="search"></i>
                                             <span>Найти</span>
@@ -128,6 +121,10 @@
                                     </div>
                                     <div id="adminTimeUserSearchResult" class="admin-license-search-result" style="display: none;"></div>
                                     <div id="adminTimeSelectedUser" class="admin-time-selected" style="display: none;"></div>
+                                </div>
+                                <div class="admin-time-filter">
+                                    <label class="admin-license-label">Дата</label>
+                                    <input type="date" id="adminTimeDate" class="text-input">
                                 </div>
                                 <div class="admin-time-filter">
                                     <label class="admin-license-label">Язык</label>

@@ -457,6 +457,20 @@ class UserManager {
       }
     } catch (e) {}
 
+    // Выводим роль пользователя и действующий пакет в нижней инфостроке
+    try {
+      const roleCode = String(userData.role_code || '').trim();
+      const licenseType = String(userData.license_type || '').trim();
+      const roleLabel = roleCode
+        ? (roleCode.charAt(0).toUpperCase() + roleCode.slice(1))
+        : '—';
+      const parts = ['👤 ' + roleLabel];
+      if (licenseType) parts.push('📦 ' + licenseType);
+      if (typeof window.setSwBarLeftInfo === 'function') {
+        window.setSwBarLeftInfo(parts.join(' · '));
+      }
+    } catch (e) {}
+
     // console.log('✅ Интерфейс настроен для авторизованного пользователя');
   }
 

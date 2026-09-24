@@ -715,6 +715,34 @@ def save_dictation_final():
                 audio_order=data.get("audio_order")
             )
         elif db_id:
+            # Проверка прав: редактировать можно только СВОИ диктанты (владелец) или админу.
+            try:
+                current_email = get_jwt_identity()
+                user_db = get_user_by_email(current_email)
+                if not user_db:
+                    return jsonify({"success": False, "error": "User not found", "msg": "User not found"}), 404
+
+                from helpers.db_license import get_user_current_role
+                role = get_user_current_role(int(user_db['id']))
+                is_admin = bool(role and str(role.get('code') or '').lower() == 'admin')
+
+                existing = get_dictation_by_id(int(db_id))
+                existing_owner = existing.get('owner_id') if existing else None
+
+                if not is_admin and (not existing_owner or int(existing_owner) != int(user_db['id'])):
+                    logger.warning(
+                        "⛔ Попытка редактирования чужого диктанта %s пользователем %s (role=%s)",
+                        db_id, user_db['id'], (role or {}).get('code'),
+                    )
+                    return jsonify({
+                        "success": False,
+                        "error": "Forbidden",
+                        "msg": "У вас нет прав редактировать чужие диктанты",
+                    }), 403
+            except Exception as e:
+                logger.error(f"❌ Ошибка проверки прав на редактирование диктанта {db_id}: {e}")
+                return jsonify({"success": False, "error": "Forbidden", "msg": "Ошибка проверки прав"}), 403
+
             # Обновляем существующий диктант в БД
             update_dictation(
                 dictation_id=db_id,
