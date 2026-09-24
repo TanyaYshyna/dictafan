@@ -710,7 +710,8 @@
   /**
    * Показывает короткое уведомление через общий toast-элемент диктанта.
    */
-  function showDictationToast(message) {
+  function showDictationToast(message, durationMs) {
+    const dur = Number.isFinite(Number(durationMs)) ? Number(durationMs) : 3000;
     try {
       const toast = document.getElementById('toastMessage');
       if (toast) {
@@ -719,7 +720,7 @@
         clearTimeout(showDictationToast._timer);
         showDictationToast._timer = setTimeout(() => {
           toast.style.display = 'none';
-        }, 3000);
+        }, dur);
         return;
       }
     } catch (e) {
@@ -2763,6 +2764,26 @@
             event.preventDefault();
             break;
           }
+          case 'Digit8': {
+            // ctrl+8 — обмен 3 текстовых кружочков на полузвезду (без модального окна)
+            if (!dictationModalState.dictationStarted) return;
+            try {
+              if (typeof performCoinExchange === 'function') performCoinExchange('text');
+            } catch (eExchange) {
+            }
+            event.preventDefault();
+            break;
+          }
+          case 'Digit9': {
+            // ctrl+9 — обмен 3 аудио-кружочков (50-80%) на микрофон (без модального окна)
+            if (!dictationModalState.dictationStarted) return;
+            try {
+              if (typeof performCoinExchange === 'function') performCoinExchange('audio');
+            } catch (eExchange) {
+            }
+            event.preventDefault();
+            break;
+          }
           case 'Digit5': {
             // ctrl+5 — следующее предложение
             if (!dictationModalState.dictationStarted) return;
@@ -3418,6 +3439,96 @@
     }
   }
 
+  /**
+   * Выполняет обмен кружочков на подсказку без модального окна.
+   * Возвращает true, если обмен произошёл.
+   * mode: 'text' — 3 текстовые активности → полузвезда;
+   *       'audio' — 3 аудио-попытки (50-80%) → микрофон.
+   * Используется и кнопками, и горячими клавишами (Ctrl+8 / Ctrl+9).
+   */
+  function performCoinExchange(mode) {
+    const session = window.__dictationModalActiveSession;
+    const st = getCurrentSentenceStateFromSession(session);
+    if (!st) return false;
+    if (mode !== 'text' && mode !== 'audio') return false;
+
+    let cost = 0;
+    if (mode === 'text') {
+      cost = getPricingValue('half_star_purchase_cost', 3);
+      const coins = Number(st.text_activity_count) || 0;
+      // Обмен доступен только если кружочков достаточно и обмен ещё не делали
+      if (coins < cost) return false;
+      if (st.text_exchange_half_star) return false;
+      st.text_activity_count = Math.max(0, coins - cost);
+      st.number_of_corrected = Math.max(Number(st.number_of_corrected) || 0, 1);
+      st.text_exchange_half_star = true;
+      setCheckButtonState('half');
+    } else {
+      cost = getPricingValue('audio_purchase_cost', 3);
+      const coins = Number(st.audio_activity50_count) || 0;
+      if (coins < cost) return false;
+      if (st.audio_exchange_mic) return false;
+      st.audio_activity50_count = Math.max(0, coins - cost);
+      const req = getRequiredAudioRepeatsValue();
+      st.number_of_audio = Math.max(Number(st.number_of_audio) || 0, req);
+      st.audio_exchange_mic = true;
+    }
+
+    // Кратко сообщаем о списании кружочков за обмен (2 секунды)
+    showDictationToast('Списано ' + cost + ' кружочков за обмен', 2000);
+
+    // Обновляем строку в таблице стартового модального окна
+    let curKey = null;
+    try {
+      curKey = session.getCurrentKey();
+      if (curKey != null) {
+        updateStartModalSentenceRow(session, curKey);
+      }
+    } catch (eRow) {
+    }
+
+    updateSentenceTabloFromSession(session, curKey);
+    updateTaskProgressFromSession(session);
+    updateNextButtonVisibilityFromSession(session);
+
+    try {
+      if (mode === 'audio') {
+        const rb = document.getElementById('recordButton');
+        if (rb) {
+          rb.disabled = false;
+          rb.classList.remove('disabled');
+          const wrap = rb.querySelector('#recordStateIcon') || rb;
+          try {
+            wrap.innerHTML = '<i data-lucide="mic"></i>';
+          } catch (e0) {
+          }
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons({ root: wrap });
+          }
+        }
+
+        const perfect = Number(st && st.number_of_perfect) || 0;
+        const corrected = Number(st && st.number_of_corrected) || 0;
+        const checkBtn = document.getElementById('checkBtn');
+        const nextBtn = document.getElementById('resultNextBtn');
+        const shouldPreferRepeat = (corrected > 0 && perfect < 1);
+        if (shouldPreferRepeat && checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
+          checkBtn.focus();
+        } else if (nextBtn && !nextBtn.disabled && typeof nextBtn.focus === 'function') {
+          nextBtn.focus();
+        } else if (checkBtn && typeof checkBtn.focus === 'function') {
+          checkBtn.focus();
+        }
+      }
+    } catch (e99) {
+    }
+
+    return true;
+  }
+
+  /**
+   * Привязывает кнопки обмена кружочков (без модального окна — обмен сразу).
+   */
   function bindCoinExchangeModal(session) {
     try {
       if (dictationModalState._coinExchangeBound) return;
@@ -3425,154 +3536,8 @@
     } catch (e0) {
     }
 
-    const modal = document.getElementById('coinExchangeModal');
-    const title = document.getElementById('coinExchangeTitle');
-    const closeBtn = document.getElementById('coinExchangeCloseBtn');
-    const confirmBtn = document.getElementById('coinExchangeConfirmBtn');
     const btnText = document.getElementById('btn_coin_exchange_text');
     const btnAudio = document.getElementById('btn_coin_exchange_audio');
-
-    if (!modal || !title || !closeBtn || !confirmBtn) return;
-
-    const open = (mode) => {
-      try {
-        dictationModalState._coinExchangeMode = mode;
-        if (mode === 'text') {
-          title.textContent = 'Обменять 3 текстовые активности на полузвезду?';
-        } else {
-          title.textContent = 'Обменять 3 аудио-попытки (50-80%) на микрофон?';
-        }
-
-        // Останавливаем активную запись речи, если она идёт
-        try {
-          const panel = dictationModalState._speechPanel;
-          if (panel && typeof panel.stopRecording === 'function') {
-            panel.stopRecording('exchange');
-          }
-        } catch (eSpeech) {
-        }
-
-        modal.style.display = 'flex';
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-          window.lucide.createIcons();
-        }
-      } catch (e) {
-      }
-    };
-
-    const close = () => {
-      try {
-        modal.style.display = 'none';
-      } catch (e) {
-      }
-    };
-
-    try {
-      modal.addEventListener('click', (e) => {
-        try {
-          e.preventDefault();
-          e.stopPropagation();
-        } catch (e0) {
-        }
-      });
-    } catch (e) {
-    }
-
-    try {
-      closeBtn.addEventListener('click', async (e) => {
-        try {
-          e.preventDefault();
-          e.stopPropagation();
-        } catch (e0) {
-        }
-        try { await close(); } catch (eIgnore) {}
-      });
-    } catch (e) {
-    }
-
-    const spendAndApply = async () => {
-      // Панель и обработчики coinExchange биндятся один раз и переиспользуются
-      // между диктантами, поэтому session из замыкания устаревает. Берём активную.
-      const session = window.__dictationModalActiveSession;
-      const st = getCurrentSentenceStateFromSession(session);
-      if (!st) return;
-
-      const mode = String(dictationModalState._coinExchangeMode || '');
-      if (mode !== 'text' && mode !== 'audio') return;
-
-      if (mode === 'text') {
-        // Бесплатный обмен: 3 текстовые активности → 1 полузвезда
-        st.text_activity_count = Math.max(0, (Number(st.text_activity_count) || 0) - 3);
-        st.number_of_corrected = Math.max(Number(st.number_of_corrected) || 0, 1);
-        st.text_exchange_half_star = true;
-        setCheckButtonState('half');
-      } else {
-        // Бесплатный обмен: 3 аудио-попытки (50-80%) → 1 микрофон
-        st.audio_activity50_count = Math.max(0, (Number(st.audio_activity50_count) || 0) - 3);
-        const req = getRequiredAudioRepeatsValue();
-        st.number_of_audio = Math.max(Number(st.number_of_audio) || 0, req);
-        st.audio_exchange_mic = true;
-      }
-
-      // Обновляем строку в таблице стартового модального окна
-      let curKey = null;
-      try {
-        curKey = session.getCurrentKey();
-        if (curKey != null) {
-          updateStartModalSentenceRow(session, curKey);
-        }
-      } catch (eRow) {
-      }
-
-      updateSentenceTabloFromSession(session, curKey);
-      updateTaskProgressFromSession(session);
-      updateNextButtonVisibilityFromSession(session);
-
-      try {
-        if (mode === 'audio') {
-          const rb = document.getElementById('recordButton');
-          if (rb) {
-            rb.disabled = false;
-            rb.classList.remove('disabled');
-            const wrap = rb.querySelector('#recordStateIcon') || rb;
-            try {
-              wrap.innerHTML = '<i data-lucide="mic"></i>';
-            } catch (e0) {
-            }
-            if (window.lucide && typeof window.lucide.createIcons === 'function') {
-              window.lucide.createIcons({ root: wrap });
-            }
-          }
-
-          const perfect = Number(st && st.number_of_perfect) || 0;
-          const corrected = Number(st && st.number_of_corrected) || 0;
-          const checkBtn = document.getElementById('checkBtn');
-          const nextBtn = document.getElementById('resultNextBtn');
-          const shouldPreferRepeat = (corrected > 0 && perfect < 1);
-          if (shouldPreferRepeat && checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
-            checkBtn.focus();
-          } else if (nextBtn && !nextBtn.disabled && typeof nextBtn.focus === 'function') {
-            nextBtn.focus();
-          } else if (checkBtn && typeof checkBtn.focus === 'function') {
-            checkBtn.focus();
-          }
-        }
-      } catch (e99) {
-      }
-      try { await close(); } catch (eIgnore) {}
-    };
-
-    try {
-      confirmBtn.addEventListener('click', async (e) => {
-        try {
-          e.preventDefault();
-          e.stopPropagation();
-        } catch (e0) {
-        }
-        await spendAndApply();
-      });
-    } catch (e) {
-    }
 
     try {
       if (btnText) {
@@ -3582,7 +3547,7 @@
             e.stopPropagation();
           } catch (e0) {
           }
-          open('text');
+          performCoinExchange('text');
         });
       }
     } catch (e) {
@@ -3596,7 +3561,7 @@
             e.stopPropagation();
           } catch (e0) {
           }
-          open('audio');
+          performCoinExchange('audio');
         });
       }
     } catch (e) {

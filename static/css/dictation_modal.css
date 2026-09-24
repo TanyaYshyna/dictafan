@@ -15,34 +15,6 @@
   z-index: 100256;
 }
 
-#dictationModal #coinExchangeModal {
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  box-sizing: border-box;
-}
-
-#dictationModal #coinExchangeModal .modal-content {
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
-  padding: 16px;
-}
-
-#dictationModal #coinExchangeModal .start-modal-title-row {
-  position: relative;
-  padding-right: 44px;
-}
-
-#dictationModal #coinExchangeModal .start-modal-header-actions {
-  position: absolute;
-  top: 0;
-  right: 0;
-}
-
 #dictationModal #start-modal.modal {
   position: fixed;
   inset: 0;
@@ -1566,6 +1538,78 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal #recordButton:focus-visible {
   outline: 2px solid var(--color-button-text-purple);
   outline-offset: 2px;
+}
+
+/* Кнопка записи во время обработки распознавания: серая и недоступная. */
+#dictationModal #recordButton.processing {
+  background: var(--color-button-gray);
+  color: var(--color-button-text-gray);
+  border: 1px solid transparent;
+  box-shadow: none;
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Лёгкая анимация «фиолетовые точечки прыгают над палочкой» во время обработки. */
+#dictationModal .whisper-processing-animation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+#dictationModal .whisper-processing-animation .dots-animation {
+  display: inline-flex;
+  gap: 4px;
+  font-size: 24px;
+  line-height: 1;
+  color: #8b5cf6;
+}
+
+#dictationModal .whisper-processing-animation .dots-animation span {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: dictation-dot-bounce 1.4s infinite;
+  animation-delay: calc(var(--i) * 0.2s);
+}
+
+@keyframes dictation-dot-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-10px); opacity: 1; }
+}
+
+#dictationModal .whisper-processing-animation .processing-text {
+  font-size: 14px;
+  color: var(--color-button-text-gray);
+  font-weight: 500;
+}
+
+#dictationModal .whisper-processing-animation .progress-container {
+  width: 100%;
+  max-width: 300px;
+  height: 4px;
+  background: rgba(139, 92, 246, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#dictationModal .whisper-processing-animation .progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  border-radius: 2px;
+  animation: dictation-processing-progress 1.2s ease-in-out infinite;
+}
+
+@keyframes dictation-processing-progress {
+  0% { width: 0%; }
+  50% { width: 70%; }
+  100% { width: 100%; }
 }
 
 #dictationModal .recording-indicator-btn {

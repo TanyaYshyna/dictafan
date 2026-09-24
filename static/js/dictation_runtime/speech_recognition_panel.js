@@ -26,6 +26,10 @@
         stream: null,
       };
 
+      // Анимация «точечки над палочкой», показываемая во время обработки
+      // распознавания (после остановки записи, пока идёт Whisper/сервер).
+      this._processingAnimationEl = null;
+
       this.els = {
         recordButton: options.recordButton || null,
         recordingIndicator: options.recordingIndicator || null,
@@ -257,6 +261,20 @@
         this._updateRecordingIndicator(false);
         this._setRecordButtonRecording(false);
         this._stopVisualizer();
+        this._hideProcessingAnimation();
+        this._setRecordButtonProcessing(false);
+      };
+
+      // Пока идёт серверная/оффлайн расшифровка (Whisper), показываем
+      // «точечки над палочкой» и делаем кнопку записи серой и недоступной.
+      this._rec.callbacks.onProcessingStart = () => {
+        this._showProcessingAnimation();
+        this._setRecordButtonProcessing(true);
+      };
+
+      this._rec.callbacks.onProcessingEnd = () => {
+        this._hideProcessingAnimation();
+        this._setRecordButtonProcessing(false);
       };
 
       return this._rec;
@@ -396,6 +414,67 @@
         rb.classList.toggle('recording', !!isRecording);
       } catch (e) {
       }
+    }
+
+    /**
+     * Делает кнопку записи серой и недоступной на время обработки распознавания,
+     * а после — возвращает ей фиолетовый цвет и доступность (если аудио ещё не выполнено).
+     */
+    _setRecordButtonProcessing(isProcessing) {
+      try {
+        const rb = this.els.recordButton;
+        if (!rb) return;
+        rb.classList.toggle('processing', !!isProcessing);
+        if (isProcessing) {
+          rb.disabled = true;
+        } else {
+          if (!this._isAudioComplete) {
+            rb.disabled = false;
+            rb.classList.remove('disabled');
+            this._setRecordButtonIcon('mic-off');
+          } else {
+            rb.disabled = true;
+            rb.classList.add('disabled');
+            this._setRecordButtonIcon('mic');
+          }
+        }
+      } catch (e) {
+      }
+    }
+
+    /**
+     * Показывает лёгкую анимацию «фиолетовые точечки прыгают над палочкой»,
+     * сигнализирующую о том, что идёт обработка распознавания.
+     */
+    _showProcessingAnimation() {
+      try {
+        const container = this.els.userAudioAnswer;
+        if (!container) return;
+        this._hideProcessingAnimation();
+        const wrap = document.createElement('div');
+        wrap.className = 'whisper-processing-animation';
+        wrap.innerHTML = '' +
+          '<div class="dots-animation">' +
+            '<span style="--i:0"></span>' +
+            '<span style="--i:1"></span>' +
+            '<span style="--i:2"></span>' +
+          '</div>' +
+          '<div class="processing-text">Обработка аудио</div>' +
+          '<div class="progress-container"><div class="progress-bar"></div></div>';
+        container.appendChild(wrap);
+        this._processingAnimationEl = wrap;
+      } catch (e) {
+      }
+    }
+
+    _hideProcessingAnimation() {
+      try {
+        if (this._processingAnimationEl && this._processingAnimationEl.parentNode) {
+          this._processingAnimationEl.parentNode.removeChild(this._processingAnimationEl);
+        }
+      } catch (e) {
+      }
+      this._processingAnimationEl = null;
     }
 
     _updateRecognitionModeIcon(mode) {
