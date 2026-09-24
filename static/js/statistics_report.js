@@ -3536,6 +3536,7 @@ class DictationReport {
         this._showTime = true;
         this._showMoney = true;
         this._showErrors = true;
+        this._showBooks = false;
         this._loading = false;
     }
 
@@ -3850,6 +3851,27 @@ class DictationReport {
         closeBtn.appendChild(closeIcon);
         closeBtn.addEventListener('click', () => this.hide());
 
+        // Books visibility toggle («Отображать книги»)
+        const booksToggle = document.createElement('button');
+        booksToggle.className = 'dictation-report-books-toggle';
+        booksToggle.type = 'button';
+        booksToggle.title = 'Отображать книги';
+        const booksIcon = document.createElement('i');
+        booksIcon.setAttribute('data-lucide', this._showBooks ? 'circle-check-big' : 'circle');
+        const booksLabel = document.createElement('span');
+        booksLabel.textContent = 'Отображать книги';
+        booksToggle.appendChild(booksIcon);
+        booksToggle.appendChild(booksLabel);
+        if (this._showBooks) booksToggle.classList.add('active');
+        booksToggle.addEventListener('click', () => {
+            this._showBooks = !this._showBooks;
+            booksToggle.classList.toggle('active', this._showBooks);
+            booksIcon.setAttribute('data-lucide', this._showBooks ? 'circle-check-big' : 'circle');
+            if (typeof lucide !== 'undefined') lucide.createIcons({ root: booksToggle });
+            this._renderTable();
+        });
+
+        rightPanel.appendChild(booksToggle);
         rightPanel.appendChild(refreshBtn);
         rightPanel.appendChild(closeBtn);
 
@@ -4133,23 +4155,25 @@ if (typeof lucide !== 'undefined') {
             tbody.appendChild(langRow);
 
             for (const book of (lang.books || [])) {
-                // Book row
-                const bookRow = document.createElement('tr');
-                bookRow.className = 'level-book';
-                const bookTd = document.createElement('td');
-                bookTd.className = 'dictation-report-td-sticky';
-                bookTd.style.textAlign = 'left';
+                if (this._showBooks) {
+                    // Book row
+                    const bookRow = document.createElement('tr');
+                    bookRow.className = 'level-book';
+                    const bookTd = document.createElement('td');
+                    bookTd.className = 'dictation-report-td-sticky';
+                    bookTd.style.textAlign = 'left';
 
-                const bookCover = document.createElement('img');
-                bookCover.className = 'book-cover-thumb';
-                bookCover.src = book.cover_url || '';
-                bookCover.alt = '';
-                bookCover.onerror = function () { this.style.display = 'none'; };
-                bookTd.appendChild(bookCover);
-                bookTd.appendChild(document.createTextNode(book.title || 'Без названия'));
-                bookRow.appendChild(bookTd);
-                appendSpacerCells(bookRow);
-                tbody.appendChild(bookRow);
+                    const bookCover = document.createElement('img');
+                    bookCover.className = 'book-cover-thumb';
+                    bookCover.src = book.cover_url || '';
+                    bookCover.alt = '';
+                    bookCover.onerror = function () { this.style.display = 'none'; };
+                    bookTd.appendChild(bookCover);
+                    bookTd.appendChild(document.createTextNode(book.title || 'Без названия'));
+                    bookRow.appendChild(bookTd);
+                    appendSpacerCells(bookRow);
+                    tbody.appendChild(bookRow);
+                }
 
                 // Dictations directly in book
                 for (const d of (book.dictations || [])) {
@@ -4158,16 +4182,18 @@ if (typeof lucide !== 'undefined') {
 
                 // Sections
                 for (const sec of (book.sections || [])) {
-                    // Section row
-                    const secRow = document.createElement('tr');
-                    secRow.className = 'level-section';
-                    const secTd = document.createElement('td');
-                    secTd.className = 'dictation-report-td-sticky';
-                    secTd.style.textAlign = 'left';
-                    secTd.textContent = `📂 ${sec.title || 'Без названия'}`;
-                    secRow.appendChild(secTd);
-                    appendSpacerCells(secRow);
-                    tbody.appendChild(secRow);
+                    if (this._showBooks) {
+                        // Section row
+                        const secRow = document.createElement('tr');
+                        secRow.className = 'level-section';
+                        const secTd = document.createElement('td');
+                        secTd.className = 'dictation-report-td-sticky';
+                        secTd.style.textAlign = 'left';
+                        secTd.textContent = `📂 ${sec.title || 'Без названия'}`;
+                        secRow.appendChild(secTd);
+                        appendSpacerCells(secRow);
+                        tbody.appendChild(secRow);
+                    }
 
                     for (const d of (sec.dictations || [])) {
                         this._appendDictationRow(tbody, d, valueCols, attempts, 'dictation', grand);

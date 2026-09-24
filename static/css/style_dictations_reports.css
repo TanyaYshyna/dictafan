@@ -594,6 +594,43 @@
   flex: 0 0 auto;
 }
 
+/* Кнопка-флаг «Отображать книги» в шапке */
+.dictation-report-header-right .dictation-report-books-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(31, 41, 51, 0.15);
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(31, 41, 51, 0.7);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.dictation-report-header-right .dictation-report-books-toggle:hover {
+  background: rgba(31, 41, 51, 0.06);
+}
+
+.dictation-report-header-right .dictation-report-books-toggle i {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.dictation-report-header-right .dictation-report-books-toggle.active {
+  background: #eef5fd;
+  border-color: rgba(74, 144, 217, 0.4);
+  color: rgba(31, 41, 51, 0.85);
+}
+
+.dictation-report-header-right .dictation-report-books-toggle.active i {
+  color: #2f80d6;
+}
+
 /* Table wrapper */
 .dictation-report-table-wrapper {
   overflow: auto;
@@ -723,6 +760,16 @@
   border-top: 2px solid rgba(31, 41, 51, 0.28);
   font-weight: 700;
   background: #f5f8ff;
+}
+
+/* Полная заливка строки языка (все ячейки до конца) */
+.dictation-report-table .level-language td {
+  background: #eef5fd;
+}
+
+/* Лёгкий оттенок строки книги (все ячейки до конца) */
+.dictation-report-table .level-book td {
+  background: #f4f8fc;
 }
 
 /* Value cells */
