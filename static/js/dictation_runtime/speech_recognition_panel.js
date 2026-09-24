@@ -459,7 +459,6 @@
             '<span style="--i:1"></span>' +
             '<span style="--i:2"></span>' +
           '</div>' +
-          '<div class="processing-text">Обработка аудио</div>' +
           '<div class="progress-container"><div class="progress-bar"></div></div>';
         container.appendChild(wrap);
         this._processingAnimationEl = wrap;
