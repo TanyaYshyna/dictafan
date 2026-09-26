@@ -90,7 +90,7 @@ def api_desk_items():
             WHERE (table_name = 'dictations'
               AND column_name IN ('tr_en','tr_uk','tr_sv','tr_be','tr_ru',
                                   'tr_de','tr_fr','tr_es','tr_it','tr_tr',
-                                  'tr_ar','tr_pl','sentences_count','audio_order','author_materials_url'))
+                                  'tr_ar','tr_pl','tr_nl','sentences_count','audio_order','author_materials_url'))
               OR (table_name = 'desk_items'
               AND column_name IN ('planned_date'))
             """
@@ -108,7 +108,7 @@ def api_desk_items():
 
         # Строим SELECT-выражения для tr_* колонок
         tr_cols_sql = []
-        for lang in ["en","uk","sv","be","ru","de","fr","es","it","tr","ar","pl"]:
+        for lang in ["en","uk","sv","be","ru","de","fr","es","it","tr","ar","pl","nl"]:
             col = f"tr_{lang}"
             if col in dictation_cols:
                 tr_cols_sql.append(f"COALESCE(d.{col}, FALSE) AS {col}")
@@ -201,6 +201,7 @@ def api_desk_items():
                                 "tr",
                                 "ar",
                                 "pl",
+                                "nl",
                             ]
                             if row.get(f"tr_{lang}")
                         ]
@@ -223,6 +224,7 @@ def api_desk_items():
                     "tr_tr": bool(row.get("tr_tr")),
                     "tr_ar": bool(row.get("tr_ar")),
                     "tr_pl": bool(row.get("tr_pl")),
+                    "tr_nl": bool(row.get("tr_nl")),
                 }
             )
 

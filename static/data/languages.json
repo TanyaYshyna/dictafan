@@ -180,5 +180,20 @@
     "applicable_model_keys": [
       "whisper:Xenova/whisper-tiny"
     ]
+  },
+  "nl": {
+    "country_cod": "nl",
+    "country_cod_url": "nl-NL",
+    "language_ru": "Нидерландский",
+    "language_en": "Dutch",
+    "language_uk": "Нідерландська",
+    "language_tr": "Felemenkçe",
+    "language_ar": "الهولندية",
+    "language_nl": "Nederlands",
+    "applicable_model_keys": [
+      "whisper:Xenova/whisper-tiny",
+      "transformer_asr:Xenova/mms-1b-fl102",
+      "transformer_asr:Xenova/mms-1b-all"
+    ]
   }
 }
