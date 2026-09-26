@@ -168,6 +168,12 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   direction: ltr;
 }
 
+/* RTL: не зеркалировать нижнее табло навигации (← N/M →):
+   левая кнопка — назад, правая — вперёд, нумерация слева направо */
+html[dir="rtl"] #dictationModal .sentence-nav-bottom-inner {
+  direction: ltr;
+}
+
 #dictationModal .sentence-nav-top-inner {
   display: flex !important;
   align-items: center;

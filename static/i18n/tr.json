@@ -770,6 +770,16 @@
       "save": "Kaydet",
       "exit": "Çık",
       "close": "Kapat"
+    },
+    "tooltips": {
+      "new": "Yeni dikte",
+      "home": "Kütüphanem",
+      "public": "Genel kütüphane",
+      "plan": "Plan",
+      "zoom_in": "Yakınlaştır",
+      "zoom_out": "Uzaklaştır",
+      "layout_free": "Serbest masa: kartlar sürüklenebilir",
+      "layout_grid": "Normal masa: kartlar sıralı (sürüklenemez)"
     }
   },
   "support": {

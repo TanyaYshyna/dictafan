@@ -770,6 +770,16 @@
       "save": "Save",
       "exit": "Exit",
       "close": "Close"
+    },
+    "tooltips": {
+      "new": "New dictation",
+      "home": "My library",
+      "public": "Public library",
+      "plan": "Plan",
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out",
+      "layout_free": "Free desk: cards can be dragged",
+      "layout_grid": "Grid desk: cards in a row (cannot drag)"
     }
   },
   "support": {

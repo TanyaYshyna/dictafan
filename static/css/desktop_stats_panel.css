@@ -356,3 +356,8 @@
     width: 14px;
     height: 14px;
 }
+
+/* ---- RTL: не зеркалировать табло статистики (огонь + число) ---- */
+html[dir="rtl"] .desktop-stats-panel {
+    direction: ltr;
+}

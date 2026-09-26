@@ -283,3 +283,9 @@
   cursor: pointer;
   display: none;
 }
+
+/* ---- RTL: не зеркалировать карточку стола, чтобы перо и «...» не менялись
+   местами, а выпадающее меню открывалось строго вниз (как в LTR) ---- */
+html[dir="rtl"] .page-index .short-card.dictation-kart.desk-card {
+  direction: ltr;
+}

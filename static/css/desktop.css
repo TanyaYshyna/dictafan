@@ -497,3 +497,26 @@
 #newDictationFillModal {
   z-index: 100310;
 }
+
+/* ---- RTL: панель инструментов прижимается к правому краю ---- */
+html[dir="rtl"] .tool-palette.tool-palette--desk {
+  left: auto;
+  right: 0;
+  border-right: none;
+  border-left: 1px solid var(--color-border, #e2e8f0);
+}
+
+html[dir="rtl"] .page-index .panel {
+  padding-left: 0;
+  padding-right: 45px;
+}
+
+html[dir="rtl"] .page-index .desk-cards-container {
+  padding-left: 12px;
+  padding-right: 0;
+}
+
+html[dir="rtl"] .tool-palette.tool-palette--desk .tool-palette-lang-selector .custom-select-options {
+  left: auto;
+  right: 56px;
+}

@@ -154,9 +154,19 @@ window.Desktop = window.Desktop || {
       if (!btn) return;
       const enabled = this.isDeskFreeLayoutEnabled();
       btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      const tr = (key, fallback) => {
+        try {
+          if (window.I18n && typeof window.I18n.t === 'function') {
+            const v = window.I18n.t(key);
+            if (v && v !== key) return String(v);
+          }
+        } catch (e) {
+        }
+        return fallback;
+      };
       btn.title = enabled
-        ? 'Свободный стол: можно таскать карточки'
-        : 'Обычный стол: карточки в ряд (таскать нельзя)';
+        ? tr('desktop.tooltips.layout_free', 'Свободный стол: можно таскать карточки')
+        : tr('desktop.tooltips.layout_grid', 'Обычный стол: карточки в ряд (таскать нельзя)');
 
       const iconName = enabled ? 'move' : 'grip-vertical';
       btn.innerHTML = `<i data-lucide="${iconName}"></i>`;
@@ -1008,9 +1018,51 @@ window.Desktop = window.Desktop || {
     });
   },
 
+  applyToolPaletteTooltips() {
+    const tr = (key, fallback) => {
+      try {
+        if (window.I18n && typeof window.I18n.t === 'function') {
+          const v = window.I18n.t(key);
+          if (v && v !== key) return String(v);
+        }
+      } catch (e) {
+      }
+      return fallback;
+    };
+
+    const map = {
+      'desktop-new': ['desktop.tooltips.new', 'Новый диктант'],
+      'desktop-home': ['desktop.tooltips.home', 'Моя библиотека'],
+      'desktop-public': ['desktop.tooltips.public', 'Глобальная библиотека'],
+      'desktop-plan': ['desktop.tooltips.plan', 'План'],
+      'desktop-zoom-in': ['desktop.tooltips.zoom_in', 'Увеличить'],
+      'desktop-zoom-out': ['desktop.tooltips.zoom_out', 'Уменьшить'],
+    };
+
+    try {
+      document.querySelectorAll('[data-action^="desktop-"]').forEach((btn) => {
+        const action = btn.getAttribute('data-action');
+        const entry = map[action];
+        if (!entry) return;
+        btn.title = tr(entry[0], entry[1]);
+      });
+    } catch (e) {
+    }
+  },
+
   initToolPalette() {
     this.loadSavedDeskZoom();
     this.applyDeskLayoutIfNeeded();
+
+    this.applyToolPaletteTooltips();
+
+    try {
+      window.addEventListener('ui-language-changed', () => {
+        this.applyToolPaletteTooltips();
+        this.applyDeskLayoutIfNeeded();
+      });
+    } catch (e) {
+    }
 
     document.querySelectorAll('[data-action^="desktop-"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
