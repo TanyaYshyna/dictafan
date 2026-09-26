@@ -79,7 +79,8 @@
       "explanations": {
         "label": "Legend:",
         "o": "original audio",
-        "t": "translation audio"
+        "t": "translation audio",
+        "listen": "listen"
       },
       "play_audio": {
         "title": "Play audio:",
@@ -118,7 +119,7 @@
         "placeholder": "Recognized text will appear here"
       },
       "exercise_mode": {
-        "label": "Audio",
+        "label": "Task types",
         "record": "record audio",
         "no_record": "don't record audio",
         "audio_only_no_hint": "audio only (no hint)",
@@ -126,9 +127,9 @@
       }
     },
     "star_counting": {
-      "label": "Star counting method",
-      "star": "star (Lucilda)",
-      "half": "half star (also Lucilda)"
+      "label": "Text check level",
+      "star": "for perfectionists (maximum load)",
+      "half": "good enough (easy mode)"
     },
     "assignment_history": {
       "retention": {

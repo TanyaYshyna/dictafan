@@ -79,7 +79,8 @@
       "explanations": {
         "label": "Açıklamalar:",
         "o": "orijinal ses",
-        "t": "çeviri sesi"
+        "t": "çeviri sesi",
+        "listen": "dinle"
       },
       "play_audio": {
         "title": "Sesi oynat:",
@@ -118,7 +119,7 @@
         "placeholder": "Tanınan metin burada görünecek"
       },
       "exercise_mode": {
-        "label": "Ses",
+        "label": "Görev türleri",
         "record": "sesi kaydet",
         "no_record": "sesi kaydetme",
         "audio_only_no_hint": "yalnızca ses (ipucu yok)",
@@ -126,9 +127,9 @@
       }
     },
     "star_counting": {
-      "label": "Yıldız sayma yöntemi",
-      "star": "yıldız (Lucilda)",
-      "half": "yarım yıldız (yine Lucilda)"
+      "label": "Metin kontrol seviyesi",
+      "star": "mükemmeliyetçiler için (maksimum yük)",
+      "half": "böyle de olur (kolay mod)"
     },
     "assignment_history": {
       "retention": {

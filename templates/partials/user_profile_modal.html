@@ -227,8 +227,8 @@
 
                                 <div class="dictation-settings-title">{{ t('profile.audio.explanations.label') }}</div>
                                 <div class="dictation-settings-legend">
-                                    <div class="dictation-settings-legend-row"><strong>o</strong> - {{ t('profile.audio.explanations.o') }} (ctrl + 1)</div>
-                                    <div class="dictation-settings-legend-row"><strong>t</strong> - {{ t('profile.audio.explanations.t') }} (ctrl + 2)</div>
+                                    <div class="dictation-settings-legend-row"><strong>o</strong> - {{ t('profile.audio.explanations.o') }} ({{ t('profile.audio.explanations.listen') }} <strong>ctrl + 1</strong>)</div>
+                                    <div class="dictation-settings-legend-row"><strong>t</strong> - {{ t('profile.audio.explanations.t') }} ({{ t('profile.audio.explanations.listen') }} <strong>ctrl + 2</strong>)</div>
                                 </div>
                             </div>
 
@@ -241,19 +241,19 @@
                                             <div style="display:flex; flex-direction:column; gap:10px;">
                                                 <label style="display:flex; align-items:center; gap:10px;">
                                                     <input type="radio" name="audioExerciseMode" id="audioExerciseModeRecord" value="record" />
-                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic"></i><span>{{ t('profile.audio.exercise_mode.record') }}</span></span>
+                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic"></i><i data-lucide="keyboard"></i><span>{{ t('profile.audio.exercise_mode.record') }}</span></span>
                                                 </label>
                                                 <label style="display:flex; align-items:center; gap:10px;">
                                                     <input type="radio" name="audioExerciseMode" id="audioExerciseModeNoRecord" value="no-record" />
-                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic-off"></i><span>{{ t('profile.audio.exercise_mode.no_record') }}</span></span>
+                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic-off"></i><i data-lucide="keyboard-off"></i><span>{{ t('profile.audio.exercise_mode.no_record') }}</span></span>
                                                 </label>
                                                 <label style="display:flex; align-items:center; gap:10px;">
                                                     <input type="radio" name="audioExerciseMode" id="audioExerciseModeOnlyNoHint" value="audio-only-no-hint" />
-                                                    <span>{{ t('profile.audio.exercise_mode.audio_only_no_hint') }}</span>
+                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic"></i><i data-lucide="keyboard-off"></i><span>{{ t('profile.audio.exercise_mode.audio_only_no_hint') }}</span></span>
                                                 </label>
                                                 <label style="display:flex; align-items:center; gap:10px;">
                                                     <input type="radio" name="audioExerciseMode" id="audioExerciseModeOnlyHint" value="audio-only-hint" />
-                                                    <span>{{ t('profile.audio.exercise_mode.audio_only_hint') }}</span>
+                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic"></i><i data-lucide="keyboard-off"></i><i data-lucide="type"></i><span>{{ t('profile.audio.exercise_mode.audio_only_hint') }}</span></span>
                                                 </label>
                                             </div>
                                         </td>
