@@ -47,6 +47,11 @@ class ПроверкаНаОшибки {
 
     this.DASHES = /[\u2010\u2011\u2012\u2013\u2014\u2015\u2212-]/g;
     this.CURLY_APOS = /[\u2019\u2018\u02BC]/g;
+    // Английские сокращения вида "-in'" (разговорная запись окончания -ing):
+    // hangin' → hanging, nothin' → nothing, runnin' → running и т.п.
+    // Правило срабатывает только на латинице (буква перед "in'" + апостроф в конце),
+    // поэтому не затрагивает слова типа "in" и безопасно для других алфавитов.
+    this.EN_GDROP_REGEX = /([a-z])in['\u2019\u2018\u02BC\u0060\u00B4](?![a-z])/gi;
     this.PUNCTUATION_REGEX = /[.,!?:;"«»„"'()\[\]{}،؛؟\u201C\u201D\u201E\u201F\u2033\u2036]/g;
     this.ARABIC_DIACRITICS_REGEX = /[\u064B-\u065F\u0670\u0671\u06D6-\u06ED]/g;
     this.ARABIC_ALIF_VARIANTS_REGEX = /[\u0622\u0623\u0625\u0671]/g;
@@ -134,6 +139,15 @@ class ПроверкаНаОшибки {
     this.EQUIVALENT_WORDS_DICT = {
       cannot: ["cant"],
       cant: ["cannot"],
+      // Разговорные английские сокращения с опущенным началом (leading apostrophe).
+      // В simplifyText апостроф снимается, поэтому "'fore" приходит как "fore".
+      //   'fore → before, 'bout → about, 'em → them
+      fore: ["before"],
+      before: ["fore"],
+      bout: ["about"],
+      about: ["bout"],
+      em: ["them"],
+      them: ["em"],
     };
   }
 
@@ -420,6 +434,7 @@ class ПроверкаНаОшибки {
 
     result = result
       .replace(this.CURLY_APOS, "'")
+      .replace(this.EN_GDROP_REGEX, '$1ing')
       .replace(/['`´]/g, '')
       .replace(allQuotesRegex, '')
       .replace(this.DASHES, ' ')
@@ -513,6 +528,52 @@ class ПроверкаНаОшибки {
     return len;
   }
 
+  /**
+   * Разворачивает английское отрицание с n't (wouldn't → would not и т.п.).
+   * В simplifyText апостроф уже убран, поэтому "wouldn't" сюда приходит как "wouldnt".
+   *
+   * Это НЕ универсальное правило для любого слова с "'t":
+   *  - won't  = will + not   (основа "wo", а не "will");
+   *  - can't  = can + not    (основа "ca");
+   *  - shan't = shall + not  (основа "sha").
+   * Поэтому неправильные формы разбираются словарём NT_IRREGULAR, а для обычных
+   * слов на -nt (want, went, point, parent…) стоит белый список вспомогательных
+   * глаголов, чтобы не создавать ложных совпадений.
+   */
+  _expandNT(word) {
+    const NT_IRREGULAR = {
+      wont: ["will", "not"],
+      cant: ["can", "not"],
+      shant: ["shall", "not"],
+    };
+    if (NT_IRREGULAR[word]) return NT_IRREGULAR[word].slice();
+
+    const m = /^([a-z]+)nt$/.exec(word);
+    if (!m) return null;
+
+    const NT_STEMS = new Set([
+      "would", "should", "could",
+      "do", "does", "did",
+      "is", "are", "was", "were",
+      "has", "have", "had",
+      "must", "might", "need", "dare", "ought",
+    ]);
+    if (!NT_STEMS.has(m[1])) return null;
+
+    return [m[1], "not"];
+  }
+
+  /**
+   * Разворачивает сокращение в массив слов.
+   * Сначала статический словарь CONTRACTIONS_DICT, затем общее правило n't.
+   */
+  _expandContraction(word) {
+    if (!word) return null;
+    const fromDict = this.CONTRACTIONS_DICT[word];
+    if (fromDict && Array.isArray(fromDict)) return fromDict.slice();
+    return this._expandNT(word);
+  }
+
   checkWords(original, userInput, langCode) {
     const simplOriginal = this.simplifyText(original);
     const simplUser = this.simplifyText(userInput);
@@ -603,7 +664,7 @@ class ПроверкаНаОшибки {
         continue;
       }
 
-      const expansionOrig = this.CONTRACTIONS_DICT[wordOrig];
+      const expansionOrig = this._expandContraction(wordOrig);
       if (expansionOrig && j + expansionOrig.length <= simplUser.length) {
         let matches = true;
         for (let k = 0; k < expansionOrig.length; k++) {
@@ -621,7 +682,7 @@ class ПроверкаНаОшибки {
       }
 
       if (!isEquivalent) {
-        const expansionUser = this.CONTRACTIONS_DICT[wordUser];
+        const expansionUser = this._expandContraction(wordUser);
         if (expansionUser && i + expansionUser.length <= simplOriginal.length) {
           let matches = true;
           for (let k = 0; k < expansionUser.length; k++) {
@@ -680,6 +741,7 @@ class ПроверкаНаОшибки {
       return this.normalizeDictationInvisibleChars(String(raw || ''))
         .normalize('NFKC')
         .toLowerCase()
+        .replace(this.EN_GDROP_REGEX, '$1ing')
         .replace(this.ARABIC_ALIF_VARIANTS_REGEX, 'ا')
         .replace(this.PUNCTUATION_REGEX, '')
         .replace(this.ARABIC_DIACRITICS_REGEX, '')
