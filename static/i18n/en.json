@@ -795,5 +795,38 @@
       "available": "A new version is available",
       "reload": "Reload"
     }
+  },
+  "dictation_report": {
+    "title": "Dictation report",
+    "close": "Close",
+    "refresh": "Refresh",
+    "show_books": "Show books",
+    "from": "from",
+    "to": "to",
+    "time": "Time",
+    "money": "Money",
+    "errors": "Errors/Characters",
+    "no_data": "No data for the selected period",
+    "loading": "Loading...",
+    "auth_error": "Authorization error",
+    "select_dates": "Select dates",
+    "load_error": "Load error",
+    "network_error": "Network error",
+    "column_dictation": "Dictation",
+    "column_total": "Total",
+    "unfinished": "unfinished",
+    "all_languages": "All languages",
+    "group": "Group",
+    "user": "User",
+    "language": "Language",
+    "tab_select": "Selection",
+    "tab_admin": "Admin",
+    "search_placeholder": "Email or name",
+    "search": "Search",
+    "not_found": "User not found",
+    "searching": "Searching…",
+    "search_error": "Search error",
+    "no_title": "Untitled",
+    "exercise": "Exercise"
   }
 }

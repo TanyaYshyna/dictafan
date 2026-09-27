@@ -3621,6 +3621,41 @@ class DictationReport {
             .replace(/'/g, '&#039;');
     }
 
+    t(key) {
+        const fullKey = 'dictation_report.' + key;
+        try {
+            if (window.I18n && typeof window.I18n.t === 'function') {
+                const v = window.I18n.t(fullKey);
+                if (v && v !== fullKey) return v;
+            }
+        } catch (e) {}
+        const ru = {
+            title: 'Отчет по диктантам',
+            close: 'Закрыть',
+            refresh: 'Обновить',
+            show_books: 'Отображать книги',
+            from: 'С',
+            to: 'По',
+            time: 'Время',
+            money: 'Деньги',
+            errors: 'Ошибки/символы',
+            no_data: 'Нет данных за выбранный период',
+            loading: 'Загрузка...',
+            auth_error: 'Ошибка авторизации',
+            select_dates: 'Выберите даты',
+            load_error: 'Ошибка загрузки',
+            network_error: 'Ошибка сети',
+            column_dictation: 'Диктант',
+            column_total: 'Итого',
+            unfinished: '↳ незаконченные',
+            all_languages: 'Все языки',
+            language: 'Язык',
+            no_title: 'Без названия',
+            exercise: 'Упражнение',
+        };
+        return ru[key] || fullKey;
+    }
+
     formatDateForInput(dt) {
         if (!dt) return '';
         const y = dt.getFullYear();
@@ -3816,15 +3851,17 @@ class DictationReport {
         if (!target || typeof ReportFilterPanel === 'undefined') return;
         if (this._filterPanel) {
             this._filterPanel.render();
+            await this._refreshResultRow();
             return;
         }
         this._filterPanel = new ReportFilterPanel({
             container: target,
-            withLanguage: true,
-            onChange: ({ userId, languageCode }) => {
+            withLanguage: false,
+            onChange: ({ userId }) => {
                 this._selectedUserId = (userId != null) ? Number(userId) : null;
-                this._selectedLanguageCode = languageCode || '';
+                this._selectedLanguageCode = '';
                 this._languagesData = null;
+                this._refreshResultRow();
                 this._loadData();
             }
         });
@@ -3836,7 +3873,72 @@ class DictationReport {
         this._selectedUserId = (this._filterPanel.getSelectedUserId() != null)
             ? Number(this._filterPanel.getSelectedUserId())
             : null;
-        this._selectedLanguageCode = this._filterPanel.getSelectedLanguageCode() || '';
+        this._selectedLanguageCode = '';
+        await this._refreshResultRow();
+    }
+
+    _refreshResultRow() {
+        if (!this._resultLabel) return;
+        const u = this._filterPanel ? this._filterPanel.getSelectedUser() : null;
+        if (!u) {
+            this._resultLabel.innerHTML = '';
+            this._fillResultLanguage();
+            return;
+        }
+        const email = u.email ? this.escapeHtml(u.email) : '';
+        const name = u.username ? this.escapeHtml(u.username) : '';
+        if (email && name) {
+            this._resultLabel.innerHTML = `${email} (<strong>${name}</strong>)`;
+        } else if (name) {
+            this._resultLabel.innerHTML = `<strong>${name}</strong>`;
+        } else if (email) {
+            this._resultLabel.innerHTML = email;
+        } else {
+            this._resultLabel.innerHTML = '';
+        }
+        this._fillResultLanguage();
+    }
+
+    async _fillResultLanguage() {
+        const sel = this._langSelect;
+        if (!sel) return;
+        sel.innerHTML = '';
+        const allOpt = document.createElement('option');
+        allOpt.value = '';
+        allOpt.textContent = this.t('all_languages');
+        sel.appendChild(allOpt);
+
+        const uid = this._selectedUserId;
+        if (uid == null) {
+            sel.value = '';
+            this._selectedLanguageCode = '';
+            return;
+        }
+        const token = this.getToken();
+        if (!token) return;
+        try {
+            const res = await fetch(`/api/statistics/dictation-report/languages?user_id=${encodeURIComponent(uid)}`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const js = await res.json().catch(() => null);
+            if (js && js.success && Array.isArray(js.languages)) {
+                this._languagesData = js.languages;
+                for (const l of js.languages) {
+                    const opt = document.createElement('option');
+                    opt.value = l.code || '';
+                    opt.textContent = l.label || (l.code || '').toUpperCase();
+                    sel.appendChild(opt);
+                }
+            }
+        } catch (e) {
+            console.warn('[DictationReport] Failed to load languages', e);
+        }
+        const codes = Array.from(sel.options).map(o => o.value);
+        if (!codes.includes(String(this._selectedLanguageCode || ''))) {
+            this._selectedLanguageCode = '';
+        }
+        sel.value = String(this._selectedLanguageCode || '');
     }
 
     /* ---------- modal ---------- */
@@ -3862,28 +3964,32 @@ class DictationReport {
             display: flex; flex-direction: column; max-height: calc(100vh - 40px);
         `;
 
-        // Header
+        // Строка 1: заголовок (слева) + крестик (справа)
         const header = document.createElement('div');
         header.className = 'dictation-report-header';
 
-        const leftPanel = document.createElement('div');
-        leftPanel.className = 'dictation-report-header-left';
-
-        // Title
         const title = document.createElement('h2');
         title.className = 'reports-modal-title';
-        title.textContent = 'Отчет по диктантам';
+        title.textContent = this.t('title');
 
-        // User picker
-        const userPickerContainer = document.createElement('div');
-        userPickerContainer.id = 'dictation-report-user-picker';
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'close-statistics-btn';
+        closeBtn.type = 'button';
+        closeBtn.title = this.t('close');
+        const closeIcon = document.createElement('i');
+        closeIcon.setAttribute('data-lucide', 'x');
+        closeBtn.appendChild(closeIcon);
+        closeBtn.addEventListener('click', () => this.hide());
 
-        // Date range
+        header.appendChild(title);
+        header.appendChild(closeBtn);
+
+        // Строка 2: диапазон дат (может переноситься при сужении окна)
         const dateRange = document.createElement('div');
         dateRange.className = 'dictation-report-date-range';
 
         const dateFromLabel = document.createElement('label');
-        dateFromLabel.textContent = 'с';
+        dateFromLabel.textContent = this.t('from');
         const dateFromInput = document.createElement('input');
         dateFromInput.type = 'date';
         dateFromInput.id = 'dictation-report-date-from';
@@ -3891,7 +3997,7 @@ class DictationReport {
         dateFromInput.value = this.formatDateForInput(now);
 
         const dateToLabel = document.createElement('label');
-        dateToLabel.textContent = 'по';
+        dateToLabel.textContent = this.t('to');
         const dateToInput = document.createElement('input');
         dateToInput.type = 'date';
         dateToInput.id = 'dictation-report-date-to';
@@ -3902,68 +4008,41 @@ class DictationReport {
         dateRange.appendChild(dateToLabel);
         dateRange.appendChild(dateToInput);
 
-        leftPanel.appendChild(title);
-        leftPanel.appendChild(userPickerContainer);
-        leftPanel.appendChild(dateRange);
+        // Строка 3: панель отборов (ReportFilterPanel)
+        const filterContainer = document.createElement('div');
+        filterContainer.id = 'dictation-report-user-picker';
 
-        // Right panel
-        const rightPanel = document.createElement('div');
-        rightPanel.className = 'dictation-report-header-right';
+        // Строка 4: результат отбора + кнопка языков
+        const resultRow = document.createElement('div');
+        resultRow.className = 'dictation-report-result-row';
 
-        // Refresh button
-        const refreshBtn = document.createElement('button');
-        refreshBtn.className = 'dictation-report-refresh-btn';
-        refreshBtn.title = 'Обновить';
-        refreshBtn.type = 'button';
-        const refreshIcon = document.createElement('i');
-        refreshIcon.setAttribute('data-lucide', 'rotate-cw');
-        refreshBtn.appendChild(refreshIcon);
-        refreshBtn.addEventListener('click', () => this._onRefresh());
+        const resultLabel = document.createElement('div');
+        resultLabel.className = 'dictation-report-result-label';
 
-        // Close button
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'close-statistics-btn';
-        closeBtn.type = 'button';
-        closeBtn.title = 'Закрыть';
-        const closeIcon = document.createElement('i');
-        closeIcon.setAttribute('data-lucide', 'x');
-        closeBtn.appendChild(closeIcon);
-        closeBtn.addEventListener('click', () => this.hide());
-
-        // Books visibility toggle («Отображать книги»)
-        const booksToggle = document.createElement('button');
-        booksToggle.className = 'dictation-report-books-toggle';
-        booksToggle.type = 'button';
-        booksToggle.title = 'Отображать книги';
-        const booksIcon = document.createElement('i');
-        booksIcon.setAttribute('data-lucide', this._showBooks ? 'circle-check-big' : 'circle');
-        const booksLabel = document.createElement('span');
-        booksLabel.textContent = 'Отображать книги';
-        booksToggle.appendChild(booksIcon);
-        booksToggle.appendChild(booksLabel);
-        if (this._showBooks) booksToggle.classList.add('active');
-        booksToggle.addEventListener('click', () => {
-            this._showBooks = !this._showBooks;
-            booksToggle.classList.toggle('active', this._showBooks);
-            booksIcon.setAttribute('data-lucide', this._showBooks ? 'circle-check-big' : 'circle');
-            if (typeof lucide !== 'undefined') lucide.createIcons({ root: booksToggle });
-            this._renderTable();
+        const langWrap = document.createElement('div');
+        langWrap.className = 'dictation-report-selects dictation-report-lang-wrap';
+        const langSel = document.createElement('select');
+        langSel.className = 'dictation-report-select';
+        langSel.title = this.t('language');
+        langWrap.appendChild(langSel);
+        langSel.addEventListener('change', () => {
+            this._selectedLanguageCode = langSel.value || '';
+            this._loadData();
         });
 
-        rightPanel.appendChild(booksToggle);
-        rightPanel.appendChild(refreshBtn);
-        rightPanel.appendChild(closeBtn);
+        resultRow.appendChild(resultLabel);
+        resultRow.appendChild(langWrap);
 
-        header.appendChild(leftPanel);
-        header.appendChild(rightPanel);
+        // Строка 5: слева тумблеры (время/деньги/ошибки), справа книги + обновить
+        const optionsRow = document.createElement('div');
+        optionsRow.className = 'dictation-report-options-row';
 
-        // Column options (checkboxes)
         const colOptions = document.createElement('div');
         colOptions.className = 'dictation-report-column-options';
 
-        const timeOpt = this._makeColOption('time', 'clock', 'Время', this._showTime);
-        const moneyOpt = this._makeColOption('money', 'dollar-sign', 'Деньги', this._showMoney);
-        const errorsOpt = this._makeColOption('errors', 'bug', 'Ошибки/Символы', this._showErrors);
+        const timeOpt = this._makeColOption('time', 'clock', this.t('time'), this._showTime);
+        const moneyOpt = this._makeColOption('money', 'dollar-sign', this.t('money'), this._showMoney);
+        const errorsOpt = this._makeColOption('errors', 'bug', this.t('errors'), this._showErrors);
 
         timeOpt.querySelector('input').addEventListener('change', (e) => {
             this._showTime = e.target.checked;
@@ -3982,6 +4061,45 @@ class DictationReport {
         colOptions.appendChild(moneyOpt);
         colOptions.appendChild(errorsOpt);
 
+        const rightOptions = document.createElement('div');
+        rightOptions.className = 'dictation-report-options-right';
+
+        // Флаг «Отображать книги»
+        const booksToggle = document.createElement('button');
+        booksToggle.className = 'dictation-report-books-toggle';
+        booksToggle.type = 'button';
+        booksToggle.title = this.t('show_books');
+        const booksIcon = document.createElement('i');
+        booksIcon.setAttribute('data-lucide', this._showBooks ? 'circle-check-big' : 'circle');
+        const booksLabel = document.createElement('span');
+        booksLabel.textContent = this.t('show_books');
+        booksToggle.appendChild(booksIcon);
+        booksToggle.appendChild(booksLabel);
+        if (this._showBooks) booksToggle.classList.add('active');
+        booksToggle.addEventListener('click', () => {
+            this._showBooks = !this._showBooks;
+            booksToggle.classList.toggle('active', this._showBooks);
+            booksIcon.setAttribute('data-lucide', this._showBooks ? 'circle-check-big' : 'circle');
+            if (typeof lucide !== 'undefined') lucide.createIcons({ root: booksToggle });
+            this._renderTable();
+        });
+
+        // Кнопка «Обновить»
+        const refreshBtn = document.createElement('button');
+        refreshBtn.className = 'dictation-report-refresh-btn';
+        refreshBtn.title = this.t('refresh');
+        refreshBtn.type = 'button';
+        const refreshIcon = document.createElement('i');
+        refreshIcon.setAttribute('data-lucide', 'rotate-cw');
+        refreshBtn.appendChild(refreshIcon);
+        refreshBtn.addEventListener('click', () => this._onRefresh());
+
+        rightOptions.appendChild(booksToggle);
+        rightOptions.appendChild(refreshBtn);
+
+        optionsRow.appendChild(colOptions);
+        optionsRow.appendChild(rightOptions);
+
         // Body (table wrapper)
         const body = document.createElement('div');
         body.className = 'statistics-content reports-modal-body';
@@ -3991,15 +4109,17 @@ class DictationReport {
         body.appendChild(tableWrapper);
 
         content.appendChild(header);
-        content.appendChild(colOptions);
+        content.appendChild(dateRange);
+        content.appendChild(filterContainer);
+        content.appendChild(resultRow);
+        content.appendChild(optionsRow);
         content.appendChild(body);
         modal.appendChild(content);
         document.body.appendChild(modal);
-// Init lucide icons
-if (typeof lucide !== 'undefined') {
-    lucide.createIcons({ root: rightPanel });
-}
 
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons({ root: content });
+        }
 
         // Date change handlers
         dateFromInput.addEventListener('change', () => this._onDateChange());
@@ -4010,7 +4130,9 @@ if (typeof lucide !== 'undefined') {
         this._tableWrapper = tableWrapper;
         this._dateFromInput = dateFromInput;
         this._dateToInput = dateToInput;
-        this._userPickerContainer = userPickerContainer;
+        this._userPickerContainer = filterContainer;
+        this._resultLabel = resultLabel;
+        this._langSelect = langSel;
     }
 
     _makeColOption(id, iconName, label, checked) {
@@ -4039,6 +4161,7 @@ if (typeof lucide !== 'undefined') {
             await this._mountFilterPanel(this._userPickerContainer);
         } catch (e) {
         }
+        await this._refreshResultRow();
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
@@ -4070,7 +4193,7 @@ if (typeof lucide !== 'undefined') {
         wrapper.innerHTML = `
             <div class="dictation-report-loading">
                 <i data-lucide="loader-2"></i>
-                <span>Загрузка...</span>
+                <span>${this.t('loading')}</span>
             </div>
         `;
         if (typeof lucide !== 'undefined') {
@@ -4079,7 +4202,7 @@ if (typeof lucide !== 'undefined') {
 
         const token = this.getToken();
         if (!token) {
-            wrapper.innerHTML = '<div class="dictation-report-empty"><p>Ошибка авторизации</p></div>';
+            wrapper.innerHTML = `<div class="dictation-report-empty"><p>${this.t('auth_error')}</p></div>`;
             this._loading = false;
             return;
         }
@@ -4089,7 +4212,7 @@ if (typeof lucide !== 'undefined') {
         const endDate = this._dateToInput ? this._dateToInput.value : '';
 
         if (!startDate || !endDate) {
-            wrapper.innerHTML = '<div class="dictation-report-empty"><p>Выберите даты</p></div>';
+            wrapper.innerHTML = `<div class="dictation-report-empty"><p>${this.t('select_dates')}</p></div>`;
             this._loading = false;
             return;
         }
@@ -4113,7 +4236,7 @@ if (typeof lucide !== 'undefined') {
                 this._data = js.languages || [];
                 this._renderTable();
             } else {
-                let errMsg = js?.error || 'Ошибка загрузки';
+                let errMsg = js?.error || this.t('load_error');
                 if (js?.traceback) {
                     errMsg += '<br><br><pre style="font-size:11px;text-align:left;background:#fdd;padding:8px;border-radius:4px;max-height:300px;overflow:auto;">' + this.escapeHtml(js.traceback) + '</pre>';
                 }
@@ -4121,7 +4244,7 @@ if (typeof lucide !== 'undefined') {
                 console.error('[DictationReport] Ошибка сервера:', js);
             }
         } catch (e) {
-            wrapper.innerHTML = '<div class="dictation-report-empty"><p>Ошибка сети</p></div>';
+            wrapper.innerHTML = `<div class="dictation-report-empty"><p>${this.t('network_error')}</p></div>`;
             console.warn('DictationReport load error', e);
         } finally {
             this._loading = false;
@@ -4136,7 +4259,7 @@ if (typeof lucide !== 'undefined') {
             wrapper.innerHTML = `
                 <div class="dictation-report-empty">
                     <i data-lucide="file-text"></i>
-                    <p>Нет данных за выбранный период</p>
+                    <p>${this.t('no_data')}</p>
                 </div>
             `;
             if (typeof lucide !== 'undefined') {
@@ -4178,14 +4301,14 @@ if (typeof lucide !== 'undefined') {
         // First column: Dictation block
         const thDict = document.createElement('th');
         thDict.className = 'dictation-report-th-sticky';
-        thDict.textContent = 'Диктант';
+        thDict.textContent = this.t('column_dictation');
         thDict.style.textAlign = 'left';
         headerRow.appendChild(thDict);
 
         // Totals column (right after the sticky first column)
         const thTotal = document.createElement('th');
         thTotal.className = 'dictation-report-total-header';
-        thTotal.textContent = 'Итого';
+        thTotal.textContent = this.t('column_total');
         headerRow.appendChild(thTotal);
 
         // Value columns header (time, money, errors)
@@ -4251,7 +4374,7 @@ if (typeof lucide !== 'undefined') {
                     bookCover.alt = '';
                     bookCover.onerror = function () { this.style.display = 'none'; };
                     bookTd.appendChild(bookCover);
-                    bookTd.appendChild(document.createTextNode(book.title || 'Без названия'));
+                    bookTd.appendChild(document.createTextNode(book.title || this.t('no_title')));
                     bookRow.appendChild(bookTd);
                     appendSpacerCells(bookRow);
                     tbody.appendChild(bookRow);
@@ -4271,7 +4394,7 @@ if (typeof lucide !== 'undefined') {
                         const secTd = document.createElement('td');
                         secTd.className = 'dictation-report-td-sticky';
                         secTd.style.textAlign = 'left';
-                        secTd.textContent = `📂 ${sec.title || 'Без названия'}`;
+                        secTd.textContent = `📂 ${sec.title || this.t('no_title')}`;
                         secRow.appendChild(secTd);
                         appendSpacerCells(secRow);
                         tbody.appendChild(secRow);
@@ -4289,7 +4412,7 @@ if (typeof lucide !== 'undefined') {
         totalRow.className = 'level-total';
         const totalLabelTd = document.createElement('td');
         totalLabelTd.className = 'dictation-report-td-sticky';
-        totalLabelTd.textContent = 'Итого';
+        totalLabelTd.textContent = this.t('column_total');
         totalLabelTd.style.textAlign = 'left';
         totalLabelTd.style.fontWeight = '800';
         totalRow.appendChild(totalLabelTd);
@@ -4375,7 +4498,7 @@ if (typeof lucide !== 'undefined') {
             cover.alt = '';
             cover.onerror = function () { this.style.display = 'none'; };
             td.appendChild(cover);
-            td.appendChild(document.createTextNode(d.title || 'Без названия'));
+            td.appendChild(document.createTextNode(d.title || this.t('no_title')));
             row.appendChild(td);
 
             const totalTd = document.createElement('td');
@@ -4455,13 +4578,13 @@ if (typeof lucide !== 'undefined') {
                 cover.alt = '';
                 cover.onerror = function () { this.style.display = 'none'; };
                 td.appendChild(cover);
-                td.appendChild(document.createTextNode(d.title || 'Без названия'));
+                td.appendChild(document.createTextNode(d.title || this.t('no_title')));
             } else if (isUnfinished) {
                 row.className = 'level-exercise';
-                td.textContent = '↳ незаконченные';
+                td.textContent = this.t('unfinished');
             } else {
                 row.className = 'level-exercise';
-                td.textContent = `↳ ${ex.title || 'Упражнение'}`;
+                td.textContent = `↳ ${ex.title || this.t('exercise')}`;
             }
             row.appendChild(td);
 

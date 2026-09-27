@@ -792,5 +792,38 @@
       "available": "نسخة جديدة متاحة",
       "reload": "تحديث"
     }
+  },
+  "dictation_report": {
+    "title": "تقرير الإملاء",
+    "close": "إغلاق",
+    "refresh": "تحديث",
+    "show_books": "إظهار الكتب",
+    "from": "من",
+    "to": "إلى",
+    "time": "الوقت",
+    "money": "المال",
+    "errors": "الأخطاء/الرموز",
+    "no_data": "لا توجد بيانات للفترة المحددة",
+    "loading": "جارٍ التحميل...",
+    "auth_error": "خطأ في التفويض",
+    "select_dates": "اختر التواريخ",
+    "load_error": "خطأ في التحميل",
+    "network_error": "خطأ في الشبكة",
+    "column_dictation": "الإملاء",
+    "column_total": "الإجمالي",
+    "unfinished": "غير مكتمل",
+    "all_languages": "كل اللغات",
+    "group": "المجموعة",
+    "user": "المستخدم",
+    "language": "اللغة",
+    "tab_select": "التحديد",
+    "tab_admin": "المشرف",
+    "search_placeholder": "البريد الإلكتروني أو الاسم",
+    "search": "بحث",
+    "not_found": "لم يتم العثور على المستخدم",
+    "searching": "جارٍ البحث…",
+    "search_error": "خطأ في البحث",
+    "no_title": "بدون عنوان",
+    "exercise": "تمرين"
   }
 }

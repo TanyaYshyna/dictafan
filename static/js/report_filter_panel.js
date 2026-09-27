@@ -14,6 +14,7 @@ class ReportFilterPanel {
     constructor(options = {}) {
         this.container = options.container || null;
         this.withLanguage = options.withLanguage !== false;
+        this.showAdminSelected = options.showAdminSelected !== false;
         this.onChange = options.onChange || null;
         this.tokenGetter = options.tokenGetter || ReportFilterPanel.getToken;
 
@@ -63,6 +64,32 @@ class ReportFilterPanel {
     }
 
     /* ---------- helpers ---------- */
+
+    t(key) {
+        const fullKey = 'dictation_report.' + key;
+        try {
+            if (window.I18n && typeof window.I18n.t === 'function') {
+                const v = window.I18n.t(fullKey);
+                if (v && v !== fullKey) return v;
+            }
+        } catch (e) {}
+        const ru = {
+            tab_select: 'Отбор',
+            tab_admin: 'Админ',
+            group: 'Группа',
+            user: 'Пользователь',
+            language: 'Язык',
+            all_languages: 'Все языки',
+            no_title: 'Без названия',
+            search_placeholder: 'Email или имя',
+            search: 'Найти',
+            auth_error: 'Ошибка авторизации',
+            searching: 'Поиск…',
+            not_found: 'Пользователь не найден',
+            search_error: 'Ошибка поиска',
+        };
+        return ru[key] || fullKey;
+    }
 
     escapeHtml(v) {
         if (v == null) return '';
@@ -143,6 +170,22 @@ class ReportFilterPanel {
         return this._adminSelectedUser;
     }
 
+    getSelectedUser() {
+        if (this._activeTab === 'admin' && this._adminSelectedUser) {
+            return this._adminSelectedUser;
+        }
+        const uid = this._selectedUserId;
+        if (uid == null) return null;
+        for (const g of this._groups) {
+            for (const u of (g.users || [])) {
+                if (String(u.id) === String(uid)) {
+                    return { id: u.id, email: u.email || '', username: u.username || '' };
+                }
+            }
+        }
+        return null;
+    }
+
     async init(initial = {}) {
         if (!this._initialized) {
             this._selectedUserId = (initial.userId != null) ? initial.userId : null;
@@ -180,7 +223,7 @@ class ReportFilterPanel {
         const selectTab = document.createElement('button');
         selectTab.type = 'button';
         selectTab.className = 'report-filter-tab';
-        selectTab.textContent = 'Отбор';
+        selectTab.textContent = this.t('tab_select');
         selectTab.addEventListener('click', () => this._switchTab('select'));
         tabs.appendChild(selectTab);
 
@@ -188,7 +231,7 @@ class ReportFilterPanel {
             const adminTab = document.createElement('button');
             adminTab.type = 'button';
             adminTab.className = 'report-filter-tab';
-            adminTab.textContent = 'Админ';
+            adminTab.textContent = this.t('tab_admin');
             adminTab.addEventListener('click', () => this._switchTab('admin'));
             tabs.appendChild(adminTab);
         }
@@ -242,22 +285,22 @@ class ReportFilterPanel {
 
         const groupSel = document.createElement('select');
         groupSel.className = 'dictation-report-select';
-        groupSel.title = 'Группа';
+        groupSel.title = this.t('group');
 
         const userSel = document.createElement('select');
         userSel.className = 'dictation-report-select';
-        userSel.title = 'Пользователь';
+        userSel.title = this.t('user');
 
         const langSel = document.createElement('select');
         langSel.className = 'dictation-report-select';
-        langSel.title = 'Язык';
+        langSel.title = this.t('language');
 
         const fillGroupSelect = () => {
             groupSel.innerHTML = '';
             for (const g of this._groups) {
                 const opt = document.createElement('option');
                 opt.value = String(g.id ?? 'self');
-                opt.textContent = g.title || 'Без названия';
+                opt.textContent = g.title || this.t('no_title');
                 groupSel.appendChild(opt);
             }
             if (this._selectedGroupId == null && this._groups.length > 0) {
@@ -291,7 +334,7 @@ class ReportFilterPanel {
             langSel.innerHTML = '';
             const allOpt = document.createElement('option');
             allOpt.value = '';
-            allOpt.textContent = 'Все языки';
+            allOpt.textContent = this.t('all_languages');
             langSel.appendChild(allOpt);
 
             const uid = this._selectedUserId;
@@ -355,51 +398,39 @@ class ReportFilterPanel {
     }
 
     _renderAdminTab(container) {
-        // Первая строка: ввод email + кнопка «Найти»
+        // Строка: ввод email + кнопка «Найти» (результат отбора выводится снаружи,
+        // в отдельной строке модалки, чтобы не «прыгал» макет).
         const searchRow = document.createElement('div');
         searchRow.className = 'admin-license-search-row';
 
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'text-input';
-        input.placeholder = 'Email или имя';
+        input.placeholder = this.t('search_placeholder');
 
         const searchBtn = document.createElement('button');
         searchBtn.type = 'button';
         searchBtn.className = 'button-color-yellow';
-        searchBtn.textContent = 'Найти';
+        searchBtn.textContent = this.t('search');
 
         searchRow.appendChild(input);
         searchRow.appendChild(searchBtn);
         container.appendChild(searchRow);
 
-        // Выбранный пользователь
-        const selectedEl = document.createElement('div');
-        selectedEl.className = 'report-filter-admin-selected';
-        container.appendChild(selectedEl);
-
-        // Вторая строка: результат поиска (список найденных пользователей)
+        // Результат поиска (список найденных пользователей)
         const resultEl = document.createElement('div');
         resultEl.className = 'admin-license-search-result report-filter-admin-result';
         container.appendChild(resultEl);
-
-        // Язык для выбранного пользователя (если отчёт использует язык)
-        let langWrap = null;
-        if (this.withLanguage) {
-            langWrap = document.createElement('div');
-            langWrap.className = 'dictation-report-selects report-filter-admin-lang';
-            container.appendChild(langWrap);
-        }
 
         const doSearch = async () => {
             const q = input.value.trim();
             if (!q) return;
             const token = this.tokenGetter();
             if (!token) {
-                resultEl.innerHTML = '<p class="report-filter-hint">Ошибка авторизации</p>';
+                resultEl.innerHTML = `<p class="report-filter-hint">${this.t('auth_error')}</p>`;
                 return;
             }
-            resultEl.innerHTML = '<p class="report-filter-hint">Поиск…</p>';
+            resultEl.innerHTML = `<p class="report-filter-hint">${this.t('searching')}</p>`;
             try {
                 const res = await fetch(`/api/statistics/admin/time/users?email=${encodeURIComponent(q)}`, {
                     method: 'GET',
@@ -411,11 +442,11 @@ class ReportFilterPanel {
                     this._renderAdminResults(resultEl);
                 } else {
                     this._adminSearchResults = [];
-                    resultEl.innerHTML = '<p class="report-filter-hint">Пользователь не найден</p>';
+                    resultEl.innerHTML = `<p class="report-filter-hint">${this.t('not_found')}</p>`;
                 }
             } catch (e) {
                 this._adminSearchResults = [];
-                resultEl.innerHTML = '<p class="report-filter-hint">Ошибка поиска</p>';
+                resultEl.innerHTML = `<p class="report-filter-hint">${this.t('search_error')}</p>`;
             }
         };
 
@@ -424,11 +455,7 @@ class ReportFilterPanel {
             if (e.key === 'Enter') doSearch();
         });
 
-        // Восстановить состояние после перерисовки
-        if (this._adminSelectedUser) {
-            this._renderAdminSelected(selectedEl);
-            if (langWrap) this._renderAdminLang(langWrap);
-        }
+        // Восстановить результаты после перерисовки
         if (this._adminSearchResults.length > 0) {
             this._renderAdminResults(resultEl);
         }
@@ -450,28 +477,17 @@ class ReportFilterPanel {
         } catch (e) {}
     }
 
-    _renderAdminSelected(el) {
-        const u = this._adminSelectedUser;
-        if (!u) {
-            el.innerHTML = '';
-            return;
-        }
-        el.innerHTML = 'Выбран: <strong></strong>';
-        const strong = el.querySelector('strong');
-        strong.textContent = u.email + (u.username ? ` (${u.username})` : '');
-    }
-
     _renderAdminLang(el) {
         el.innerHTML = '';
         const langSel = document.createElement('select');
         langSel.className = 'dictation-report-select';
-        langSel.title = 'Язык';
+        langSel.title = this.t('language');
 
         const fill = async () => {
             langSel.innerHTML = '';
             const allOpt = document.createElement('option');
             allOpt.value = '';
-            allOpt.textContent = 'Все языки';
+            allOpt.textContent = this.t('all_languages');
             langSel.appendChild(allOpt);
 
             const uid = this._adminSelectedUser ? this._adminSelectedUser.id : null;

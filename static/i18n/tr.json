@@ -795,5 +795,38 @@
       "available": "Yeni bir sürüm mevcut",
       "reload": "Yenile"
     }
+  },
+  "dictation_report": {
+    "title": "Dikte raporu",
+    "close": "Kapat",
+    "refresh": "Yenile",
+    "show_books": "Kitapları göster",
+    "from": "başlangıç",
+    "to": "bitiş",
+    "time": "Zaman",
+    "money": "Para",
+    "errors": "Hata/Karakter",
+    "no_data": "Seçilen dönem için veri yok",
+    "loading": "Yükleniyor...",
+    "auth_error": "Yetkilendirme hatası",
+    "select_dates": "Tarihleri seçin",
+    "load_error": "Yükleme hatası",
+    "network_error": "Ağ hatası",
+    "column_dictation": "Dikte",
+    "column_total": "Toplam",
+    "unfinished": "tamamlanmamış",
+    "all_languages": "Tüm diller",
+    "group": "Grup",
+    "user": "Kullanıcı",
+    "language": "Dil",
+    "tab_select": "Seçim",
+    "tab_admin": "Admin",
+    "search_placeholder": "E-posta veya ad",
+    "search": "Ara",
+    "not_found": "Kullanıcı bulunamadı",
+    "searching": "Aranıyor…",
+    "search_error": "Arama hatası",
+    "no_title": "Başlıksız",
+    "exercise": "Alıştırma"
   }
 }

@@ -369,6 +369,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .dictation-report-date-range label {
@@ -595,7 +596,8 @@
 }
 
 /* Кнопка-флаг «Отображать книги» в шапке */
-.dictation-report-header-right .dictation-report-books-toggle {
+.dictation-report-header-right .dictation-report-books-toggle,
+.dictation-report-options-right .dictation-report-books-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -611,23 +613,27 @@
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.dictation-report-header-right .dictation-report-books-toggle:hover {
+.dictation-report-header-right .dictation-report-books-toggle:hover,
+.dictation-report-options-right .dictation-report-books-toggle:hover {
   background: rgba(31, 41, 51, 0.06);
 }
 
-.dictation-report-header-right .dictation-report-books-toggle i {
+.dictation-report-header-right .dictation-report-books-toggle i,
+.dictation-report-options-right .dictation-report-books-toggle i {
   width: 16px;
   height: 16px;
   flex: 0 0 auto;
 }
 
-.dictation-report-header-right .dictation-report-books-toggle.active {
+.dictation-report-header-right .dictation-report-books-toggle.active,
+.dictation-report-options-right .dictation-report-books-toggle.active {
   background: #eef5fd;
   border-color: rgba(74, 144, 217, 0.4);
   color: rgba(31, 41, 51, 0.85);
 }
 
-.dictation-report-header-right .dictation-report-books-toggle.active i {
+.dictation-report-header-right .dictation-report-books-toggle.active i,
+.dictation-report-options-right .dictation-report-books-toggle.active i {
   color: #2f80d6;
 }
 
@@ -853,41 +859,52 @@
 .report-filter-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   width: 100%;
+  border: 1px solid rgba(31, 41, 51, 0.15);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.4);
+  overflow: hidden;
 }
 
 .report-filter-tabs {
   display: flex;
-  gap: 6px;
-  border-bottom: 1px solid rgba(31, 41, 51, 0.12);
+  gap: 2px;
+  align-items: flex-end;
+  padding: 4px 8px 0 8px;
+  border-bottom: 1px solid rgba(31, 41, 51, 0.15);
+  background: rgba(31, 41, 51, 0.03);
 }
 
 .report-filter-tab {
-  border: none;
+  border: 1px solid transparent;
+  border-bottom: none;
   background: transparent;
-  padding: 6px 14px;
+  padding: 8px 16px;
   font-size: 14px;
   font-weight: 600;
   color: rgba(31, 41, 51, 0.55);
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
+  border-radius: 8px 8px 0 0;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 
 .report-filter-tab:hover {
   color: rgba(31, 41, 51, 0.85);
+  background: rgba(31, 41, 51, 0.04);
 }
 
 .report-filter-tab.is-active {
-  color: var(--color-button-blue, #4a90d9);
-  border-bottom-color: var(--color-button-blue, #4a90d9);
+  color: rgba(31, 41, 51, 0.9);
+  background: #ffffff;
+  border-color: rgba(31, 41, 51, 0.15);
 }
 
 .report-filter-tab-content {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 8px;
 }
 
 /* Админ: строка поиска (по аналогии с admin-license) */
@@ -900,6 +917,24 @@
 .report-filter-panel .admin-license-search-row .text-input {
   flex: 1;
   min-width: 0;
+  padding: 6px 10px;
+  height: 38px;
+  border: 1px solid rgba(31, 41, 51, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  color: rgba(31, 41, 51, 0.85);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.report-filter-panel .admin-license-search-row .text-input:focus {
+  border-color: var(--color-button-blue, #4a90d9);
+}
+
+.report-filter-panel .admin-license-search-row .button-color-yellow {
+  height: 44px;
+  padding: 0 22px;
 }
 
 .report-filter-admin-result {
@@ -953,4 +988,51 @@
 
 .report-filter-admin-lang {
   margin-top: 2px;
+}
+
+/* --- Строка 4: результат отбора + язык (DictationReport) --- */
+.dictation-report-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 38px;
+}
+
+.dictation-report-result-label {
+  font-size: 14px;
+  color: rgba(31, 41, 51, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dictation-report-result-label strong {
+  font-weight: 700;
+}
+
+.dictation-report-lang-wrap {
+  flex: 0 0 auto;
+}
+
+.dictation-report-lang-wrap .dictation-report-select {
+  min-height: 38px;
+  max-width: 220px;
+}
+
+/* --- Строка 5: тумблеры слева, книги + обновить справа --- */
+.dictation-report-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dictation-report-options-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }

@@ -797,5 +797,38 @@
       "available": "Доступна нова версія",
       "reload": "Оновити"
     }
+  },
+  "dictation_report": {
+    "title": "Звіт по диктантах",
+    "close": "Закрити",
+    "refresh": "Оновити",
+    "show_books": "Показувати книги",
+    "from": "з",
+    "to": "по",
+    "time": "Час",
+    "money": "Гроші",
+    "errors": "Помилки/Символи",
+    "no_data": "Немає даних за вибраний період",
+    "loading": "Завантаження...",
+    "auth_error": "Помилка авторизації",
+    "select_dates": "Оберіть дати",
+    "load_error": "Помилка завантаження",
+    "network_error": "Помилка мережі",
+    "column_dictation": "Диктант",
+    "column_total": "Разом",
+    "unfinished": "незавершені",
+    "all_languages": "Усі мови",
+    "group": "Група",
+    "user": "Користувач",
+    "language": "Мова",
+    "tab_select": "Відбір",
+    "tab_admin": "Адмін",
+    "search_placeholder": "Email або ім'я",
+    "search": "Знайти",
+    "not_found": "Користувача не знайдено",
+    "searching": "Пошук…",
+    "search_error": "Помилка пошуку",
+    "no_title": "Без назви",
+    "exercise": "Вправа"
   }
 }

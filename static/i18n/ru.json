@@ -797,5 +797,38 @@
       "available": "Доступна новая версия",
       "reload": "Обновить"
     }
+  },
+  "dictation_report": {
+    "title": "Отчет по диктантам",
+    "close": "Закрыть",
+    "refresh": "Обновить",
+    "show_books": "Отображать книги",
+    "from": "с",
+    "to": "по",
+    "time": "Время",
+    "money": "Деньги",
+    "errors": "Ошибки/Символы",
+    "no_data": "Нет данных за выбранный период",
+    "loading": "Загрузка...",
+    "auth_error": "Ошибка авторизации",
+    "select_dates": "Выберите даты",
+    "load_error": "Ошибка загрузки",
+    "network_error": "Ошибка сети",
+    "column_dictation": "Диктант",
+    "column_total": "Итого",
+    "unfinished": "незаконченные",
+    "all_languages": "Все языки",
+    "group": "Группа",
+    "user": "Пользователь",
+    "language": "Язык",
+    "tab_select": "Отбор",
+    "tab_admin": "Админ",
+    "search_placeholder": "Email или имя",
+    "search": "Найти",
+    "not_found": "Пользователь не найден",
+    "searching": "Поиск…",
+    "search_error": "Ошибка поиска",
+    "no_title": "Без названия",
+    "exercise": "Упражнение"
   }
 }
