@@ -54,6 +54,14 @@ class StatisticsReport {
             return;
         }
 
+        // Синхронизируем пользователя с панелью отборов перед отправкой.
+        if (this._filterPanel) {
+            try {
+                const uid = this._filterPanel.getSelectedUserId();
+                this.selectedUserId = (uid != null) ? Number(uid) : null;
+            } catch (e) {
+            }
+        }
         const userId = Number(this.selectedUserId) || null;
         const userLabel = (userId != null) ? this._findUserLabel(userId) : '';
 
@@ -216,181 +224,190 @@ class StatisticsReport {
         let modal = document.getElementById('statistics-modal');
         if (modal) {
             this.modal = modal;
+            this._modal = modal;
+            // При повторном открытии модалка уже существует, но инстанция может быть
+            // новой (StatisticsReport.open создаёт новый объект). Пере-привязываем ссылки
+            // на DOM-элементы, чтобы _refreshResultRow/_fillResultLanguage работали.
+            this._resultLabel = modal.querySelector('.dictation-report-result-label');
+            this._langSelect = document.getElementById('activityLanguageSelect');
+            this._filterContainer = document.getElementById('activityUserPicker');
             return;
         }
 
         // Создаем модальное окно
         modal = document.createElement('div');
         modal.id = 'statistics-modal';
-        modal.className = 'modal';
+        modal.className = 'modal dictation-report-modal';
         modal.style.display = 'none';
-        modal.style.position = 'fixed';
-        modal.style.left = '0';
-        modal.style.top = '0';
-        modal.style.width = '100%';
-        modal.style.height = '100%';
-        modal.style.alignItems = 'center';
-        modal.style.justifyContent = 'center';
-        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-        modal.style.backdropFilter = 'blur(4px)';
-        // Скролл должен быть внутри модалки, а не у страницы.
-        modal.style.overflow = 'hidden';
-        // На странице приватной библиотеки много элементов с высоким z-index
-        // (карточки, дропдауны, оверлеи). Ставим выше, чтобы модалка была видна.
-        modal.style.zIndex = '10150';
-
-        modal.innerHTML = `
-            <div class="modal-content statistics-modal-content">
-                <div class="statistics-header">
-                    <div style="display:flex; align-items:flex-start; gap: 14px; min-width: 0; flex: 1 1 auto;">
-                        <div style="display:flex; align-items:stretch; gap: 12px; min-width: 0;">
-                            <div style="display:flex; flex-direction: column; align-items:flex-start; gap: 8px; min-width: 240px;">
-                                <div style="font-size: 22px; font-weight: 700; line-height: 1.1;">Отчет об активности</div>
-                                <div id="activityLanguagePicker" style="position: relative; min-width: 210px; width: 100%;"></div>
-                            </div>
-
-                            <div id="activityFlagOptions" style="display:flex; flex-wrap: wrap; align-items:center; gap: 12px; padding-top: 2px;"></div>
-                        </div>
-                    </div>
-
-                    <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0; padding-top: 2px;">
-                        <button id="sendActivityTelegramBtn" class="action-btn" title="Отправить в Telegram" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
-                            <i data-lucide="send" style="width: 18px; height: 18px;"></i>
-                        </button>
-                        <button id="updateStatisticsBtn" class="action-btn" title="Обновить" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
-                            <i data-lucide="rotate-cw" style="width: 18px; height: 18px;"></i>
-                        </button>
-                        <button class="close-statistics-btn" id="closeStatisticsBtn">
-                            <i data-lucide="x"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="statistics-controls">
-                    <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
-                        <div style="display:flex; align-items:center; gap: 10px;">
-                            <div id="activityUserPicker" style="display:flex; gap: 8px;"></div>
-                            <select id="groupBySelect" class="group-select">
-                                <option value="days">По дням</option>
-                                <option value="weeks">По неделям</option>
-                                <option value="months">По месяцам</option>
-                            </select>
-                        </div>
-
-                        <div class="date-range-controls" style="margin-left: auto;">
-                            <input type="date" id="startDate" class="date-input" style="width: 128px; padding-right: 20px;">
-                            <span>—</span>
-                            <input type="date" id="endDate" class="date-input" style="width: 128px; padding-right: 20px;">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="statistics-chart" id="statisticsChart">
-                    <!-- Здесь будет график -->
-                </div>
-            </div>
+        modal.style.cssText = `
+            position: fixed; left: 0; top: 0; width: 100%; height: 100%;
+            align-items: flex-start; justify-content: center;
+            background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px);
+            overflow: hidden; z-index: 10150; padding-top: 20px;
         `;
 
-        try {
-            const content = modal.querySelector('.modal-content');
-            if (content) {
-                content.style.zIndex = '10151';
-                content.style.maxHeight = '90vh';
-                content.style.height = '90vh';
-                content.style.display = 'flex';
-                content.style.flexDirection = 'column';
-                content.style.overflow = 'hidden';
-                content.style.boxSizing = 'border-box';
-            }
+        const content = document.createElement('div');
+        content.className = 'modal-content statistics-modal-content';
+        content.style.cssText = `
+            max-width: 95vw; width: 1400px; margin: 0 auto;
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - 20px - var(--sw-status-bar-height, 0px) - 5mm);
+        `;
 
-            const header = modal.querySelector('.statistics-header');
-            if (header) {
-                header.style.flexShrink = '0';
-            }
+        // Строка 1: название + период (слева) и крестик (справа)
+        const header = document.createElement('div');
+        header.className = 'dictation-report-header';
 
-            const controls = modal.querySelector('.statistics-controls');
-            if (controls) {
-                controls.style.flexShrink = '0';
-            }
+        const headerLeft = document.createElement('div');
+        headerLeft.className = 'dictation-report-header-left';
 
-            const chart = modal.querySelector('#statisticsChart');
-            if (chart) {
-                chart.style.flex = '1 1 auto';
-                chart.style.overflowY = 'auto';
-                chart.style.minHeight = '0';
-            }
-        } catch (e) {
-        }
+        const title = document.createElement('div');
+        title.className = 'reports-modal-title';
+        title.textContent = 'Отчет об активности';
 
-        document.body.appendChild(modal);
-        this.modal = modal;
+        const dateRange = document.createElement('div');
+        dateRange.className = 'dictation-report-date-range';
 
-        // Инициализируем иконки
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
+        const dateFromLabel = document.createElement('label');
+        dateFromLabel.textContent = 'С';
+        const dateFromInput = document.createElement('input');
+        dateFromInput.type = 'date';
+        dateFromInput.id = 'startDate';
 
-        try {
-            const wrap = document.getElementById('planfactLanguagePicker');
-            if (wrap && typeof LanguageSelector !== 'undefined') {
-                const raw = this.getLanguageData() || {};
-                const dataWithAll = { all: { language_ru: 'Все языки', language_en: 'All languages' }, ...raw };
-                const codes = ['all', ...Object.keys(raw || {}).map(k => String(k).toLowerCase()).filter(Boolean).sort()];
-                new LanguageSelector({
-                    container: wrap,
-                    mode: 'report-selector',
-                    languageData: dataWithAll,
-                    nativeLanguage: 'all',
-                    learningLanguages: codes,
-                    currentLearning: String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all',
-                    onLanguageChange: ({ currentLearning }) => {
-                        this.selectedLanguage = String(currentLearning || 'all').trim().toLowerCase() || 'all';
-                        this.updateReport();
-                    }
-                });
-            }
-        } catch (e) {
-        }
+        const dateToLabel = document.createElement('label');
+        dateToLabel.textContent = 'По';
+        const dateToInput = document.createElement('input');
+        dateToInput.type = 'date';
+        dateToInput.id = 'endDate';
 
-        // Обработчики событий
-        document.getElementById('closeStatisticsBtn').addEventListener('click', () => {
-            this.hide();
-        });
+        dateRange.appendChild(dateFromLabel);
+        dateRange.appendChild(dateFromInput);
+        dateRange.appendChild(dateToLabel);
+        dateRange.appendChild(dateToInput);
 
-        document.getElementById('updateStatisticsBtn').addEventListener('click', () => {
+        headerLeft.appendChild(title);
+        headerLeft.appendChild(dateRange);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'close-statistics-btn';
+        closeBtn.id = 'closeStatisticsBtn';
+        closeBtn.type = 'button';
+        closeBtn.title = 'Закрыть';
+        const closeIcon = document.createElement('i');
+        closeIcon.setAttribute('data-lucide', 'x');
+        closeBtn.appendChild(closeIcon);
+        closeBtn.addEventListener('click', () => this.hide());
+
+        header.appendChild(headerLeft);
+        header.appendChild(closeBtn);
+
+        // Строка 2: панель отборов
+        const filterContainer = document.createElement('div');
+        filterContainer.id = 'activityUserPicker';
+        filterContainer.style.cssText = 'flex: 0 0 auto;';
+
+        // Строка 3: результат отбора + язык (слева)
+        const resultRow = document.createElement('div');
+        resultRow.className = 'dictation-report-result-row';
+
+        const resultLabel = document.createElement('div');
+        resultLabel.className = 'dictation-report-result-label';
+
+        const langWrap = document.createElement('div');
+        langWrap.className = 'dictation-report-selects dictation-report-lang-wrap';
+        const langSel = document.createElement('select');
+        langSel.id = 'activityLanguageSelect';
+        langSel.className = 'dictation-report-select';
+        langSel.title = 'Язык';
+        langWrap.appendChild(langSel);
+        langSel.addEventListener('change', () => {
+            this.selectedLanguage = langSel.value || 'all';
             this.updateStatistics();
         });
 
-        try {
-            const sendBtn = document.getElementById('sendActivityTelegramBtn');
-            if (sendBtn) {
-                sendBtn.addEventListener('click', () => {
-                    this.sendTelegramSelfReportFromActivity();
-                });
-            }
-        } catch (e) {
-        }
+        resultRow.appendChild(resultLabel);
+        resultRow.appendChild(langWrap);
 
-        try {
-            const wrap = document.getElementById('activityLanguagePicker');
-            if (wrap && typeof LanguageSelector !== 'undefined') {
-                const raw = this.getLanguageData() || {};
-                const dataWithAll = { all: { language_ru: 'Все языки', language_en: 'All languages' }, ...raw };
-                const codes = ['all', ...Object.keys(raw || {}).map(k => String(k).toLowerCase()).filter(Boolean).sort()];
-                new LanguageSelector({
-                    container: wrap,
-                    mode: 'report-selector',
-                    languageData: dataWithAll,
-                    nativeLanguage: 'all',
-                    learningLanguages: codes,
-                    currentLearning: String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all',
-                    onLanguageChange: ({ currentLearning }) => {
-                        this.selectedLanguage = String(currentLearning || 'all').trim().toLowerCase() || 'all';
-                        this.updateStatistics();
-                    }
-                });
-            }
-        } catch (e) {
+        // Строка 4: слева флаги + группировка, справа telegram + обновить
+        const optionsRow = document.createElement('div');
+        optionsRow.className = 'dictation-report-options-row';
+
+        const colOptions = document.createElement('div');
+        colOptions.className = 'dictation-report-column-options';
+
+        const flagsContainer = document.createElement('div');
+        flagsContainer.id = 'activityFlagOptions';
+        flagsContainer.style.cssText = 'display:flex; flex-wrap: wrap; align-items:center; gap: 12px;';
+
+        const groupBySelect = document.createElement('select');
+        groupBySelect.id = 'groupBySelect';
+        groupBySelect.className = 'group-select';
+        groupBySelect.innerHTML = `
+            <option value="days">По дням</option>
+            <option value="weeks">По неделям</option>
+            <option value="months">По месяцам</option>
+        `;
+        groupBySelect.value = this.groupBy;
+
+        colOptions.appendChild(flagsContainer);
+        colOptions.appendChild(groupBySelect);
+
+        const rightOptions = document.createElement('div');
+        rightOptions.className = 'dictation-report-options-right';
+
+        const telegramBtn = document.createElement('button');
+        telegramBtn.id = 'sendActivityTelegramBtn';
+        telegramBtn.className = 'action-btn';
+        telegramBtn.title = 'Отправить в Telegram';
+        telegramBtn.type = 'button';
+        telegramBtn.style.cssText = 'display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;';
+        const sendIcon = document.createElement('i');
+        sendIcon.setAttribute('data-lucide', 'send');
+        sendIcon.style.cssText = 'width: 18px; height: 18px;';
+        telegramBtn.appendChild(sendIcon);
+        telegramBtn.addEventListener('click', () => this.sendTelegramSelfReportFromActivity());
+
+        const refreshBtn = document.createElement('button');
+        refreshBtn.id = 'updateStatisticsBtn';
+        refreshBtn.className = 'action-btn';
+        refreshBtn.title = 'Обновить';
+        refreshBtn.type = 'button';
+        refreshBtn.style.cssText = 'display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;';
+        const refreshIcon = document.createElement('i');
+        refreshIcon.setAttribute('data-lucide', 'rotate-cw');
+        refreshIcon.style.cssText = 'width: 18px; height: 18px;';
+        refreshBtn.appendChild(refreshIcon);
+        refreshBtn.addEventListener('click', () => this.updateStatistics());
+
+        rightOptions.appendChild(telegramBtn);
+        rightOptions.appendChild(refreshBtn);
+
+        optionsRow.appendChild(colOptions);
+        optionsRow.appendChild(rightOptions);
+
+        // Тело с графиком
+        const chart = document.createElement('div');
+        chart.id = 'statisticsChart';
+        chart.className = 'statistics-chart';
+        chart.style.cssText = 'flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-bottom: 0; padding-top: 8px;';
+
+        content.appendChild(header);
+        content.appendChild(filterContainer);
+        content.appendChild(resultRow);
+        content.appendChild(optionsRow);
+        content.appendChild(chart);
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+
+        this.modal = modal;
+        this._modal = modal;
+        this._resultLabel = resultLabel;
+        this._langSelect = langSel;
+        this._filterContainer = filterContainer;
+
+        // Инициализируем иконки
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons({ root: content });
         }
 
         // Закрытие по клику вне модального окна
@@ -405,8 +422,8 @@ class StatisticsReport {
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 30);
 
-        document.getElementById('startDate').value = this.formatDateForInput(startDate);
-        document.getElementById('endDate').value = this.formatDateForInput(endDate);
+        dateFromInput.value = this.formatDateForInput(startDate);
+        dateToInput.value = this.formatDateForInput(endDate);
 
         try {
             this._renderFlagOptions();
@@ -414,15 +431,15 @@ class StatisticsReport {
         }
 
         try {
-            const groupBy = document.getElementById('groupBySelect');
-            if (groupBy) {
-                groupBy.addEventListener('change', () => this.updateStatistics());
-            }
+            groupBySelect.addEventListener('change', () => {
+                this.groupBy = groupBySelect.value;
+                this.updateStatistics();
+            });
         } catch (e) {
         }
         try {
-            if (document.getElementById('startDate')) document.getElementById('startDate').addEventListener('change', () => this.updateStatistics());
-            if (document.getElementById('endDate')) document.getElementById('endDate').addEventListener('change', () => this.updateStatistics());
+            dateFromInput.addEventListener('change', () => this.updateStatistics());
+            dateToInput.addEventListener('change', () => this.updateStatistics());
         } catch (e) {
         }
     }
@@ -538,6 +555,7 @@ class StatisticsReport {
         if (!container || typeof ReportFilterPanel === 'undefined') return;
         if (this._filterPanel) {
             this._filterPanel.render();
+            this._refreshResultRow();
             return;
         }
         this._filterPanel = new ReportFilterPanel({
@@ -545,6 +563,8 @@ class StatisticsReport {
             withLanguage: false,
             onChange: ({ userId }) => {
                 this.selectedUserId = (userId != null) ? Number(userId) : null;
+                this.selectedLanguage = 'all';
+                this._refreshResultRow();
                 this.updateStatistics();
             }
         });
@@ -555,6 +575,69 @@ class StatisticsReport {
         this.selectedUserId = (this._filterPanel.getSelectedUserId() != null)
             ? Number(this._filterPanel.getSelectedUserId())
             : null;
+        this._refreshResultRow();
+    }
+
+    _refreshResultRow() {
+        if (!this._resultLabel) return;
+        const u = this._filterPanel ? this._filterPanel.getSelectedUser() : null;
+        if (!u) {
+            this._resultLabel.innerHTML = '';
+            this._fillResultLanguage();
+            return;
+        }
+        const email = u.email ? this.escapeHtml(u.email) : '';
+        const name = u.username ? this.escapeHtml(u.username) : '';
+        if (email && name) {
+            this._resultLabel.innerHTML = `${email} (<strong>${name}</strong>)`;
+        } else if (name) {
+            this._resultLabel.innerHTML = `<strong>${name}</strong>`;
+        } else if (email) {
+            this._resultLabel.innerHTML = email;
+        } else {
+            this._resultLabel.innerHTML = '';
+        }
+        this._fillResultLanguage();
+    }
+
+    async _fillResultLanguage() {
+        const sel = this._langSelect;
+        if (!sel) return;
+        sel.innerHTML = '';
+        const allOpt = document.createElement('option');
+        allOpt.value = 'all';
+        allOpt.textContent = 'Все языки';
+        sel.appendChild(allOpt);
+
+        const uid = this.selectedUserId;
+        if (uid == null) {
+            sel.value = 'all';
+            this.selectedLanguage = 'all';
+            return;
+        }
+        const token = this.getToken();
+        if (!token) return;
+        try {
+            const res = await fetch(`/api/statistics/dictation-report/languages?user_id=${encodeURIComponent(uid)}`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const js = await res.json().catch(() => null);
+            if (js && js.success && Array.isArray(js.languages)) {
+                for (const l of js.languages) {
+                    const opt = document.createElement('option');
+                    opt.value = l.code || '';
+                    opt.textContent = l.label || (l.code || '').toUpperCase();
+                    sel.appendChild(opt);
+                }
+            }
+        } catch (e) {
+            console.warn('[StatisticsReport] Failed to load languages', e);
+        }
+        const codes = Array.from(sel.options).map(o => o.value);
+        const current = String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all';
+        sel.value = codes.includes(current) ? current : 'all';
+        this.selectedLanguage = sel.value;
     }
 
     _renderFlagOptions() {
@@ -738,6 +821,17 @@ class StatisticsReport {
         const startDate = new Date(startDateInput.value);
         const endDate = new Date(endDateInput.value);
         this.groupBy = groupBySelect.value;
+
+        // Всегда синхронизируем выбранного пользователя с панелью отборов,
+        // чтобы при смене периода + «Обновить» запрос уходил по человеку из фильтра,
+        // а не по владельцу отчёта.
+        if (this._filterPanel) {
+            try {
+                const uid = this._filterPanel.getSelectedUserId();
+                this.selectedUserId = (uid != null) ? Number(uid) : null;
+            } catch (e) {
+            }
+        }
 
         // Получаем статистику за период
         let stats = [];

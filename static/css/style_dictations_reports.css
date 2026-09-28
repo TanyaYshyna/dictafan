@@ -319,6 +319,17 @@
   flex: 0 0 auto;
 }
 
+/* Отчет об активности (StatisticsReport) использует ту же компоновку строк */
+#statistics-modal .dictation-report-header,
+#statistics-modal .dictation-report-result-row,
+#statistics-modal .dictation-report-options-row {
+  flex: 0 0 auto;
+}
+
+#statistics-modal .statistics-chart {
+  margin-bottom: 0;
+}
+
 .dictation-report-header {
   display: flex;
   align-items: flex-start;
