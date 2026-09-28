@@ -268,21 +268,20 @@ class StatisticsReport {
         const dateRange = document.createElement('div');
         dateRange.className = 'dictation-report-date-range';
 
-        const dateFromLabel = document.createElement('label');
-        dateFromLabel.textContent = 'С';
         const dateFromInput = document.createElement('input');
         dateFromInput.type = 'date';
         dateFromInput.id = 'startDate';
 
-        const dateToLabel = document.createElement('label');
-        dateToLabel.textContent = 'По';
+        const dateSep = document.createElement('span');
+        dateSep.textContent = '—';
+        dateSep.style.cssText = 'font-size: 14px; font-weight: 600; color: rgba(31, 41, 51, 0.7);';
+
         const dateToInput = document.createElement('input');
         dateToInput.type = 'date';
         dateToInput.id = 'endDate';
 
-        dateRange.appendChild(dateFromLabel);
         dateRange.appendChild(dateFromInput);
-        dateRange.appendChild(dateToLabel);
+        dateRange.appendChild(dateSep);
         dateRange.appendChild(dateToInput);
 
         headerLeft.appendChild(title);
@@ -349,8 +348,9 @@ class StatisticsReport {
         `;
         groupBySelect.value = this.groupBy;
 
-        colOptions.appendChild(flagsContainer);
+        // Группировка (по дням/неделям/месяцам) — в начале строки, слева от флагов.
         colOptions.appendChild(groupBySelect);
+        colOptions.appendChild(flagsContainer);
 
         const rightOptions = document.createElement('div');
         rightOptions.className = 'dictation-report-options-right';
@@ -4070,28 +4070,28 @@ class DictationReport {
         title.className = 'reports-modal-title';
         title.textContent = this.t('title');
 
-        // Период — сразу после названия, переносится вниз под название при сужении окна
+        // Период — сразу после названия, переносится вниз под название при сужении окна.
+        // Разделитель «—» не требует локализации.
         const dateRange = document.createElement('div');
         dateRange.className = 'dictation-report-date-range';
 
-        const dateFromLabel = document.createElement('label');
-        dateFromLabel.textContent = this.t('from');
         const dateFromInput = document.createElement('input');
         dateFromInput.type = 'date';
         dateFromInput.id = 'dictation-report-date-from';
         const now = new Date();
         dateFromInput.value = this.formatDateForInput(now);
 
-        const dateToLabel = document.createElement('label');
-        dateToLabel.textContent = this.t('to');
+        const dateSep = document.createElement('span');
+        dateSep.textContent = '—';
+        dateSep.style.cssText = 'font-size: 14px; font-weight: 600; color: rgba(31, 41, 51, 0.7);';
+
         const dateToInput = document.createElement('input');
         dateToInput.type = 'date';
         dateToInput.id = 'dictation-report-date-to';
         dateToInput.value = this.formatDateForInput(now);
 
-        dateRange.appendChild(dateFromLabel);
         dateRange.appendChild(dateFromInput);
-        dateRange.appendChild(dateToLabel);
+        dateRange.appendChild(dateSep);
         dateRange.appendChild(dateToInput);
 
         headerLeft.appendChild(title);
