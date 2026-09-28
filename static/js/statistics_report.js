@@ -3964,27 +3964,18 @@ class DictationReport {
             display: flex; flex-direction: column; max-height: calc(100vh - 40px);
         `;
 
-        // Строка 1: заголовок (слева) + крестик (справа)
+        // Строка 1: заголовок + период (слева) и крестик (справа)
         const header = document.createElement('div');
         header.className = 'dictation-report-header';
+
+        const headerLeft = document.createElement('div');
+        headerLeft.className = 'dictation-report-header-left';
 
         const title = document.createElement('h2');
         title.className = 'reports-modal-title';
         title.textContent = this.t('title');
 
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'close-statistics-btn';
-        closeBtn.type = 'button';
-        closeBtn.title = this.t('close');
-        const closeIcon = document.createElement('i');
-        closeIcon.setAttribute('data-lucide', 'x');
-        closeBtn.appendChild(closeIcon);
-        closeBtn.addEventListener('click', () => this.hide());
-
-        header.appendChild(title);
-        header.appendChild(closeBtn);
-
-        // Строка 2: диапазон дат (может переноситься при сужении окна)
+        // Период — сразу после названия, переносится вниз под название при сужении окна
         const dateRange = document.createElement('div');
         dateRange.className = 'dictation-report-date-range';
 
@@ -4007,6 +3998,21 @@ class DictationReport {
         dateRange.appendChild(dateFromInput);
         dateRange.appendChild(dateToLabel);
         dateRange.appendChild(dateToInput);
+
+        headerLeft.appendChild(title);
+        headerLeft.appendChild(dateRange);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'close-statistics-btn';
+        closeBtn.type = 'button';
+        closeBtn.title = this.t('close');
+        const closeIcon = document.createElement('i');
+        closeIcon.setAttribute('data-lucide', 'x');
+        closeBtn.appendChild(closeIcon);
+        closeBtn.addEventListener('click', () => this.hide());
+
+        header.appendChild(headerLeft);
+        header.appendChild(closeBtn);
 
         // Строка 3: панель отборов (ReportFilterPanel)
         const filterContainer = document.createElement('div');
@@ -4109,7 +4115,6 @@ class DictationReport {
         body.appendChild(tableWrapper);
 
         content.appendChild(header);
-        content.appendChild(dateRange);
         content.appendChild(filterContainer);
         content.appendChild(resultRow);
         content.appendChild(optionsRow);

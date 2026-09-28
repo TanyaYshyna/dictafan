@@ -308,11 +308,20 @@
 .dictation-report-modal .modal-content {
   max-width: 95vw;
   width: 1400px;
+  overflow: hidden;
+}
+
+/* Шапка, панель отборов и строки настроек не сжимаются — сжимается только тело с таблицей */
+.dictation-report-modal .dictation-report-header,
+.dictation-report-modal #dictation-report-user-picker,
+.dictation-report-modal .dictation-report-result-row,
+.dictation-report-modal .dictation-report-options-row {
+  flex: 0 0 auto;
 }
 
 .dictation-report-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   padding: 0 0 8px 0;
@@ -321,10 +330,14 @@
 .dictation-report-header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.dictation-report-header-left .reports-modal-title {
+  margin: 0;
 }
 
 .dictation-report-header-right {
@@ -639,11 +652,21 @@
 
 /* Table wrapper */
 .dictation-report-table-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
-  max-height: calc(100vh - 260px);
   border: 1px solid rgba(31, 41, 51, 0.1);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.4);
+}
+
+/* Body занимает всё оставшееся место, таблица скроллится внутри */
+.dictation-report-modal .reports-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .dictation-report-table {
@@ -994,7 +1017,7 @@
 .dictation-report-result-row {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 12px;
   flex-wrap: wrap;
   min-height: 38px;
