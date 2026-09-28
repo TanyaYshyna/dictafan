@@ -3961,7 +3961,8 @@ class DictationReport {
         content.className = 'modal-content statistics-modal-content';
         content.style.cssText = `
             max-width: 95vw; width: 1400px; margin: 0 auto;
-            display: flex; flex-direction: column; max-height: calc(100vh - 40px);
+            display: flex; flex-direction: column;
+            max-height: calc(100vh - 20px - var(--sw-status-bar-height, 0px) - 5mm);
         `;
 
         // Строка 1: заголовок + период (слева) и крестик (справа)

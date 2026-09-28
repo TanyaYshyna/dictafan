@@ -1021,6 +1021,7 @@
   gap: 12px;
   flex-wrap: wrap;
   min-height: 38px;
+  padding-top: 8px;
 }
 
 .dictation-report-result-label {
