@@ -1257,10 +1257,22 @@ function _readFileAsBase64(file) {
  * Собирает canonical URLs для всех audio_file в предложениях и передаёт
  * в AudioManager.uploadDictationAudioFromCacheToB2().
  */
-async function _uploadDraftAudioToB2(dictationId, token, dirtySetParam) {
+async function _uploadDraftAudioToB2(dictationId, token, dirtySetParam, snapshotParam) {
   var flowNum = window.__SAVE_FLOW || 0;
-  if (!state.content || !dictationId || !token) {
-    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2 пропущено: content=' + !!state.content + ' dictationId=' + dictationId + ' token=' + !!token);
+  // Снапшот содержимого (передаётся из _launchBackgroundB2Upload): если редактор уже
+  // закрыт, state.content/state.config/state._sharedAudioFilename равны null, поэтому
+  // фоновой загрузке передаём копию данных заранее.
+  var snapshot = snapshotParam || null;
+  var langBlocks = snapshot ? (snapshot.langBlocks || []) : (state.content ? (state.content.langBlocks || []) : null);
+  var sharedAudioFilename = snapshot ? (snapshot.sharedAudioFilename || null) : state._sharedAudioFilename;
+  var originalLanguage = snapshot ? (snapshot.originalLanguage || '') : (state.config ? state.config.originalLanguage : '');
+
+  if (!dictationId || !token) {
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2 пропущено: dictationId=' + dictationId + ' token=' + !!token);
+    return { ok: false, reason: 'missing_data' };
+  }
+  if (langBlocks === null) {
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2 пропущено: content отсутствует (state.content=null и снапшот не передан)');
     return { ok: false, reason: 'missing_data' };
   }
 
@@ -1298,7 +1310,6 @@ async function _uploadDraftAudioToB2(dictationId, token, dirtySetParam) {
   }
 
   // Проходим по всем языковым блокам (оригинал + переводы)
-  var langBlocks = state.content.langBlocks || [];
   var urls = [];
   var allFilenames = []; // keep-list для cleanup
 
@@ -1335,13 +1346,12 @@ async function _uploadDraftAudioToB2(dictationId, token, dirtySetParam) {
   }
 
   // Добавляем shared audio файл, если он есть (всегда для оригинального языка)
-  if (state._sharedAudioFilename) {
-    allFilenames.push(state._sharedAudioFilename);
-    var origLang = (state.config ? state.config.originalLanguage : '');
-    if (origLang && (uploadAll || dirtySet.has(state._sharedAudioFilename))) {
-      var sharedUrl = am.buildDictationAudioUrl(dictationId, String(origLang).toLowerCase().trim(), state._sharedAudioFilename);
+  if (sharedAudioFilename) {
+    allFilenames.push(sharedAudioFilename);
+    if (originalLanguage && (uploadAll || dirtySet.has(sharedAudioFilename))) {
+      var sharedUrl = am.buildDictationAudioUrl(dictationId, String(originalLanguage).toLowerCase().trim(), sharedAudioFilename);
       urls.push(sharedUrl);
-      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: shared audio ' + state._sharedAudioFilename);
+      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] _uploadDraftAudioToB2: shared audio ' + sharedAudioFilename);
     }
   }
 
@@ -1379,6 +1389,54 @@ async function _uploadDraftAudioToB2(dictationId, token, dirtySetParam) {
   } catch (e) {
     console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] B2 upload error', e);
     return { ok: false, reason: 'exception', error: e };
+  }
+}
+
+/**
+ * Запускает фоновую (fire-and-forget) загрузку аудио на B2.
+ * Вызывается в момент сохранения ПОСЛЕ того, как данные уже записаны в очередь/БД
+ * и аудио лежит в CacheStorage (отмашка SW на сохранение дана). Мы НЕ ждём полного
+ * завершения загрузки на B2: по ТЗ редактор должен закрыться сразу после передачи
+ * данных, а B2-загрузка продолжается в фоне.
+ *
+ * @param {string} dictationId - актуальный (возможно уже обновлённый) ID диктанта
+ * @param {string} token - токен авторизации
+ * @param {Set|null} dirtySetSnapshot - снапшот грязных аудио-файлов
+ * @param {object} snapshot - { langBlocks, sharedAudioFilename, originalLanguage }
+ */
+function _launchBackgroundB2Upload(dictationId, token, dirtySetSnapshot, snapshot) {
+  try {
+    if (!window.__B2_BACKGROUND_UPLOADS) window.__B2_BACKGROUND_UPLOADS = {};
+    var k = String(dictationId || '');
+    // Не дублируем уже идущую фоновую загрузку для того же диктанта.
+    if (k && window.__B2_BACKGROUND_UPLOADS[k]) {
+      console.log('[dictationEditorModal] Фоновая B2-загрузка уже идёт для ' + k + ' — пропускаем дубль');
+      return;
+    }
+    if (k) window.__B2_BACKGROUND_UPLOADS[k] = true;
+
+    var flowNum = window.__SAVE_FLOW || 0;
+    console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Фоновая B2-загрузка стартовала: dictationId=' + dictationId + ' time=' + new Date().toISOString());
+
+    // Запускаем без await — редактор должен закрыться, не дожидаясь B2.
+    _uploadDraftAudioToB2(dictationId, token, dirtySetSnapshot, snapshot)
+      .then(function (b2Result) {
+        if (b2Result && b2Result.ok) {
+          console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Фоновая B2-загрузка завершена: uploaded=' + b2Result.uploaded + ' skipped=' + b2Result.skipped + ' failed=' + (b2Result.failed ? b2Result.failed.length : 0) + ' cacheMiss=' + b2Result.cacheMiss);
+        } else {
+          console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Фоновая B2-загрузка не завершилась успешно: ' + JSON.stringify(b2Result));
+        }
+      })
+      .catch(function (err) {
+        console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Ошибка фоновой B2-загрузки:', err);
+      })
+      .then(function () {
+        try {
+          if (window.__B2_BACKGROUND_UPLOADS) window.__B2_BACKGROUND_UPLOADS[k] = false;
+        } catch (e) {}
+      });
+  } catch (e) {
+    console.warn('[dictationEditorModal] Не удалось запустить фоновую B2-загрузку:', e);
   }
 }
 
@@ -4326,32 +4384,25 @@ async function _handleSave() {
             } catch (e) {}
           }
 
-          // Загружаем аудио на B2, если флаг audio был установлен ДО сброса dirtyFlags.
-          // Используем hasDirtyAudio (скопирован ДО _setDirtyFlags), а НЕ flags.audio,
-          // потому что _setDirtyFlags() мутирует тот же объект state.dirtyFlags.
+          // Загружаем аудио на B2 в ФОНОВОМ режиме (fire-and-forget), если флаг audio
+          // был установлен ДО сброса dirtyFlags. Используем hasDirtyAudio (скопирован
+          // ДО _setDirtyFlags), а НЕ flags.audio, потому что _setDirtyFlags() мутирует
+          // тот же объект state.dirtyFlags.
+          // По ТЗ редактор должен закрыться сразу после передачи данных (БД + кеш +
+          // отмашка SW), а B2-загрузка продолжается в фоне и НЕ блокирует закрытие.
           // Важно: используем актуальный (уже обновлённый) ID диктанта, чтобы аудио
           // загрузилось под реальным dict_<id>.
           var effectiveDictationIdForB2 = state.config ? (state.config.dictationId || normalizedId) : normalizedId;
           if (hasDirtyAudio && navigator.onLine) {
-            console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Загружаем аудио на B2: dictationId=' + effectiveDictationIdForB2);
-            try {
-              var b2Result = await _uploadDraftAudioToB2(effectiveDictationIdForB2, token, dirtySetSnapshot);
-              if (b2Result && b2Result.ok) {
-                _setDirtyFlags({ audio: false });
-                console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио загружено на B2 успешно: uploaded=' + b2Result.uploaded + ' skipped=' + b2Result.skipped + ' failed=' + (b2Result.failed ? b2Result.failed.length : 0) + ' cacheMiss=' + b2Result.cacheMiss);
-              } else if (b2Result && b2Result.reason === 'inflight_timeout') {
-                console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось — таймаут ожидания inflight');
-              } else if (b2Result && b2Result.reason === 'inflight') {
-                console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось — inflight (race condition)');
-              } else if (b2Result && b2Result.uploaded > 0 && b2Result.failed && b2Result.failed.length > 0) {
-                console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио загружено частково: uploaded=' + b2Result.uploaded + ' failed=' + b2Result.failed.length);
-              } else {
-                console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось: ' + JSON.stringify(b2Result));
-              }
-            } catch (audioErr) {
-              console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось (останется в кеше):', audioErr);
-              // Не фатально — аудио осталось в MEDIA_CACHE_PERSIST
-            }
+            console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Запускаю фоновую загрузку аудио на B2: dictationId=' + effectiveDictationIdForB2);
+            // Снапшот данных ДО закрытия редактора: после _closeEditorModal() state.content
+            // и state.config будут null, поэтому копируем нужные поля заранее.
+            var b2Snapshot = {
+              langBlocks: (state.content && state.content.langBlocks) ? state.content.langBlocks.slice() : [],
+              sharedAudioFilename: state._sharedAudioFilename || null,
+              originalLanguage: state.config ? (state.config.originalLanguage || '') : ''
+            };
+            _launchBackgroundB2Upload(effectiveDictationIdForB2, token, dirtySetSnapshot, b2Snapshot);
           } else if (hasDirtyAudio && !navigator.onLine) {
             console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио отложено — нет сети: dictationId=' + normalizedId);
           } else {
@@ -4489,26 +4540,25 @@ async function _handleSave() {
     var effectiveDictationId = state.config ? state.config.dictationId : normalizedId;
     if (!effectiveDictationId) effectiveDictationId = normalizedId;
 
-    // Этап 2: Сохраняем аудио (если dirty audio) — прямой fetch путь
+    // Этап 2: Сохраняем аудио (если dirty audio) — прямой fetch путь.
+    // Загружаем на B2 в ФОНОВОМ режиме (fire-and-forget): редактор должен закрыться
+    // сразу после сохранения БД, не дожидаясь полного завершения B2-загрузки.
     var hasDirtyAudioLegacy = !!(flags.audio && flags.audio.dirty && flags.audio.dirty.size > 0);
     var dirtySetSnapshotLegacy = null;
     if (hasDirtyAudioLegacy && flags.audio.dirty instanceof Set) {
       dirtySetSnapshotLegacy = new Set(flags.audio.dirty);
     }
     console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Прямий fetch: hasDirtyAudio=' + hasDirtyAudioLegacy + ' online=' + navigator.onLine);
-    if (hasDirtyAudioLegacy) {
-      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Сохраняю аудио на B2 (прямий fetch)... dictationId=' + effectiveDictationId);
-      try {
-        var legacyB2Result = await _uploadDraftAudioToB2(effectiveDictationId, token, dirtySetSnapshotLegacy);
-        if (legacyB2Result && legacyB2Result.ok) {
-          _setDirtyFlags({ audio: false });
-          console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио сохранено на B2: uploaded=' + legacyB2Result.uploaded);
-        } else {
-          console.warn('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не загрузилось: ' + JSON.stringify(legacyB2Result));
-        }
-      } catch (audioErr) {
-        console.error('[dictationEditorModal] [FLOW-' + flowNum + '] Ошибка сохранения аудио:', audioErr);
-      }
+    if (hasDirtyAudioLegacy && navigator.onLine) {
+      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Запускаю фоновую загрузку аудио на B2 (прямий fetch)... dictationId=' + effectiveDictationId);
+      var legacyB2Snapshot = {
+        langBlocks: (state.content && state.content.langBlocks) ? state.content.langBlocks.slice() : [],
+        sharedAudioFilename: state._sharedAudioFilename || null,
+        originalLanguage: state.config ? (state.config.originalLanguage || '') : ''
+      };
+      _launchBackgroundB2Upload(effectiveDictationId, token, dirtySetSnapshotLegacy, legacyB2Snapshot);
+    } else if (hasDirtyAudioLegacy && !navigator.onLine) {
+      console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио отложено — нет сети: dictationId=' + effectiveDictationId);
     } else {
       console.log('[dictationEditorModal] [FLOW-' + flowNum + '] Аудио не требуется: hasDirtyAudio=false');
     }

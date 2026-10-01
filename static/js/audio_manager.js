@@ -1472,14 +1472,19 @@ class AudioManagerClass {
     async getB2UploadUrl(token) {
         const t = String(token || '').trim();
         if (!t) return { ok: false, reason: 'missing_token' };
-        const resp = await fetch('/api/b2/get_upload_url', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${t}`
-            },
-            body: JSON.stringify({})
-        });
+        let resp;
+        try {
+            resp = await fetch('/api/b2/get_upload_url', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${t}`
+                },
+                body: JSON.stringify({})
+            });
+        } catch (e) {
+            return { ok: false, reason: 'get_upload_url_timeout' };
+        }
         if (!resp.ok) {
             let text = '';
             try { text = await resp.text(); } catch (e) {}
@@ -1630,16 +1635,23 @@ class AudioManagerClass {
                     }
 
                     console.log('[AudioManager] [FLOW-' + flowNum + '] завантажую на B2: ' + remotePath + ' blobSize=' + blob.size);
-                    const b2Resp = await fetch(up.uploadUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': up.uploadAuthToken,
-                            'X-Bz-File-Name': encodeURIComponent(remotePath),
-                            'Content-Type': blob.type || 'b2/x-auto',
-                            'X-Bz-Content-Sha1': 'do_not_verify'
-                        },
-                        body: blob
-                    });
+                    let b2Resp;
+                    try {
+                        b2Resp = await fetch(up.uploadUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': up.uploadAuthToken,
+                                'X-Bz-File-Name': encodeURIComponent(remotePath),
+                                'Content-Type': blob.type || 'b2/x-auto',
+                                'X-Bz-Content-Sha1': 'do_not_verify'
+                            },
+                            body: blob
+                        });
+                    } catch (b2FetchErr) {
+                        failed += 1;
+                        console.log('[AudioManager] [FLOW-' + flowNum + '] B2 upload failed: ' + remotePath + ' err=' + String(b2FetchErr && b2FetchErr.message ? b2FetchErr.message : b2FetchErr));
+                        continue;
+                    }
                     if (!b2Resp.ok) {
                         failed += 1;
                         console.log('[AudioManager] [FLOW-' + flowNum + '] B2 upload failed: ' + remotePath + ' status=' + b2Resp.status);
