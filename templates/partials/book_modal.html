@@ -158,8 +158,12 @@
             </button>
         </div>
         <div class="modal-body crop-modal-body">
-            <div class="crop-container">
+            <div class="crop-container" id="crop-dropzone">
                 <img id="crop-image" src="" alt="Crop">
+                <div class="crop-drop-hint" id="crop-drop-hint">
+                    <i data-lucide="upload"></i>
+                    <span>Перетащите сюда картинку</span>
+                </div>
             </div>
             <div class="crop-actions">
                 <button type="button" class="btn-secondary" id="crop-cancel"></button>

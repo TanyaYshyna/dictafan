@@ -986,6 +986,7 @@
 }
 
 .crop-container {
+  position: relative;
   width: 100%;
   height: 500px;
   background: #000;
@@ -994,6 +995,44 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.crop-container.drag-over {
+  outline: 3px dashed var(--color-button-yellow, rgb(252, 235, 163));
+  outline-offset: -6px;
+}
+
+.crop-drop-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.45);
+  transition: opacity 0.2s ease;
+}
+
+.crop-drop-hint svg {
+  width: 28px;
+  height: 28px;
+}
+
+/* Как только картинка загружена в кроппер, подсказка прячется */
+.crop-container.crop-has-image .crop-drop-hint {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* При перетаскивании поверх уже открытого кроппера подсказка снова видна */
+.crop-container.drag-over .crop-drop-hint {
+  opacity: 1;
+  visibility: visible;
 }
 
 .crop-container img {

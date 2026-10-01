@@ -306,6 +306,7 @@
 
         setTextIfEmptyById('crop-cancel', 'Отмена');
         setTextIfEmptyById('crop-confirm', 'Обрезать');
+        setTextIfEmpty('#crop-drop-hint span', 'Перетащите сюда картинку');
       } catch (e) {
       }
     }

@@ -6,6 +6,7 @@
   let cropper = null;
   let croppedImageBlob = null;
   let activeConfig = null;
+  let fileDialogActive = false;
 
   function getAppBuildValue() {
     try {
@@ -194,6 +195,71 @@
     }
   }
 
+  function filesFromDataTransfer(dt) {
+    try {
+      if (!dt || !dt.files || !dt.files.length) return [];
+      return Array.prototype.slice.call(dt.files);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function bindDropZone(el) {
+    if (!el) return;
+    if (el.getAttribute && el.getAttribute('data-cover-drop-bound') === '1') return;
+    if (el.setAttribute) el.setAttribute('data-cover-drop-bound', '1');
+
+    el.addEventListener('dragover', (e) => {
+      try { e.preventDefault(); } catch (e2) {}
+      try { if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; } catch (e2) {}
+      try { el.classList.add('drag-over'); } catch (e2) {}
+    });
+
+    el.addEventListener('dragleave', (e) => {
+      try { e.preventDefault(); } catch (e2) {}
+      try { el.classList.remove('drag-over'); } catch (e2) {}
+    });
+
+    el.addEventListener('drop', (e) => {
+      try { e.preventDefault(); } catch (e2) {}
+      try { e.stopPropagation(); } catch (e2) {}
+      try { el.classList.remove('drag-over'); } catch (e2) {}
+      const files = filesFromDataTransfer(e.dataTransfer);
+      const file = files[0];
+      if (file) processFile(file);
+    });
+  }
+
+  function preventWindowDrop() {
+    if (window.__coverManagerGlobalDropPrevented) return;
+    window.__coverManagerGlobalDropPrevented = true;
+    const skip = (target) => {
+      try {
+        if (!target) return false;
+        if (target.isContentEditable) return true;
+        const tag = String(target.tagName || '').toUpperCase();
+        return tag === 'INPUT' || tag === 'TEXTAREA';
+      } catch (e) {
+        return false;
+      }
+    };
+    ['dragover', 'drop'].forEach((type) => {
+      document.addEventListener(type, (e) => {
+        if (skip(e.target)) return;
+        try { e.preventDefault(); } catch (e2) {}
+      });
+    });
+  }
+
+  function initFileDialogLock() {
+    if (window.__coverManagerFileDialogLockInit) return;
+    window.__coverManagerFileDialogLockInit = true;
+    window.addEventListener('focus', () => {
+      // Диалог выбора файла закрылся — снимаем блокировку повторного открытия
+      setTimeout(() => { fileDialogActive = false; }, 50);
+    });
+  }
+
   function applyPreview(cfg, blob) {
     const previewIds = normIdList(cfg && cfg.previewImgId);
     const placeholderIds = normIdList(cfg && cfg.placeholderId);
@@ -225,8 +291,7 @@
     }
   }
 
-  function handleCoverSelect(event) {
-    const file = getCoverFileFromEvent(event);
+  function processFile(file) {
     if (!file) return;
 
     if (!file.type || !file.type.startsWith('image/')) {
@@ -262,6 +327,19 @@
     })();
   }
 
+  function handleCoverSelect(event) {
+    const file = getCoverFileFromEvent(event);
+    if (!file) return;
+
+    // Сбрасываем value, чтобы повторный выбор того же файла срабатывал
+    try {
+      if (event && event.target) event.target.value = '';
+    } catch (e) {
+    }
+
+    processFile(file);
+  }
+
   function openCropModal(imageSrc) {
     const els = getModalEls(activeConfig);
     const modal = els.modal;
@@ -273,6 +351,12 @@
 
     modal.style.display = 'flex';
     modal.classList.add('show');
+
+    try {
+      const cropContainer = modal.querySelector('.crop-container');
+      if (cropContainer) cropContainer.classList.add('crop-has-image');
+    } catch (e) {
+    }
 
     if (cropper) {
       try {
@@ -475,33 +559,77 @@
     croppedImageBlob = null;
   }
 
+  function triggerFilePicker(fileInput) {
+    if (fileDialogActive) return;
+    fileDialogActive = true;
+    try {
+      fileInput.click();
+    } catch (e) {
+      fileDialogActive = false;
+      return;
+    }
+    // Страховка на случай, если событие focus не придёт (нативный диалог закрыт)
+    setTimeout(() => {
+      if (fileDialogActive) fileDialogActive = false;
+    }, 4000);
+  }
+
   function bind(config) {
     activeConfig = config || {};
 
     const fileInput = getElById(activeConfig.fileInputId);
     const uploadBtn = getElById(activeConfig.uploadBtnId);
     const clickable = getElById(activeConfig.clickableId);
+    const dropZone = getElById(activeConfig.dropZoneId || null);
 
     if (uploadBtn && fileInput) {
-      uploadBtn.addEventListener('click', () => fileInput.click());
+      if (!uploadBtn.getAttribute('data-cover-click-bound')) {
+        uploadBtn.setAttribute('data-cover-click-bound', '1');
+        uploadBtn.addEventListener('click', () => triggerFilePicker(fileInput));
+      }
     }
     if (clickable && fileInput) {
-      clickable.addEventListener('click', () => fileInput.click());
+      if (!clickable.getAttribute('data-cover-click-bound')) {
+        clickable.setAttribute('data-cover-click-bound', '1');
+        clickable.addEventListener('click', () => triggerFilePicker(fileInput));
+      }
     }
     if (fileInput) {
-      fileInput.addEventListener('change', handleCoverSelect);
+      if (!fileInput.getAttribute('data-cover-change-bound')) {
+        fileInput.setAttribute('data-cover-change-bound', '1');
+        fileInput.addEventListener('change', handleCoverSelect);
+      }
+    }
+
+    // Drag & drop: кликабельная область, превью, явная drop-зона и сам кроп-модал
+    try { bindDropZone(clickable); } catch (e) {}
+    try { bindDropZone(dropZone); } catch (e) {}
+    const previewIds = normIdList(activeConfig && activeConfig.previewImgId);
+    for (const id of previewIds) {
+      try { bindDropZone(getElById(id)); } catch (e) {}
     }
 
     const els = getModalEls(activeConfig);
-    if (els.closeBtn) {
+    if (els.closeBtn && !els.closeBtn.getAttribute('data-crop-btn-bound')) {
+      els.closeBtn.setAttribute('data-crop-btn-bound', '1');
       els.closeBtn.addEventListener('click', () => closeCropModal(true));
     }
-    if (els.cancelBtn) {
+    if (els.cancelBtn && !els.cancelBtn.getAttribute('data-crop-btn-bound')) {
+      els.cancelBtn.setAttribute('data-crop-btn-bound', '1');
       els.cancelBtn.addEventListener('click', () => closeCropModal(true));
     }
-    if (els.confirmBtn) {
+    if (els.confirmBtn && !els.confirmBtn.getAttribute('data-crop-btn-bound')) {
+      els.confirmBtn.setAttribute('data-crop-btn-bound', '1');
       els.confirmBtn.addEventListener('click', handleCropConfirm);
     }
+
+    try {
+      const cropContainer = els.modal ? els.modal.querySelector('.crop-container') : null;
+      bindDropZone(cropContainer);
+    } catch (e) {}
+
+    try { preventWindowDrop(); } catch (e) {}
+    try { initFileDialogLock(); } catch (e) {}
   }
 
   window.CoverManager = {
