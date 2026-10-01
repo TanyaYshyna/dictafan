@@ -190,10 +190,22 @@
 .rating-priority-header {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 8px;
     flex-wrap: wrap;
-    padding: 6px 0;
+    padding: 0;
+}
+
+.rating-priority-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.rating-priority-rows {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .rating-priority-table {
@@ -208,22 +220,17 @@
 .rating-priority-row {
     display: flex;
     align-items: center;
-    gap: 0;
+    gap: 6px;
     padding: 4px 10px;
+    border: 1px solid rgba(31, 41, 51, 0.12);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.5);
     transition: background 0.15s;
-    cursor: default;
+    cursor: pointer;
 }
 
-.rating-priority-row + .rating-priority-row {
-    border-top: 1px solid rgba(31, 41, 51, 0.06);
-}
-
-.rating-priority-row--active {
-    background: rgba(255, 198, 9, 0.08);
-}
-
-.rating-priority-row--active + .rating-priority-row--active {
-    border-top-color: rgba(255, 198, 9, 0.15);
+.rating-priority-row:hover {
+    background: rgba(31, 41, 51, 0.04);
 }
 
 .rating-priority-checkbox {
@@ -232,7 +239,6 @@
     justify-content: center;
     width: 22px;
     height: 22px;
-    margin-right: 8px;
     cursor: pointer;
     flex: 0 0 auto;
 }
@@ -259,49 +265,6 @@
     width: 16px;
     height: 16px;
     flex: 0 0 auto;
-}
-
-.rating-priority-arrows {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    flex: 0 0 auto;
-    margin-left: 6px;
-}
-
-.rating-priority-arrow {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: transparent;
-    border-radius: 6px;
-    cursor: pointer;
-    color: rgba(31, 41, 51, 0.5);
-    transition: background 0.15s, color 0.15s;
-    padding: 0;
-}
-
-.rating-priority-arrow:hover {
-    background: rgba(31, 41, 51, 0.08);
-    color: rgba(31, 41, 51, 0.85);
-}
-
-.rating-priority-arrow:active {
-    background: rgba(31, 41, 51, 0.14);
-}
-
-.rating-priority-arrow i {
-    width: 16px;
-    height: 16px;
-}
-
-.rating-priority-arrow:disabled {
-    opacity: 0.25;
-    cursor: not-allowed;
-    pointer-events: none;
 }
 
 /* ===== Dictation Report ===== */

@@ -1054,17 +1054,16 @@ class StatisticsReport {
 class RatingReport {
     constructor(options = {}) {
         this.modal = null;
-        this.selectedPeriod = options.period || 'today';
-        this.customStartDate = null;
-        this.customEndDate = null;
+        // Период теперь всегда выбирается парой дат (селектор периода убран)
+        this.selectedPeriod = 'custom';
+        this.customStartDate = this.formatDateForInput(new Date());
+        this.customEndDate = this.formatDateForInput(new Date());
         this.selectedLanguage = 'all';
         this.topLimit = 10;
 
-        // Параметры для сравнения: порядок приоритета (индексы 0,1,2)
-        // и какие включены (чекбоксы)
+        // Флаги параметров сравнения (порядок фиксированный, стрелки убраны)
         this.priorityOrder = ['money', 'time', 'symbols'];
         this.checkedParams = { money: true, time: false, symbols: false };
-        this._currentPriorityRow = 0;
     }
 
     getLanguageData() {
@@ -1118,50 +1117,6 @@ class RatingReport {
         }
     }
 
-    getPeriodRange(periodKey) {
-        const end = new Date();
-        end.setHours(0, 0, 0, 0);
-        const start = new Date(end);
-        const key = String(periodKey || 'today');
-
-        if (key === '3') {
-            start.setDate(start.getDate() - 2);
-        } else if (key === '7') {
-            start.setDate(start.getDate() - 6);
-        } else if (key === '30') {
-            start.setDate(start.getDate() - 29);
-        } else {
-            // today
-        }
-        return { start, end };
-    }
-
-    applyPeriodToDateInputs() {
-        const startInput = document.getElementById('ratingStartDate');
-        const endInput = document.getElementById('ratingEndDate');
-        if (!startInput || !endInput) return;
-
-        const isCustom = String(this.selectedPeriod) === 'custom';
-        startInput.disabled = !isCustom;
-        endInput.disabled = !isCustom;
-
-        if (!isCustom) {
-            const { start, end } = this.getPeriodRange(this.selectedPeriod);
-            startInput.value = this.formatDateForInput(start);
-            endInput.value = this.formatDateForInput(end);
-            return;
-        }
-
-        // custom
-        if (!this.customStartDate || !this.customEndDate) {
-            const { start, end } = this.getPeriodRange('30');
-            this.customStartDate = this.formatDateForInput(start);
-            this.customEndDate = this.formatDateForInput(end);
-        }
-        startInput.value = String(this.customStartDate || '');
-        endInput.value = String(this.customEndDate || '');
-        this.validateAndNormalizeCustomRange();
-    }
 
     validateAndNormalizeCustomRange() {
         const startInput = document.getElementById('ratingStartDate');
@@ -1199,19 +1154,6 @@ class RatingReport {
         return icons[key] || 'circle';
     }
 
-    _movePriorityRow(direction) {
-        const idx = this._currentPriorityRow;
-        const newIdx = idx + direction;
-        if (newIdx < 0 || newIdx >= this.priorityOrder.length) return;
-
-        const arr = this.priorityOrder;
-        [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
-        this._currentPriorityRow = newIdx;
-
-        this._renderPriorityHeader();
-        this.updateRating();
-    }
-
     _toggleParam(paramKey) {
         const checkedCount = Object.values(this.checkedParams).filter(Boolean).length;
         if (this.checkedParams[paramKey] && checkedCount <= 1) {
@@ -1229,17 +1171,16 @@ class RatingReport {
         if (!container) return;
 
         const order = this.priorityOrder;
-        const currentIdx = this._currentPriorityRow;
 
-        let rowsHtml = order.map((key, idx) => {
+        const rowsHtml = order.map((key) => {
             const checked = this.checkedParams[key] ? 'checked' : '';
-            const isActive = idx === currentIdx;
-            const activeClass = isActive ? 'rating-priority-row--active' : '';
             const icon = this._getParamIcon(key);
             const label = this._getParamLabel(key);
             return `
-                <div class="rating-priority-row ${activeClass}" data-index="${idx}">
-                    <input type="checkbox" ${checked} data-param="${key}" class="rating-priority-checkbox">
+                <div class="rating-priority-row" data-param="${key}">
+                    <span class="rating-priority-checkbox">
+                        <input type="checkbox" ${checked} data-param="${key}" class="rating-priority-checkbox-input">
+                    </span>
                     <i data-lucide="${icon}" style="width: 16px; height: 16px; flex-shrink: 0;"></i>
                     <span class="rating-priority-label">${label}</span>
                 </div>
@@ -1251,41 +1192,26 @@ class RatingReport {
                 <div class="rating-priority-rows">
                     ${rowsHtml}
                 </div>
-                <div class="rating-priority-arrows">
-                    <button class="rating-priority-arrow" id="priorityArrowUp" title="Переместить вверх">
-                        <i data-lucide="chevron-up" style="width: 18px; height: 18px;"></i>
-                    </button>
-                    <button class="rating-priority-arrow" id="priorityArrowDown" title="Переместить вниз">
-                        <i data-lucide="chevron-down" style="width: 18px; height: 18px;"></i>
-                    </button>
-                </div>
             </div>
         `;
 
-        const checkboxes = container.querySelectorAll('.rating-priority-checkbox');
-        checkboxes.forEach(cb => {
-            cb.addEventListener('change', (e) => {
-                const param = e.target.dataset.param;
-                this._toggleParam(param);
-            });
-        });
-
+        // Клик по строке-флагу переключает его (кроме клика по самому чекбоксу)
         const rows = container.querySelectorAll('.rating-priority-row');
         rows.forEach(row => {
             row.addEventListener('click', (e) => {
-                if (e.target.type === 'checkbox') return;
-                const idx = parseInt(row.dataset.index, 10);
-                if (!isNaN(idx)) {
-                    this._currentPriorityRow = idx;
-                    this._renderPriorityHeader();
-                }
+                if (e.target && e.target.type === 'checkbox') return;
+                const param = row.dataset.param;
+                if (param) this._toggleParam(param);
             });
         });
 
-        const arrowUp = document.getElementById('priorityArrowUp');
-        const arrowDown = document.getElementById('priorityArrowDown');
-        if (arrowUp) arrowUp.addEventListener('click', () => this._movePriorityRow(-1));
-        if (arrowDown) arrowDown.addEventListener('click', () => this._movePriorityRow(1));
+        const checkboxes = container.querySelectorAll('.rating-priority-checkbox-input');
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const param = e.target.dataset.param;
+                if (param) this._toggleParam(param);
+            });
+        });
 
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
@@ -1394,9 +1320,6 @@ class RatingReport {
                         </div>
 
                         <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
-                            <button class="action-btn" id="refreshRatingBtn" title="Обновить" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
-                                <i data-lucide="rotate-cw"></i>
-                            </button>
                             <button class="close-statistics-btn" id="closeRatingBtn">
                                 <i data-lucide="x"></i>
                             </button>
@@ -1404,21 +1327,6 @@ class RatingReport {
                     </div>
 
                     <div style="display:flex; align-items:center; gap: 10px; margin-top: 8px; flex-wrap: wrap; justify-content:flex-start;">
-                        <select id="ratingPeriodSelect" class="group-select" style="min-width: 160px;">
-                            <option value="today">За сегодня</option>
-                            <option value="3">За 3 дня</option>
-                            <option value="7">За 7 дней</option>
-                            <option value="30">За 30 дней</option>
-                            <option value="custom">За период</option>
-                        </select>
-
-                        <div style="display:flex; align-items:center; gap: 8px;">
-                            <span style="opacity: 0.8; font-size: 13px;">выводить первых</span>
-                            <input id="ratingTopLimit" type="number" min="1" max="50" step="1" value="10" class="date-input" style="width: 70px; padding-right: 12px;">
-                        </div>
-
-                        <div id="ratingTotalParticipants" style="opacity: 0.85; font-size: 13px;"></div>
-
                         <div class="date-range-controls" style="display:flex; align-items:center; gap: 8px; flex-wrap: nowrap;">
                             <input type="date" id="ratingStartDate" class="date-input" style="width: 112px; padding-right: 18px;">
                             <span>—</span>
@@ -1426,8 +1334,24 @@ class RatingReport {
                         </div>
                     </div>
 
-                    <!-- Блок приоритетов: чекбоксы и стрелки -->
-                    <div id="ratingPriorityHeader" class="rating-priority-header" style="margin-top: 8px;"></div>
+                    <div style="display:flex; align-items:center; gap: 10px; margin-top: 8px; flex-wrap: wrap; justify-content:flex-start;">
+                        <div style="display:flex; align-items:center; gap: 8px;">
+                            <span style="opacity: 0.8; font-size: 13px;">выводить первых</span>
+                            <input id="ratingTopLimit" type="number" min="1" max="50" step="1" value="10" class="date-input" style="width: 70px; padding-right: 12px;">
+                        </div>
+
+                        <div id="ratingTotalParticipants" style="opacity: 0.85; font-size: 13px;"></div>
+                    </div>
+
+                    <div style="display:flex; align-items:flex-end; gap: 10px; margin-top: 8px; flex-wrap: nowrap; justify-content:space-between;">
+                        <!-- Флаги параметров: левый верхний угол таблицы, в одну строку -->
+                        <div id="ratingPriorityHeader" class="rating-priority-header" style="margin-top: 0;"></div>
+
+                        <!-- Кнопка "Обновить": правый верхний угол над таблицей -->
+                        <button class="action-btn" id="refreshRatingBtn" title="Обновить" style="display:flex; align-items:center; justify-content:center; flex-shrink: 0; padding-left: 10px; padding-right: 10px;">
+                            <i data-lucide="rotate-cw"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="statistics-chart" id="ratingList" style="overflow-y:auto;">
@@ -1479,19 +1403,6 @@ class RatingReport {
         });
 
         try {
-            const sel = document.getElementById('ratingPeriodSelect');
-            if (sel) {
-                sel.value = String(this.selectedPeriod);
-                sel.addEventListener('change', () => {
-                    this.selectedPeriod = String(sel.value || 'today');
-                    this.applyPeriodToDateInputs();
-                    this.updateRating();
-                });
-            }
-        } catch (e) {
-        }
-
-        try {
             const wrap = document.getElementById('ratingLanguagePicker');
             if (wrap && typeof LanguageSelector !== 'undefined') {
                 const raw = this.getLanguageData() || {};
@@ -1525,9 +1436,21 @@ class RatingReport {
         } catch (e) {
         }
 
-        this.applyPeriodToDateInputs();
+        // Устанавливаем стартовые даты (по умолчанию — сегодня)
+        try {
+            const startInput = document.getElementById('ratingStartDate');
+            const endInput = document.getElementById('ratingEndDate');
+            if (startInput && endInput) {
+                startInput.disabled = false;
+                endInput.disabled = false;
+                startInput.value = String(this.customStartDate || '');
+                endInput.value = String(this.customEndDate || '');
+                this.validateAndNormalizeCustomRange();
+            }
+        } catch (e) {
+        }
 
-        // Рендерим шапку с приоритетами
+        // Рендерим флаги параметров
         this._renderPriorityHeader();
 
         try {

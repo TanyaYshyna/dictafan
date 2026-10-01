@@ -2428,6 +2428,15 @@ function _maybeCloseWithPrompt() {
           }
           if (ok) {
             _closeEditorModal(true); // wasSaved=true — НЕ удаляем контент из кэша
+          } else {
+            // Сохранение не удалось — НЕ закрываем редактор молча, сообщаем пользователю,
+            // чтобы он не потерял изменения и мог повторить попытку.
+            console.error('[dictationEditorModal] [SAVE-CLOSE] сохранение не удалось — редактор остаётся открытым');
+            try {
+              if (window.DesktopToast && typeof window.DesktopToast.show === 'function') {
+                window.DesktopToast.show('Не вдалося зберегти зміни. Спробуйте ще раз.', 'error', 3500);
+              }
+            } catch (e2) {}
           }
         },
       });
@@ -2774,6 +2783,22 @@ function _updateEditorModeDisplay() {
   }
 }
 
+function _applyDefaultCoverPlaceholder(langOrig, langTr) {
+  var coverImg = document.getElementById('dictationEditorModalCoverImage');
+  if (!coverImg) return;
+  var langForCover = langOrig || langTr || '';
+  if (langForCover) {
+    coverImg.src = '/static/data/covers/cover_' + langForCover + '.webp';
+    coverImg.onerror = function () {
+      this.onerror = null;
+      this.src = '/static/data/covers/cover.webp';
+    };
+  } else {
+    coverImg.onerror = null;
+    coverImg.src = '/static/data/covers/cover.webp';
+  }
+}
+
 function _initFormFields() {
   if (!state.config) return;
 
@@ -2827,6 +2852,11 @@ function _initFormFields() {
   const coverImg = document.getElementById('dictationEditorModalCoverImage');
   if (state.config.coverUrl) {
     if (coverImg) coverImg.src = state.config.coverUrl;
+  } else {
+    _applyDefaultCoverPlaceholder(
+      state.config.originalLanguage,
+      state.config.translationLanguage
+    );
   }
 }
 
@@ -3974,6 +4004,15 @@ function _applySavedDictationIds(savedMeta, prevId) {
   }
 }
 
+function _fetchWithTimeout(url, options, timeoutMs) {
+  timeoutMs = Number(timeoutMs) > 0 ? Number(timeoutMs) : 30000;
+  var controller = new AbortController();
+  var timer = setTimeout(function () { controller.abort(); }, timeoutMs);
+  var opts = options || {};
+  opts.signal = controller.signal;
+  return fetch(url, opts).finally(function () { clearTimeout(timer); });
+}
+
 async function _handleSave() {
   var saveBtn = document.getElementById('dictationEditorModalSaveBtn');
   if (!saveBtn) return false;
@@ -4332,14 +4371,14 @@ async function _handleSave() {
     // Этап 1: Сохраняем текст/БД (если dirty db) — старый путь, если SaveQueueBatcher не доступен
     if (flags.db) {
       console.log('[dictationEditorModal] Сохраняю текст/БД (прямой fetch)...');
-      var dbResponse = await fetch('/save_dictation_final', {
+      var dbResponse = await _fetchWithTimeout('/save_dictation_final', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify(saveData)
-      });
+      }, 30000);
 
       if (dbResponse.ok) {
         var dbResult = await dbResponse.json();
@@ -4767,6 +4806,19 @@ function open(config) {
 
   modal.style.display = 'flex';
 
+  // Сбрасываем обложку на статическую заглушку для нового/другого диктанта.
+  // _initFormFields() ниже перезапишет её реальной обложкой, если есть config.coverUrl.
+  _applyDefaultCoverPlaceholder(langOrig, langTr);
+  // Сбрасываем cropped blob и файловый input, чтобы обложка предыдущего
+  // диктанта не «протекла» в только что созданный диктант.
+  try {
+    if (window.CoverManager && typeof window.CoverManager.clearCroppedBlob === 'function') {
+      window.CoverManager.clearCroppedBlob();
+    }
+  } catch (e) {}
+  var _coverFileInput = document.getElementById('dictationEditorModalCoverFile');
+  if (_coverFileInput) _coverFileInput.value = '';
+
   // Инициализация
   _setupUserSection();
   _initLanguageFlags();
@@ -5131,6 +5183,16 @@ function _closeEditorModal(wasSaved) {
   state.currentDictation = null;
   state.dirtyFlags = { db: false, cover: false, audio: { dirty: new Set() } };
   state._sharedAudioFilename = null;
+
+  // Сбрасываем обложку: очищаем cropped blob и файловый input,
+  // чтобы при следующем открытии не осталась обложка предыдущего диктанта.
+  try {
+    if (window.CoverManager && typeof window.CoverManager.clearCroppedBlob === 'function') {
+      window.CoverManager.clearCroppedBlob();
+    }
+  } catch (e) {}
+  var coverFileInput = document.getElementById('dictationEditorModalCoverFile');
+  if (coverFileInput) coverFileInput.value = '';
   state._sharedAudioDuration = null;
   state._sharedAudioFile = null;
 
@@ -6549,19 +6611,15 @@ function _updateEditorFromFillConfig(config) {
     idSpan.textContent = displayId || 'новий';
   }
 
-  // Устанавливаем статическую обложку-заглушку для языка (если нет загруженной обложки)
+  // Обложка: если в конфиге уже есть URL — показываем его, иначе — статическую заглушку
+  // для языка. Важно сбрасывать заглушку всегда, а не только когда src пустой, иначе
+  // после предыдущего диктанта с кастомной обложкой (blob URL) останется старая картинка.
   var coverImg = document.getElementById('dictationEditorModalCoverImage');
-  if (coverImg && (!coverImg.src || coverImg.src === window.location.href || coverImg.src.endsWith('/'))) {
-    var langForCover = config.originalLanguage || config.translationLanguage || '';
-    if (langForCover) {
-      // Пробуем статическую обложку для конкретного языка
-      coverImg.src = '/static/data/covers/cover_' + langForCover + '.webp';
-      coverImg.onerror = function () {
-        // Если нет обложки для языка — показываем общую заглушку
-        this.src = '/static/data/covers/cover.webp';
-      };
+  if (coverImg) {
+    if (config.coverUrl) {
+      coverImg.src = config.coverUrl;
     } else {
-      coverImg.src = '/static/data/covers/cover.webp';
+      _applyDefaultCoverPlaceholder(config.originalLanguage || '', config.translationLanguage || '');
     }
   }
 

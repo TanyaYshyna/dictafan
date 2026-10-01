@@ -41,3 +41,37 @@
   font-size: 14px;
   background: #fff;
 }
+
+.add-to-desk-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  padding: 0 16px 16px 16px;
+}
+
+.add-to-desk-modal .add-to-desk-save-btn {
+  height: 44px;
+  padding: 0 24px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  background: var(--color-button-yellow, rgb(252, 235, 163));
+  color: var(--color-button-text-yellow, rgb(255, 198, 9));
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.add-to-desk-modal .add-to-desk-save-btn:hover {
+  border-color: var(--color-button-shadow-yellow, #f8cd46);
+  box-shadow: 0 3px 0 0 var(--color-button-shadow-yellow, #f8cd46);
+}
+
+.add-to-desk-modal .add-to-desk-save-btn:active {
+  border-color: var(--color-button-shadow-yellow, #f8cd46);
+  box-shadow: none;
+}
+
+.add-to-desk-modal .add-to-desk-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -496,9 +496,41 @@ class ПроверкаНаОшибки {
     return aligned;
   }
 
+  /**
+   * Эквивалентность английских разговорных форм с опущенным "-g":
+   * hangin ≡ hanging, runnin ≡ running, tryin ≡ trying и т.п.
+   *
+   * Нужно потому, что simplifyText превращает "hangin'" в "hanging"
+   * (см. EN_GDROP_REGEX), а юзер по уговору может набрать просто "hangin"
+   * без апострофа — и это тоже должно считаться правильным.
+   *
+   * Чтобы не ловить ложные пары (thin/thing, win/wing, basin/basing...),
+   * требуем, чтобы основа перед "-in" содержала гласную.
+   */
+  _isGDropEquivalent(w1, w2) {
+    if (!w1 || !w2) return false;
+    const a = String(w1);
+    const b = String(w2);
+    if (a.length === b.length) return false;
+
+    const longer = a.length > b.length ? a : b;
+    const shorter = a.length > b.length ? b : a;
+
+    // Длинное слово оканчивается на "ing", а короткое — это оно же без последней "g".
+    if (!longer.endsWith('ing')) return false;
+    if (shorter !== longer.slice(0, -1)) return false;
+    if (!shorter.endsWith('in')) return false;
+
+    const stem = shorter.slice(0, -2);
+    return stem.length > 0 && /[aeiouy]/i.test(stem);
+  }
+
   areWordsEquivalent(word1, word2, langCode) {
     if (!word1 || !word2) return false;
     if (word1 === word2) return true;
+
+    // Английская разговорная g-drop форма: hangin ≡ hanging (в т.ч. "hangin'").
+    if (this._isGDropEquivalent(word1, word2)) return true;
 
     // Проверка эквивалентности чисел (цифры ↔ слова)
     if (this._areNumberEquivalent(word1, word2, langCode)) return true;

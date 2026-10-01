@@ -202,14 +202,22 @@
           // Этап 1: отправляем текст/БД
           console.log(TAG, '[flushQueue] отправляю БД:', item.key);
 
-          var dbResponse = await fetch('/save_dictation_final', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ' + token,
-            },
-            body: JSON.stringify(item.payload),
-          });
+          var controller = new AbortController();
+          var abortTimer = setTimeout(function () { controller.abort(); }, 30000);
+          var dbResponse;
+          try {
+            dbResponse = await fetch('/save_dictation_final', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token,
+              },
+              body: JSON.stringify(item.payload),
+              signal: controller.signal,
+            });
+          } finally {
+            clearTimeout(abortTimer);
+          }
 
           if (!dbResponse.ok) {
             throw new Error('HTTP ' + dbResponse.status);
