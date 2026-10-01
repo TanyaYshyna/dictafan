@@ -662,6 +662,7 @@ class UserManager {
       nativeLanguage,
       learningLanguage,
       learningLanguages,
+      uiLanguage,
     } = payload;
 
     if (!username || !email || !password) {
@@ -680,7 +681,8 @@ class UserManager {
           password,
           native_language: nativeLanguage,
           learning_language: learningLanguage,
-          learning_languages: learningLanguages
+          learning_languages: learningLanguages,
+          ui_lang: uiLanguage
         })
       });
 
@@ -885,6 +887,7 @@ function normalizeRegisterArgs(arg1, arg2, arg3) {
       nativeLanguage = 'ru',
       learningLanguage = 'en',
       learningLanguages,
+      uiLanguage = '',
     } = arg1;
 
     const normalizedLearning = Array.isArray(learningLanguages) && learningLanguages.length
@@ -902,6 +905,7 @@ function normalizeRegisterArgs(arg1, arg2, arg3) {
       nativeLanguage: nativeLanguage.toLowerCase(),
       learningLanguage: learningLanguage.toLowerCase(),
       learningLanguages: normalizedLearning,
+      uiLanguage: (uiLanguage || '').toLowerCase(),
     };
   }
 

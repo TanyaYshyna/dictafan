@@ -1152,6 +1152,12 @@ class LoginModal {
         const nativeLanguage = selectorValues?.nativeLanguage || 'ru';
         const learningLanguage = selectorValues?.currentLearning || 'en';
 
+        // Язык интерфейса выбирается отдельным селектором в шапке модалки.
+        // Если пользователь его не трогал — берём текущее значение из localStorage / I18n.
+        const uiLanguage = (this.uiLanguageSelector?.getValues?.()?.nativeLanguage
+            || this._getUiLang()
+            || 'en').trim().toLowerCase();
+
         if (nativeLanguage === learningLanguage) {
             this.showError(this._t('login_modal.errors.native_learning_must_differ', 'Родной и изучаемый языки должны различаться'), 'register');
             return;
@@ -1185,6 +1191,7 @@ class LoginModal {
                 password,
                 nativeLanguage,
                 learningLanguage,
+                uiLanguage,
             });
 
             if (result?.success) {
@@ -1195,6 +1202,15 @@ class LoginModal {
                 if (this.pendingResolve) {
                     this.pendingResolve();
                     this.pendingResolve = null;
+                }
+
+                // Перезагружаем страницу, чтобы сервер отрендерил её на выбранном
+                // языке интерфейса (cookie ui_lang уже сохранён ответом /api/register).
+                try {
+                    if (typeof window.location?.reload === 'function') {
+                        window.location.reload();
+                    }
+                } catch (e) {
                 }
             } else {
                 this.showError(result?.error || this._t('login_modal.errors.register_failed', 'Ошибка регистрации'), 'register');

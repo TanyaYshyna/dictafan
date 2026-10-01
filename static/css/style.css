@@ -1827,7 +1827,7 @@ html[dir="rtl"] .topbar-save-group {
     height: 100% !important;
     justify-content: center;
     align-items: center;
-    z-index: 10000 !important;
+    z-index: 100450 !important;
     background-color: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
     overflow-y: auto;

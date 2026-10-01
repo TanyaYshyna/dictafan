@@ -166,6 +166,17 @@ def api_register():
     })
     # Куки нужны для работы @jwt_required() на обычных HTML-страницах (напр. /library/private)
     set_access_cookies(response, access_token)
+
+    # Сохраняем выбранный язык интерфейса в cookie, чтобы после перезагрузки
+    # страница сразу отрендерилась на нужном языке (SSR).
+    ui_lang = str(data.get('ui_lang') or '').strip().lower()
+    if ui_lang not in SUPPORTED_UI_LANGS:
+        ui_lang = native_language if native_language in SUPPORTED_UI_LANGS else DEFAULT_UI_LANG
+    try:
+        response.set_cookie('ui_lang', ui_lang, max_age=60 * 60 * 24 * 365, samesite='Lax')
+    except Exception:
+        pass
+
     return response
 
 

@@ -4307,6 +4307,17 @@ class DictationReport {
             return;
         }
 
+        // Всегда синхронизируем выбранного пользователя с панелью отборов:
+        // при смене даты пересчёт должен идти по человеку из фильтра,
+        // а не по владельцу отчёта (лейба отбора может показывать другого).
+        if (this._filterPanel) {
+            try {
+                const uid = this._filterPanel.getSelectedUserId();
+                this._selectedUserId = (uid != null) ? Number(uid) : null;
+            } catch (e) {
+            }
+        }
+
         const userId = this._selectedUserId;
         const startDate = this._dateFromInput ? this._dateFromInput.value : '';
         const endDate = this._dateToInput ? this._dateToInput.value : '';
