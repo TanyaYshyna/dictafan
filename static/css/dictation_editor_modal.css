@@ -123,7 +123,9 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 16px 5vw 16px;
+  /* Нижний отступ учитывает фиксированную инфо-строку (swStatusBarGlobal),
+     чтобы таблица предложений не "заваливалась" под неё. */
+  padding: 16px 5vw calc(16px + var(--sw-status-bar-height, 0px));
 }
 
 /* ===== HEADER CONTAINER (флаги + badge + название + id) ===== */
@@ -1278,7 +1280,8 @@
   gap: 8px;
 }
 
-/* Індикатор запису (рожевий кружок) */
+/* Індикатор запису — как в блоке аудиозаписи диктанта:
+   залитый кружок (без чёрного контура), розовый при записи. */
 .dictation-editor-modal__rec-indicator {
   display: inline-flex;
   align-items: center;
@@ -1288,12 +1291,19 @@
   border-radius: 50%;
   background: transparent;
   transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .dictation-editor-modal__rec-indicator i {
   width: 16px;
   height: 16px;
   color: var(--color-button-purple, #7c5cbf);
   transition: color 0.2s;
+}
+.dictation-editor-modal__rec-indicator i svg {
+  stroke: none !important;
+  fill: currentColor;
+  stroke-width: 0 !important;
 }
 .dictation-editor-modal__rec-indicator.active i {
   color: #e84393;
@@ -1350,12 +1360,13 @@
   height: 20px;
 }
 
-/* Другий рядок правої панелі: лейба + пагон + play + apply */
+/* Рядок лейби + пагон + play + apply (тепер зліва, перед елементами запису) */
 .dictation-editor-modal__self-mic-actions {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
+  flex: 1;
+  min-width: 0;
 }
 
 .dictation-editor-modal__self-mic-file-row {

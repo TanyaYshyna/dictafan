@@ -2980,6 +2980,26 @@ function _updateAuthorUrlCheckButton() {
   btn.disabled = !url;
 }
 
+/**
+ * Открывает ссылку в новой вкладке.
+ * ВАЖНО: в этом файле на верхнем уровне объявлена функция `open(config)`,
+ * которая перекрывает нативный `window.open`. Поэтому открываем ссылку через
+ * временный <a target="_blank">, а не через window.open.
+ */
+function _openExternalUrlInNewTab(url) {
+  if (!url) return;
+  var a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  try {
+    a.click();
+  } finally {
+    document.body.removeChild(a);
+  }
+}
+
 function _initAuthorUrlCheckButton() {
   var btn = document.getElementById('dictationEditorModalAuthorUrlCheck');
   if (!btn || btn.getAttribute('data-check-handler')) return;
@@ -2990,7 +3010,7 @@ function _initAuthorUrlCheckButton() {
     var input = document.getElementById('dictationEditorModalAuthorUrl');
     var url = _normalizeAuthorUrl(input ? input.value : '');
     if (!url) return;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    _openExternalUrlInNewTab(url);
   });
 }
 

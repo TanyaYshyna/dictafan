@@ -259,32 +259,32 @@
 
                 <!-- Права панель: запис з мікрофона -->
                 <div class="dictation-editor-modal__self-right-panel">
-                  <!-- Перший рядок: індикатор + canvas + кнопка запису -->
+                  <!-- Рядок: лейба + вибір + прослухати + застосувати (левее індикатора запису) -->
                   <div class="dictation-editor-modal__self-mic-row">
+                    <div class="dictation-editor-modal__self-mic-actions">
+                      <div class="dictation-editor-modal__self-mic-file-row">
+                        <span id="editorModalSelfMicFilename" class="dictation-editor-modal__self-mic-filename">—</span>
+                        <div class="dictation-editor-modal__self-mic-dropdown-wrapper">
+                          <button id="editorModalSelfMicDropdownBtn" class="dictation-editor-modal__mic-dropdown-btn" type="button" title="Список записаних файлів" disabled>
+                            <i data-lucide="chevron-down"></i>
+                          </button>
+                          <div id="editorModalSelfMicDropdown" class="dictation-editor-modal__self-mic-dropdown" style="display:none;"></div>
+                        </div>
+                      </div>
+                      <button id="editorModalSelfPlayNewBtn" class="dictation-editor-modal__mic-action-btn" type="button" title="Прослухати записане" disabled>
+                        <i data-lucide="play"></i>
+                      </button>
+                      <button id="editorModalSelfApplyNewBtn" class="dictation-editor-modal__mic-action-btn" type="button" title="Застосувати записане" disabled>
+                        <i data-lucide="corner-down-left"></i>
+                      </button>
+                    </div>
+                    <!-- Элементы записи -->
                     <span id="editorModalSelfRecordingIndicator" class="dictation-editor-modal__rec-indicator" disabled title="Индикатор записи">
                       <i data-lucide="circle"></i>
                     </span>
                     <canvas id="editorModalSelfAudioVisualizer" class="dictation-editor-modal__audio-visualizer"></canvas>
                     <button id="editorModalSelfRecordBtn" class="dictation-editor-modal__mic-btn" type="button" title="Записати">
                       <span id="editorModalSelfRecordIcon"><i data-lucide="mic"></i></span>
-                    </button>
-                  </div>
-                  <!-- Другий рядок: лейба + пагон вниз + play + apply -->
-                  <div class="dictation-editor-modal__self-mic-actions">
-                    <div class="dictation-editor-modal__self-mic-file-row">
-                      <span id="editorModalSelfMicFilename" class="dictation-editor-modal__self-mic-filename">—</span>
-                      <div class="dictation-editor-modal__self-mic-dropdown-wrapper">
-                        <button id="editorModalSelfMicDropdownBtn" class="dictation-editor-modal__mic-dropdown-btn" type="button" title="Список записаних файлів" disabled>
-                          <i data-lucide="chevron-down"></i>
-                        </button>
-                        <div id="editorModalSelfMicDropdown" class="dictation-editor-modal__self-mic-dropdown" style="display:none;"></div>
-                      </div>
-                    </div>
-                    <button id="editorModalSelfPlayNewBtn" class="dictation-editor-modal__mic-action-btn" type="button" title="Прослухати записане" disabled>
-                      <i data-lucide="play"></i>
-                    </button>
-                    <button id="editorModalSelfApplyNewBtn" class="dictation-editor-modal__mic-action-btn" type="button" title="Застосувати записане" disabled>
-                      <i data-lucide="corner-down-left"></i>
                     </button>
                   </div>
                 </div>
