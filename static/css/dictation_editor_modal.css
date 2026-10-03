@@ -220,7 +220,10 @@
   background: var(--color-panel-bg);
   border-radius: 8px;
   margin-bottom: 12px;
-  flex: 1;
+  /* Панель закладок тянется по содержимому, а не делит высоту
+     с табличной частью — иначе внизу всех закладок остаётся
+     пустое пространство (~15 мм). */
+  flex: 0 0 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -1067,7 +1070,10 @@
 /* ===== СТИЛИ ТАБЛИЦЫ ===== */
 .dictation-editor-modal__sentences-table {
   width: 100%;
-  border-collapse: collapse;
+  /* separate + spacing 0 нужны, чтобы у ячеек шапки работали
+     скруглённые углы (при collapse border-radius игнорируется). */
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 14px;
   table-layout: auto;
 }
@@ -1093,6 +1099,15 @@
   letter-spacing: 0.5px;
   z-index: 2;
   border-bottom: 2px solid var(--color-border-light, #e5e3df);
+}
+
+/* Скруглённые углы шапки таблицы, повторяющие радиус обёртки (8px минус 1px рамки),
+   чтобы в углах не было утончения/утолщения обводки. */
+.dictation-editor-modal__sentences-table thead th:first-child {
+  border-top-left-radius: 7px;
+}
+.dictation-editor-modal__sentences-table thead th:last-child {
+  border-top-right-radius: 7px;
 }
 
 /* Все колонки скрыты по умолчанию (управляется через JS) */
@@ -1298,7 +1313,9 @@
   width: 16px;
   height: 16px;
   color: var(--color-button-purple, #7c5cbf);
-  transition: color 0.2s;
+  /* Пока запись не ведётся — индикатор прозрачный. */
+  opacity: 0;
+  transition: color 0.2s, opacity 0.2s;
 }
 .dictation-editor-modal__rec-indicator i svg {
   stroke: none !important;
@@ -1307,6 +1324,7 @@
 }
 .dictation-editor-modal__rec-indicator.active i {
   color: #e84393;
+  opacity: 1;
   animation: dictation-editor-modal-pulse 1s infinite;
 }
 
