@@ -2900,8 +2900,24 @@ function _initFormFields() {
   }
 
   const authorUrlInput = document.getElementById('dictationEditorModalAuthorUrl');
-  if (authorUrlInput && state.config.authorMaterialsUrl) {
-    authorUrlInput.value = state.config.authorMaterialsUrl;
+  if (authorUrlInput) {
+    if (state.config.authorMaterialsUrl) {
+      authorUrlInput.value = state.config.authorMaterialsUrl;
+    }
+    // Синхронизируем введённый URL в state.config, зажигаем зелёную звезду (db dirty)
+    // и активируем/деактивируем кнопку проверки ссылки.
+    if (!authorUrlInput.getAttribute('data-author-url-handler')) {
+      authorUrlInput.setAttribute('data-author-url-handler', '1');
+      authorUrlInput.addEventListener('input', function () {
+        var raw = String(this.value || '').trim();
+        if (state.config) {
+          state.config.authorMaterialsUrl = raw || null;
+        }
+        _setDirtyFlags({ db: true });
+        _updateAuthorUrlCheckButton();
+      });
+    }
+    _updateAuthorUrlCheckButton();
   }
 
   // Флаг "Диктант для первой загрузки" (кружок / кружок с большой галочкой)
@@ -2941,6 +2957,41 @@ function _toggleFirstLoadFlag() {
   }
   _renderFirstLoadToggle();
   _setDirtyFlags({ db: true });
+}
+
+function _normalizeAuthorUrl(url) {
+  var raw = String(url || '').trim();
+  if (!raw) return '';
+  if (!/^https?:\/\//i.test(raw)) {
+    raw = 'https://' + raw;
+  }
+  return raw;
+}
+
+/**
+ * Активирует/деактивирует кнопку проверки ссылки справа от поля ввода.
+ * Кнопка доступна только если в поле есть непустая ссылка.
+ */
+function _updateAuthorUrlCheckButton() {
+  var input = document.getElementById('dictationEditorModalAuthorUrl');
+  var btn = document.getElementById('dictationEditorModalAuthorUrlCheck');
+  if (!btn) return;
+  var url = _normalizeAuthorUrl(input ? input.value : '');
+  btn.disabled = !url;
+}
+
+function _initAuthorUrlCheckButton() {
+  var btn = document.getElementById('dictationEditorModalAuthorUrlCheck');
+  if (!btn || btn.getAttribute('data-check-handler')) return;
+  btn.setAttribute('data-check-handler', '1');
+  btn.addEventListener('click', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var input = document.getElementById('dictationEditorModalAuthorUrl');
+    var url = _normalizeAuthorUrl(input ? input.value : '');
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  });
 }
 
 function _initLevelSelector() {
@@ -4270,6 +4321,10 @@ async function _handleSave() {
       book_id: targetBookId,
       cover_b64: cover_b64,
       is_first_load: state.config ? !!state.config.is_first_load : false,
+      author_materials_url: (function () {
+        var raw = state.config ? String(state.config.authorMaterialsUrl || '').trim() : '';
+        return raw || null;
+      })(),
     };
 
     console.log('[dictationEditorModal] [TRACE] _handleSave: audio_user_shared=' + saveData.audio_user_shared + ' _sharedAudioFilename=' + state._sharedAudioFilename + ' dirty.db=' + flags.db + ' dirty.audio.size=' + (flags.audio && flags.audio.dirty ? flags.audio.dirty.size : 0));
@@ -4874,6 +4929,7 @@ function open(config) {
   _initLanguageFlags();
   _initFormFields();
   _initLevelSelector();
+  _initAuthorUrlCheckButton();
   _initVoiceModeRadios();
   _initCoverUpload();
   _initHaveAudioTab();

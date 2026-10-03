@@ -1313,7 +1313,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 }
 
 #dictationModal .error-count-label {
-  color: var(--color-button-gray);
+  color: var(--color-button-text-gray);
 }
 
 #dictationModal .translation-audio-button-wrapper .play-btn-translation {
