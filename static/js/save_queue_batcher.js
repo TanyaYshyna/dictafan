@@ -220,6 +220,29 @@
           }
 
           if (!dbResponse.ok) {
+            // Вариант А: конфликт оптимистичной блокировки (409) — терминальное
+            // состояние очереди. Повторять отправку бессмысленно: без force=true
+            // сервер будет возвращать 409 до бесконечности. Помечаем запись как
+            // 'conflict' и ждём решения пользователя из редактора.
+            if (dbResponse.status === 409) {
+              var conflictMsg = 'Диктант был изменён в другом окне или на другом устройстве.';
+              try {
+                var conflictBody = await dbResponse.json().catch(function () { return null; });
+                if (conflictBody && conflictBody.msg) conflictMsg = String(conflictBody.msg);
+              } catch (eConflict) {
+                // Игнорируем ошибку парсинга — используем стандартный текст
+              }
+              item.status = 'conflict';
+              item.lastError = conflictMsg;
+              item.updatedAt = Date.now();
+              try {
+                await window.IdbManager.idbPut('draft_save_queue', item);
+              } catch (ePut) {
+                console.warn(TAG, '[flushQueue] не удалось пометить конфликт:', String(ePut));
+              }
+              console.warn(TAG, '[flushQueue] конфликт 409 для:', item.key, conflictMsg);
+              continue;
+            }
             throw new Error('HTTP ' + dbResponse.status);
           }
 
@@ -235,11 +258,13 @@
           // Аудио не шлём из очереди — оно уже обрабатывается через _uploadDraftAudioToB2
           // когда пользователь онлайн.
 
-          // Запоминаем реальные ID (для новых диктантов сервер вернул dict_<id>).
+          // Запоминаем реальные ID (для новых диктантов сервер вернул dict_<id>)
+          // и актуальный updated_at — чтобы клиент обновил optimistic lock после сохранения.
           savedMeta = {
             key: item.key,
             dictation_id: dbResult.dictation_id || null,
             db_id: dbResult.db_id != null ? dbResult.db_id : (dbResult.id != null ? dbResult.id : null),
+            updated_at: dbResult.updated_at != null ? String(dbResult.updated_at) : null,
           };
 
           // Успех — удаляем из очереди
@@ -297,12 +322,13 @@
   async function getQueueInfo() {
     try {
       if (!window.IdbManager || typeof window.IdbManager.idbGetAll !== 'function') {
-        return { total: 0, pending: 0, failed: 0 };
+        return { total: 0, pending: 0, failed: 0, conflict: 0 };
       }
       var rows = await window.IdbManager.idbGetAll('draft_save_queue') || [];
       var total = 0;
       var pending = 0;
       var failed = 0;
+      var conflict = 0;
       for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
         if (r.type === 'draft_save') {
@@ -311,11 +337,12 @@
           // Иначе _handleSave() увидит pending===0 и ошибочно решит, что всё сохранено.
           if (r.status === 'pending' || r.status === 'sending') pending++;
           if (r.status === 'failed') failed++;
+          if (r.status === 'conflict') conflict++;
         }
       }
-      return { total: total, pending: pending, failed: failed };
+      return { total: total, pending: pending, failed: failed, conflict: conflict };
     } catch (e) {
-      return { total: 0, pending: 0, failed: 0 };
+      return { total: 0, pending: 0, failed: 0, conflict: 0 };
     }
   }
 
@@ -324,11 +351,39 @@
     return await _flushQueue();
   }
 
+  /**
+   * Удалить конфликтные записи (status='conflict') из очереди для указанного диктанта.
+   * Используется после того, как пользователь разрешил конфликт 409 перезаписью,
+   * чтобы застрявшая запись не осталась в IndexedDB.
+   */
+  async function clearConflict(dictationId) {
+    try {
+      if (!window.IdbManager || typeof window.IdbManager.idbGetAll !== 'function') return;
+      var dictId = String(dictationId || '').trim();
+      if (!dictId) return;
+      var rows = await window.IdbManager.idbGetAll('draft_save_queue') || [];
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        if (r && r.type === 'draft_save' && r.dictationId === dictId && r.status === 'conflict') {
+          try {
+            await window.IdbManager.idbDelete('draft_save_queue', r.key);
+            console.log(TAG, '[clearConflict] удалена конфликтная запись:', r.key);
+          } catch (eDel) {
+            console.warn(TAG, '[clearConflict] ошибка удаления:', String(eDel));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(TAG, '[clearConflict] ошибка:', e);
+    }
+  }
+
   // Экспортируем
   window.SaveQueueBatcher = {
     enqueueSave: enqueueSave,
     flushAll: flushAll,
     getQueueInfo: getQueueInfo,
+    clearConflict: clearConflict,
   };
 
   // Инициализация

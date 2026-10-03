@@ -474,14 +474,22 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
             
             sentences.append(sentence)
         
-        # Получаем audio_user_shared и audio_order из данных диктанта
+        # Получаем метаданные диктанта (audio_user_shared, audio_order, title, author_materials_url, updated_at)
         audio_user_shared = None
         audio_order = ''
+        title = None
+        author_materials_url = None
+        updated_at = None
         try:
             dictation_data = get_dictation_by_id(db_id)
             if dictation_data:
                 audio_user_shared = dictation_data.get('audio_user_shared')
                 audio_order = dictation_data.get('audio_order', '')
+                title = dictation_data.get('title')
+                author_materials_url = dictation_data.get('author_materials_url')
+                updated_at = dictation_data.get('updated_at')
+                if updated_at is not None:
+                    updated_at = str(updated_at)
         except Exception:
             pass
 
@@ -490,6 +498,9 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
             'sentences': sentences,
             'audio_user_shared': audio_user_shared,
             'audio_order': audio_order,
+            'title': title,
+            'author_materials_url': author_materials_url,
+            'updated_at': updated_at,
         })
         
     except Exception as e:
@@ -560,14 +571,22 @@ def api_get_dictation_sentences_simple(dictation_id):
             
             sentences.append(sentence)
         
-        # Получаем audio_user_shared и audio_order из данных диктанта
+        # Получаем метаданные диктанта (audio_user_shared, audio_order, title, author_materials_url, updated_at)
         audio_user_shared = None
         audio_order = ''
+        title = None
+        author_materials_url = None
+        updated_at = None
         try:
             dictation_data = get_dictation_by_id(dictation_id)
             if dictation_data:
                 audio_user_shared = dictation_data.get('audio_user_shared')
                 audio_order = dictation_data.get('audio_order', '')
+                title = dictation_data.get('title')
+                author_materials_url = dictation_data.get('author_materials_url')
+                updated_at = dictation_data.get('updated_at')
+                if updated_at is not None:
+                    updated_at = str(updated_at)
         except Exception:
             pass
         
@@ -576,6 +595,9 @@ def api_get_dictation_sentences_simple(dictation_id):
             'sentences': sentences,
             'audio_user_shared': audio_user_shared,
             'audio_order': audio_order,
+            'title': title,
+            'author_materials_url': author_materials_url,
+            'updated_at': updated_at,
         })
         
     except Exception as e:

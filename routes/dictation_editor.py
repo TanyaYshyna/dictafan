@@ -658,6 +658,7 @@ def save_dictation_final():
 
         # Если это новый диктант (temp_id начинается с dict_temp_) - создаём в БД
         is_new_dictation = dictation_id.startswith('dict_temp_') or (temp_id and temp_id.startswith('dict_temp_'))
+        saved_updated_at = None
         
         if is_new_dictation and not db_id:
             # Создаём диктант в БД
@@ -702,7 +703,7 @@ def save_dictation_final():
             logger.info(f"✅ Создан новый диктант в БД: dict_{db_id}")
             
             # Обновляем диктант с полными данными (title, level, speakers, title_translations, author_materials_url, audio_order)
-            update_dictation(
+            updated_dictation = update_dictation(
                 dictation_id=db_id,
                 title=data.get("title", "Новый диктант"),
                 language_code=payload_original_lang,
@@ -714,6 +715,7 @@ def save_dictation_final():
                 audio_user_shared=_normalize_audio_filename(data.get("audio_user_shared")),
                 audio_order=data.get("audio_order")
             )
+            saved_updated_at = updated_dictation.get('updated_at') if updated_dictation else None
         elif db_id:
             # Проверка прав: редактировать можно только СВОИ диктанты (владелец) или админу.
             try:
@@ -743,8 +745,31 @@ def save_dictation_final():
                 logger.error(f"❌ Ошибка проверки прав на редактирование диктанта {db_id}: {e}")
                 return jsonify({"success": False, "error": "Forbidden", "msg": "Ошибка проверки прав"}), 403
 
+            # Вариант А: оптимистичная блокировка через updated_at.
+            # Если клиент передал updated_at и он не совпадает с актуальным в БД —
+            # значит диктант был изменён в другом окне/на другом устройстве.
+            # Возвращаем 409, чтобы клиент решил: перезаписать или перезагрузить.
+            client_updated_at = data.get('updated_at')
+            force = bool(data.get('force'))
+            if not force and client_updated_at and existing and existing.get('updated_at'):
+                try:
+                    db_updated_at = str(existing.get('updated_at'))
+                    if db_updated_at and db_updated_at != str(client_updated_at):
+                        logger.warning(
+                            "⛔ Конфликт сохранения диктанта %s: client updated_at=%s, db updated_at=%s",
+                            db_id, client_updated_at, db_updated_at,
+                        )
+                        return jsonify({
+                            "success": False,
+                            "error": "Conflict",
+                            "msg": "Диктант был изменён в другом окне. Перезапишите или перезагрузите данные.",
+                            "conflict": True,
+                        }), 409
+                except Exception as e:
+                    logger.warning(f"⚠️ Не удалось сравнить updated_at для диктанта {db_id}: {e}")
+
             # Обновляем существующий диктант в БД
-            update_dictation(
+            updated_dictation = update_dictation(
                 dictation_id=db_id,
                 title=data.get("title"),
                 language_code=payload_original_lang,
@@ -756,6 +781,7 @@ def save_dictation_final():
                 audio_user_shared=_normalize_audio_filename(data.get("audio_user_shared")),
                 audio_order=data.get("audio_order")
             )
+            saved_updated_at = updated_dictation.get('updated_at') if updated_dictation else None
         else:
             return jsonify({"success": False, "error": "Missing db_id - dictation not created in DB"}), 400
 
@@ -1208,6 +1234,7 @@ def save_dictation_final():
                 "dictation_id": dictation_id,
                 "id": db_id,
                 "db_id": db_id,
+                "updated_at": saved_updated_at,
                 "exercises_saved": exercises_saved,
                 "exercises_error": exercises_error,
                 "exercises_after_save": exercises_after_save,
@@ -1219,6 +1246,7 @@ def save_dictation_final():
                 "dictation_id": dictation_id,
                 "id": db_id,
                 "db_id": db_id,
+                "updated_at": saved_updated_at,
                 "exercises_saved": exercises_saved,
                 "exercises_error": exercises_error,
                 "exercises_after_save": exercises_after_save,
@@ -1231,6 +1259,7 @@ def save_dictation_final():
                 "dictation_id": dictation_id,
                 "id": db_id,
                 "db_id": db_id,
+                "updated_at": saved_updated_at,
                 "exercises_saved": exercises_saved,
                 "exercises_error": exercises_error,
                 "exercises_after_save": exercises_after_save,

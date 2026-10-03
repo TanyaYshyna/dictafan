@@ -191,11 +191,19 @@ async function _refreshDictationCacheAfterSave(sentencesPayload) {
       keysToWrite.push(userId + ':dict_' + numericId);
       keysToWrite.push('anon:dict_' + numericId);
       var updatedAt = Date.now();
+      var authorMaterialsUrl = (state.config && state.config.authorMaterialsUrl)
+        ? String(state.config.authorMaterialsUrl)
+        : null;
+      var title = (state.config && state.config.title)
+        ? String(state.config.title)
+        : null;
       for (var i = 0; i < keysToWrite.length; i++) {
         await idb.idbPut('dictations', {
           key: keysToWrite[i],
           dictationId: cacheDictationId,
           sentences: sentencesPayload,
+          author_materials_url: authorMaterialsUrl,
+          title: title,
           updatedAt: updatedAt,
         });
       }
@@ -2862,11 +2870,14 @@ function _initFormFields() {
 
   const titleEl = document.getElementById('dictationEditorModalTitle');
   const titleInput = document.getElementById('dictationEditorModalTitleInput');
-  if (titleEl && state.config.title) {
-    titleEl.textContent = state.config.title;
+  // Всегда присваиваем (в том числе пустую строку), чтобы заголовок предыдущего
+  // диктанта не «протекал» в следующий (аналогично полю со ссылкой).
+  var titleValue = state.config.title || '';
+  if (titleEl) {
+    titleEl.textContent = titleValue;
   }
-  if (titleInput && state.config.title) {
-    titleInput.value = state.config.title;
+  if (titleInput) {
+    titleInput.value = titleValue;
   }
 
   // Обработчик изменения названия диктанта: синхронизируем state.config.title,
@@ -2901,9 +2912,10 @@ function _initFormFields() {
 
   const authorUrlInput = document.getElementById('dictationEditorModalAuthorUrl');
   if (authorUrlInput) {
-    if (state.config.authorMaterialsUrl) {
-      authorUrlInput.value = state.config.authorMaterialsUrl;
-    }
+    // ВАЖНО: всегда присваиваем значение (в том числе пустую строку),
+    // иначе при открытии диктанта БЕЗ ссылки в поле остаётся URL от
+    // предыдущего диктанта и визуально "перетекает" между диктантами.
+    authorUrlInput.value = state.config.authorMaterialsUrl || '';
     // Синхронизируем введённый URL в state.config, зажигаем зелёную звезду (db dirty)
     // и активируем/деактивируем кнопку проверки ссылки.
     if (!authorUrlInput.getAttribute('data-author-url-handler')) {
@@ -4131,6 +4143,11 @@ function _applySavedDictationIds(savedMeta, prevId) {
   if (savedMeta.db_id && (!state.config.dbId || state.config.dictationId !== prev)) {
     state.config.dbId = savedMeta.db_id;
   }
+  // Вариант А: после успешного сохранения сервер вернул новый updated_at.
+  // Запоминаем его, чтобы следующее сохранение в этой же сессии не дало ложный 409.
+  if (savedMeta.updated_at) {
+    state.updatedAt = String(savedMeta.updated_at);
+  }
 }
 
 function _fetchWithTimeout(url, options, timeoutMs) {
@@ -4341,6 +4358,10 @@ async function _handleSave() {
       book_id: targetBookId,
       cover_b64: cover_b64,
       is_first_load: state.config ? !!state.config.is_first_load : false,
+      // Вариант А: optimistic locking. Передаём updated_at, с которым открыли редактор.
+      // Сервер вернёт 409, если за это время диктант изменился в другом окне/устройстве.
+      updated_at: state.updatedAt || null,
+      force: false,
       author_materials_url: (function () {
         var raw = state.config ? String(state.config.authorMaterialsUrl || '').trim() : '';
         return raw || null;
@@ -4395,6 +4416,32 @@ async function _handleSave() {
               savedMeta = flushResults[mi];
               break;
             }
+          }
+
+          // Вариант А: если запись ушла в состояние 'conflict' (сервер вернул 409),
+          // показываем диалог разрешения конфликта. Повторная отправка без force=true
+          // невозможна, поэтому конфликт нужно решить здесь.
+          if ((queueInfo.conflict || 0) > 0) {
+            console.warn('[dictationEditorModal] Обнаружен конфликт сохранения в очереди (409)');
+            var conflictResolved = await _resolveSaveConflict(saveData, token, null);
+            if (conflictResolved === true) {
+              // Убираем застрявшую конфликтную запись из очереди
+              try {
+                if (typeof window.SaveQueueBatcher.clearConflict === 'function') {
+                  await window.SaveQueueBatcher.clearConflict(normalizedId);
+                }
+              } catch (eClear) {
+                console.warn('[dictationEditorModal] Ошибка очистки конфликта:', eClear);
+              }
+              saved = true;
+              _setDirtyFlags({ db: false, audio: false, cover: false });
+              await _refreshDictationCacheAfterSave(sentencesPayload);
+              console.log('[dictationEditorModal] Конфликт разрешён перезаписью (очередь)');
+            } else {
+              console.warn('[dictationEditorModal] Конфликт не разрешён — запись остаётся в очереди');
+              saved = false;
+            }
+            return saved;
           }
 
           if (queueInfo.pending === 0) {
@@ -4506,12 +4553,31 @@ async function _handleSave() {
         body: JSON.stringify(saveData)
       }, 30000);
 
+      // Вариант А: конфликт optimistic locking (409) — диктант изменён в другом окне/устройстве.
+      if (dbResponse.status === 409) {
+        var conflictResolved = await _resolveSaveConflict(saveData, token, dbResponse);
+        if (conflictResolved === true) {
+          saved = true;
+          console.log('[dictationEditorModal] Конфликт разрешён (перезапись)');
+        } else {
+          console.warn('[dictationEditorModal] Конфликт не разрешён — сохранение отменено');
+        }
+        return saved;
+      }
+
       if (dbResponse.ok) {
         var dbResult = await dbResponse.json();
         if (dbResult.success) {
           _setDirtyFlags({ db: false });
           saved = true;
           console.log('[dictationEditorModal] Текст/БД сохранён');
+
+          // Вариант А: обновляем optimistic lock после успешного сохранения.
+          // Сервер вернул новый updated_at (CURRENT_TIMESTAMP) — запоминаем его,
+          // чтобы повторное сохранение в этой же сессии не дало ложный 409.
+          if (dbResult.updated_at) {
+            state.updatedAt = String(dbResult.updated_at);
+          }
 
           // Обновляем audio_order в state.config и в DictationContent,
           // чтобы при повторном открытии (без перезагрузки страницы) радио выставилось правильно
@@ -4666,6 +4732,103 @@ async function _handleSave() {
   return saved;
 }
 
+/* ===== ВАРИАНТ А: РАЗРЕШЕНИЕ КОНФЛИКТА ОПТИМИСТИЧНОЙ БЛОКИРОВКИ ===== */
+
+/**
+ * Перезаписать данные в БД с force=true (в обход проверки updated_at).
+ * Возвращает true, если перезапись прошла успешно.
+ */
+async function _forceOverwriteSave(saveData, token) {
+  try {
+    var forceData = Object.assign({}, saveData);
+    forceData.force = true;
+    forceData.updated_at = null;
+
+    var resp = await _fetchWithTimeout('/save_dictation_final', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify(forceData)
+    }, 30000);
+
+    if (resp.ok) {
+      var result = await resp.json();
+      if (result && result.success) {
+        _setDirtyFlags({ db: false, audio: false, cover: false });
+        // Вариант А: обновляем optimistic lock после перезаписи.
+        if (result.updated_at) {
+          state.updatedAt = String(result.updated_at);
+        }
+        // Обновляем IndexedDB-кеш свежими предложениями, чтобы после
+        // перезаписи удалённые строки не «вернулись» из кеша.
+        var sentencesPayload = (saveData && Array.isArray(saveData.sentences)) ? saveData.sentences : [];
+        await _refreshDictationCacheAfterSave(sentencesPayload);
+        return true;
+      }
+    }
+    return false;
+  } catch (e) {
+    console.error('[dictationEditorModal] Ошибка перезаписи после конфликта:', e);
+    return false;
+  }
+}
+
+/**
+ * Показать диалог разрешения конфликта 409 (диктант изменён в другом окне/устройстве).
+ * Возвращает true, если пользователь выбрал «Перезаписати» и перезапись прошла успешно,
+ * иначе false.
+ */
+async function _resolveSaveConflict(saveData, token, dbResponse) {
+  var conflictMsg = 'Диктант был изменён в другом окне или на другом устройстве.';
+  try {
+    if (dbResponse && typeof dbResponse.json === 'function') {
+      var body = await dbResponse.json().catch(function () { return null; });
+      if (body && body.msg) conflictMsg = String(body.msg);
+    }
+  } catch (e) {
+    // Игнорируем ошибку парсинга — используем стандартный текст
+  }
+
+  var modalAvailable = (typeof window.DesktopConfirmModal !== 'undefined'
+    && typeof window.DesktopConfirmModal.open === 'function');
+
+  return await new Promise(function (resolve) {
+    if (!modalAvailable) {
+      // Фолбэк без универсальной модалки
+      var overwrite = window.confirm(conflictMsg + '\n\nПерезаписати дані в БД?');
+      if (!overwrite) {
+        resolve(false);
+        return;
+      }
+      _forceOverwriteSave(saveData, token).then(resolve);
+      return;
+    }
+
+    window.DesktopConfirmModal.open({
+      title: 'Конфлікт збереження',
+      message: conflictMsg,
+      buttons: [
+        {
+          text: 'Перезаписати',
+          type: 'danger',
+          onClick: function () {
+            _forceOverwriteSave(saveData, token).then(resolve);
+          }
+        },
+        {
+          text: 'Скасувати',
+          type: 'primary',
+          onClick: function () {
+            resolve(false);
+          }
+        }
+      ]
+    });
+  });
+}
+
 /* ===== OPEN / CLOSE ===== */
 
 function open(config) {
@@ -4680,6 +4843,12 @@ function open(config) {
   }
 
   state.config = config || {};
+
+  // Вариант А: запоминаем updated_at диктанта на момент открытия редактора.
+  // Он передаётся в save_dictation_final и используется для optimistic locking.
+  state.updatedAt = (config && (config.updatedAt || config.updated_at))
+    ? String(config.updatedAt || config.updated_at)
+    : null;
 
   // Восстанавливаем последний язык перевода из localStorage (поверх того, что пришло из config)
   var dictationId = config ? config.dictationId || '' : '';

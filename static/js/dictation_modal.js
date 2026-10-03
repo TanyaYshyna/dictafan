@@ -5340,7 +5340,12 @@
       if (!sentences.length) {
         return null;
       }
-      return sentences;
+      return {
+        sentences,
+        author_materials_url: cached && cached.author_materials_url ? String(cached.author_materials_url) : null,
+        title: cached && cached.title ? String(cached.title) : null,
+        updated_at: cached && cached.updated_at ? String(cached.updated_at) : null,
+      };
     } catch (e) {
       return null;
     }
@@ -5397,6 +5402,10 @@
         key,
         dictationId: dictId,
         sentences,
+        audio_user_shared: (data && data.audio_user_shared) ? String(data.audio_user_shared) : null,
+        author_materials_url: (data && data.author_materials_url) ? String(data.author_materials_url) : null,
+        title: (data && data.title) ? String(data.title) : null,
+        updated_at: (data && data.updated_at) ? String(data.updated_at) : null,
         updatedAt: Date.now(),
       });
     }
@@ -5448,7 +5457,32 @@
       throw new Error('missing_dictation_params');
     }
 
-    let sentences = await loadSentencesFromIndexedDb({ dictationId });
+    const cachedMeta = await loadSentencesFromIndexedDb({ dictationId });
+    let sentences = cachedMeta && Array.isArray(cachedMeta.sentences) ? cachedMeta.sentences : null;
+
+    // Если в кеше есть author_materials_url/title — применяем их как fallback,
+    // чтобы диктант открывался офлайн с теми же метаданными, что и онлайн.
+    try {
+      if (cachedMeta) {
+        if (cachedMeta.author_materials_url && !dictationModalState.authorMaterialsUrl) {
+          dictationModalState.authorMaterialsUrl = String(cachedMeta.author_materials_url);
+          const dictationData = document.getElementById('dictation-data');
+          if (dictationData) dictationData.setAttribute('data-author-materials-url', dictationModalState.authorMaterialsUrl);
+        }
+        if (cachedMeta.title) {
+          const dictationData = document.getElementById('dictation-data');
+          if (dictationData) {
+            const existing = String(dictationData.getAttribute('data-title-orig') || '').trim();
+            if (!existing) {
+              dictationData.setAttribute('data-title-orig', String(cachedMeta.title));
+              _updateDictationTitle(String(cachedMeta.title));
+            }
+          }
+        }
+      }
+    } catch (eMeta) {
+    }
+
     if (!Array.isArray(sentences) || sentences.length === 0) {
       try {
         if (window.DesktopToast && typeof window.DesktopToast.show === 'function') {
@@ -5499,7 +5533,8 @@
         throw e;
       }
 
-      sentences = await loadSentencesFromIndexedDb({ dictationId });
+      const freshMeta = await loadSentencesFromIndexedDb({ dictationId });
+      sentences = freshMeta && Array.isArray(freshMeta.sentences) ? freshMeta.sentences : null;
       try {
         if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') {
           window.DesktopLoadingModal.hide();

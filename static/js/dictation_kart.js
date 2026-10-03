@@ -224,6 +224,9 @@ window.DictationKart = window.DictationKart || {
       sentences: sentences,
       audio_user_shared: (data && data.audio_user_shared) ? String(data.audio_user_shared) : null,
       audio_order: (data && data.audio_order) ? String(data.audio_order) : '',
+      author_materials_url: (data && data.author_materials_url) ? String(data.author_materials_url) : null,
+      title: (data && data.title) ? String(data.title) : null,
+      updated_at: (data && data.updated_at) ? String(data.updated_at) : null,
     };
   },
 
@@ -241,7 +244,10 @@ window.DictationKart = window.DictationKart || {
       if (cached && Array.isArray(cached.sentences) && cached.sentences.length) {
         return {
           sentences: cached.sentences,
-          audio_user_shared: cached.audio_user_shared || null
+          audio_user_shared: cached.audio_user_shared || null,
+          author_materials_url: cached.author_materials_url || null,
+          title: cached.title || null,
+          updated_at: cached.updated_at || null,
         };
       }
       // Пробуем анонимный ключ
@@ -251,7 +257,10 @@ window.DictationKart = window.DictationKart || {
         if (anonCached && Array.isArray(anonCached.sentences) && anonCached.sentences.length) {
           return {
             sentences: anonCached.sentences,
-            audio_user_shared: anonCached.audio_user_shared || null
+            audio_user_shared: anonCached.audio_user_shared || null,
+            author_materials_url: anonCached.author_materials_url || null,
+            title: anonCached.title || null,
+            updated_at: anonCached.updated_at || null,
           };
         }
       }
@@ -452,6 +461,9 @@ window.DictationKart = window.DictationKart || {
         const sentencesResp = await this._fetchSentencesFromServer(dictKey, lo, lo);
         const sentences = sentencesResp.sentences;
         const sharedAudioFilename = sentencesResp.audio_user_shared;
+        const authorMaterialsUrl = sentencesResp.author_materials_url || null;
+        const title = sentencesResp.title || null;
+        const serverUpdatedAt = sentencesResp.updated_at || null;
         const keysToWrite = new Set();
         keysToWrite.add(`${userId}:${dictKey}:${lo}:${lo}`);
         keysToWrite.add(`anon:${dictKey}:${lo}:${lo}`);
@@ -475,6 +487,9 @@ window.DictationKart = window.DictationKart || {
             langTr: lo,
             sentences,
             audio_user_shared: sharedAudioFilename || null,
+            author_materials_url: authorMaterialsUrl,
+            title,
+            updated_at: serverUpdatedAt,
             updatedAt,
           });
         }
@@ -519,6 +534,9 @@ window.DictationKart = window.DictationKart || {
           const sentencesResp = await this._fetchSentencesFromServer(dictKey, lo, lt);
           const sentences = sentencesResp.sentences;
           const sharedAudioFilename = sentencesResp.audio_user_shared;
+          const authorMaterialsUrl = sentencesResp.author_materials_url || null;
+          const title = sentencesResp.title || null;
+          const serverUpdatedAt = sentencesResp.updated_at || null;
           const keysToWrite = new Set();
           keysToWrite.add(`${userId}:${dictKey}:${lo}:${lt}`);
           keysToWrite.add(`anon:${dictKey}:${lo}:${lt}`);
@@ -542,6 +560,9 @@ window.DictationKart = window.DictationKart || {
               langTr: lt,
               sentences,
               audio_user_shared: sharedAudioFilename || null,
+              author_materials_url: authorMaterialsUrl,
+              title,
+              updated_at: serverUpdatedAt,
               updatedAt,
             });
           }
@@ -1147,7 +1168,7 @@ window.DictationKart = window.DictationKart || {
                   .then(function (cachedResult) {
                     if (cachedResult && Array.isArray(cachedResult.sentences) && cachedResult.sentences.length) {
                       console.log('[dictation_kart] Cache HIT for editor, sentences count:', cachedResult.sentences.length);
-                      return { source: 'cache', sentences: cachedResult.sentences, audio_user_shared: cachedResult.audio_user_shared };
+                      return { source: 'cache', sentences: cachedResult.sentences, audio_user_shared: cachedResult.audio_user_shared, updated_at: cachedResult.updated_at };
                     }
                     return null;
                   })
@@ -1162,7 +1183,7 @@ window.DictationKart = window.DictationKart || {
                 serverPromise = window.DictationKart._fetchSentencesFromServer(dictationId, langOriginal, langTranslation)
                   .then(function (result) {
                     console.log('[dictation_kart] Server OK for editor, sentences count:', result.sentences ? result.sentences.length : 0);
-                    return { source: 'server', sentences: result.sentences || [], audio_user_shared: result.audio_user_shared || null };
+                    return { source: 'server', sentences: result.sentences || [], audio_user_shared: result.audio_user_shared || null, updated_at: result.updated_at || null };
                   })
                   .catch(function (err) {
                     console.warn('[dictation_kart] Server failed for editor:', err.message || err);
@@ -1194,29 +1215,31 @@ window.DictationKart = window.DictationKart || {
                           sentences: serverResult.sentences,
                           audio_user_shared: serverResult.audio_user_shared,
                           audio_order: audioOrder,
+                          updatedAt: serverResult.updated_at || cached.updated_at,
                         });
                       }
                     }
                   }).catch(function () {});
-                  return { sentences: cached.sentences, audio_user_shared: cached.audio_user_shared };
+                  return { sentences: cached.sentences, audio_user_shared: cached.audio_user_shared, updated_at: cached.updated_at };
                 }
                 // Кеша нет — ждём сервер
                 return serverPromise.then(function (serverResult) {
                   if (serverResult && serverResult.sentences && serverResult.sentences.length) {
-                    return { sentences: serverResult.sentences, audio_user_shared: serverResult.audio_user_shared };
+                    return { sentences: serverResult.sentences, audio_user_shared: serverResult.audio_user_shared, updated_at: serverResult.updated_at };
                   }
                   // И сервер не дал данных — показываем пустую таблицу
                   console.warn('[dictation_kart] No data from cache or server, editor will be empty');
                   if (typeof window.DictationKart._showToast === 'function') {
                     window.DictationKart._showToast('Не вдалося завантажити дані. Перевірте підключення до інтернету.', { type: 'warning' });
                   }
-                  return { sentences: [], audio_user_shared: null };
+                  return { sentences: [], audio_user_shared: null, updated_at: null };
                 });
               });
 
               sentencesPromise.then(function (result) {
                 var sentences = result && Array.isArray(result.sentences) ? result.sentences : [];
                 var audio_user_shared = result ? result.audio_user_shared : null;
+                var updated_at = result ? result.updated_at : null;
                 window.DictationEditorModal.open({
                   dictationId: dictationId,
                   originalLanguage: langOriginal,
@@ -1230,6 +1253,7 @@ window.DictationKart = window.DictationKart || {
                   sentences: sentences,
                   audio_user_shared: audio_user_shared,
                   audio_order: audioOrder,
+                  updatedAt: updated_at,
                 });
               });
             } else {
