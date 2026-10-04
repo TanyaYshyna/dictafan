@@ -207,11 +207,31 @@
   flex: 1;
 }
 
+.dictation-editor-modal__source {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.dictation-editor-modal__source--server {
+  color: #1a7f37;
+  background: rgba(26, 127, 55, 0.12);
+}
+
+.dictation-editor-modal__source--cache {
+  color: #9a6700;
+  background: rgba(154, 103, 0, 0.14);
+}
+
 .dictation-editor-modal__id {
   font-size: 13px;
   color: var(--color-button-text-transparent, #888);
   font-family: monospace;
-  margin-left: auto;
   flex-shrink: 0;
 }
 

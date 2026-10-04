@@ -2914,6 +2914,23 @@ function _initFormFields() {
     idEl.textContent = displayId;
   }
 
+  // Индикатор источника данных (Server/Cache) возле номера диктанта.
+  // Источник передаётся в config.source из dictation_kart.js при открытии редактора.
+  var sourceEl = document.getElementById('dictation-editor-modal-source');
+  if (sourceEl) {
+    var source = state.config && state.config.source ? String(state.config.source).toLowerCase() : '';
+    if (source === 'server' || source === 'cache') {
+      sourceEl.textContent = source === 'server' ? 'Server' : 'Cache';
+      sourceEl.classList.remove('dictation-editor-modal__source--server', 'dictation-editor-modal__source--cache');
+      sourceEl.classList.add(source === 'server' ? 'dictation-editor-modal__source--server' : 'dictation-editor-modal__source--cache');
+      sourceEl.style.display = '';
+    } else {
+      sourceEl.textContent = '';
+      sourceEl.classList.remove('dictation-editor-modal__source--server', 'dictation-editor-modal__source--cache');
+      sourceEl.style.display = 'none';
+    }
+  }
+
   const authorUrlInput = document.getElementById('dictationEditorModalAuthorUrl');
   if (authorUrlInput) {
     // ВАЖНО: всегда присваиваем значение (в том числе пустую строку),
