@@ -3216,7 +3216,7 @@
       if (!container) return;
       const n = Math.max(0, Math.min(9, Number(count) || 0));
       const parts = [];
-      for (let i = 0; i < n; i++) parts.push('<i data-lucide="circle-small"></i>');
+      for (let i = 0; i < n; i++) parts.push('<i data-lucide="candy"></i>');
       container.innerHTML = parts.join('');
       if (colorVar) {
         container.style.color = `var(${colorVar})`;
@@ -3384,7 +3384,7 @@
       if (wrap) {
         const n = Math.max(0, Number(textCoins) || 0);
         if (n > 0) {
-          wrap.innerHTML = '<i data-lucide="circle-small"></i>' + String(n);
+          wrap.innerHTML = '<i data-lucide="candy"></i>' + String(n);
           wrap.style.display = '';
         } else {
           wrap.innerHTML = '';
@@ -3412,7 +3412,7 @@
         } else {
           const n = Math.max(0, Number(audioCoins) || 0);
           if (n > 0) {
-            wrap.innerHTML = '<i data-lucide="circle-small"></i>' + String(n);
+            wrap.innerHTML = '<i data-lucide="candy"></i>' + String(n);
           } else {
             wrap.innerHTML = '';
           }
@@ -3474,8 +3474,8 @@
       st.audio_exchange_mic = true;
     }
 
-    // Кратко сообщаем о списании кружочков за обмен (2 секунды)
-    showDictationToast('Списано ' + cost + ' кружочков за обмен', 2000);
+    // Кратко сообщаем о списании конфеток за обмен (2 секунды)
+    showDictationToast('Списано ' + cost + ' конфеток за обмен', 2000);
 
     // Обновляем строку в таблице стартового модального окна
     let curKey = null;
@@ -4944,7 +4944,7 @@
         if (activityCount > 0) {
           const actSpan = document.createElement('span');
           actSpan.className = 'activity-count';
-          actSpan.innerHTML = '<i data-lucide="circle-small"></i>' + String(activityCount);
+          actSpan.innerHTML = '<i data-lucide="candy"></i>' + String(activityCount);
           tdActivities.appendChild(actSpan);
         }
       }
@@ -5797,7 +5797,7 @@
         if (activityCount > 0) {
           const actSpan = document.createElement('span');
           actSpan.className = 'activity-count';
-          actSpan.innerHTML = '<i data-lucide="circle-small"></i>' + String(activityCount);
+          actSpan.innerHTML = '<i data-lucide="candy"></i>' + String(activityCount);
           tdActivities.appendChild(actSpan);
         }
 
