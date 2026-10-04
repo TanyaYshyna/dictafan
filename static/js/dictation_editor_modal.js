@@ -191,6 +191,9 @@ async function _refreshDictationCacheAfterSave(sentencesPayload) {
       keysToWrite.push(userId + ':dict_' + numericId);
       keysToWrite.push('anon:dict_' + numericId);
       var updatedAt = Date.now();
+      var serverUpdatedAt = (state.updatedAt != null && String(state.updatedAt).trim())
+        ? String(state.updatedAt).trim()
+        : null;
       var authorMaterialsUrl = (state.config && state.config.authorMaterialsUrl)
         ? String(state.config.authorMaterialsUrl)
         : null;
@@ -204,6 +207,7 @@ async function _refreshDictationCacheAfterSave(sentencesPayload) {
           sentences: sentencesPayload,
           author_materials_url: authorMaterialsUrl,
           title: title,
+          updated_at: serverUpdatedAt,
           updatedAt: updatedAt,
         });
       }

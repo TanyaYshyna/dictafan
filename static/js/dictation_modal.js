@@ -5483,6 +5483,44 @@
     } catch (eMeta) {
     }
 
+    // Если в кеше уже есть предложения — при наличии интернета проверяем,
+    // не изменился ли диктант на сервере (учитель мог отредактировать и сохранить).
+    // Сравниваем updated_at: если версии разошлись — перезагружаем кеш.
+    if (Array.isArray(sentences) && sentences.length > 0) {
+      try {
+        const numericMatch = dictationId.match(/^dict_(\d+)$/);
+        const numericId = numericMatch ? numericMatch[1] : String(dictationId).replace(/^dict_/, '');
+        const metaResp = await fetch(`/api/dictation/${encodeURIComponent(numericId)}/meta`, { method: 'GET', cache: 'no-store' });
+        if (metaResp.ok) {
+          const meta = await metaResp.json();
+          const serverUpdatedAt = meta && meta.success ? String(meta.updated_at || '') : '';
+          const cachedUpdatedAt = cachedMeta && cachedMeta.updated_at ? String(cachedMeta.updated_at) : '';
+          if (serverUpdatedAt && cachedUpdatedAt !== serverUpdatedAt) {
+            console.log('[DM:loadContent] Версия диктанта изменилась: cache=' + cachedUpdatedAt + ' server=' + serverUpdatedAt + ' — перезагружаю кеш');
+            await fetchSentencesFromServerAndCache({ dictationId });
+            const freshMeta = await loadSentencesFromIndexedDb({ dictationId });
+            sentences = freshMeta && Array.isArray(freshMeta.sentences) ? freshMeta.sentences : sentences;
+            if (freshMeta) {
+              if (freshMeta.author_materials_url) {
+                dictationModalState.authorMaterialsUrl = String(freshMeta.author_materials_url);
+                const dd = document.getElementById('dictation-data');
+                if (dd) dd.setAttribute('data-author-materials-url', dictationModalState.authorMaterialsUrl);
+              }
+              if (freshMeta.title) {
+                const dd = document.getElementById('dictation-data');
+                if (dd) {
+                  dd.setAttribute('data-title-orig', String(freshMeta.title));
+                  _updateDictationTitle(String(freshMeta.title));
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Нет интернета или сервер недоступен — остаёмся на кешированной версии.
+      }
+    }
+
     if (!Array.isArray(sentences) || sentences.length === 0) {
       try {
         if (window.DesktopToast && typeof window.DesktopToast.show === 'function') {

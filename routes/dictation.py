@@ -605,6 +605,29 @@ def api_get_dictation_sentences_simple(dictation_id):
         return jsonify({'success': False, 'error': f'Ошибка загрузки предложений: {str(e)}'}), 500
 
 
+@dictation_bp.route('/api/dictation/<int:dictation_id>/meta', methods=['GET'])
+def api_get_dictation_meta(dictation_id):
+    """
+    Лёгкий endpoint для проверки актуальности кеша диктанта.
+    Возвращает только updated_at без полного списка предложений.
+    Используется клиентом при открытии диктанта: если кешированная версия устарела,
+    клиент перезагружает полный список предложений с сервера.
+    """
+    try:
+        dictation_data = get_dictation_by_id(dictation_id)
+        if not dictation_data:
+            return jsonify({'success': False, 'error': 'Диктант не найден'}), 404
+
+        updated_at = dictation_data.get('updated_at')
+        return jsonify({
+            'success': True,
+            'updated_at': str(updated_at) if updated_at is not None else None,
+        })
+    except Exception as e:
+        current_app.logger.error(f"Ошибка при получении метаданных диктанта {dictation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f'Ошибка получения метаданных: {str(e)}'}), 500
+
+
 # ==============================================================
 # API endpoint для server-side распознавания речи (Whisper)
 @dictation_bp.route('/api/speech-recognition/transcribe', methods=['POST'])
