@@ -4439,11 +4439,12 @@ async function _handleSave() {
             }
           }
 
-          // Вариант А: если запись ушла в состояние 'conflict' (сервер вернул 409),
-          // показываем диалог разрешения конфликта. Повторная отправка без force=true
-          // невозможна, поэтому конфликт нужно решить здесь.
-          if ((queueInfo.conflict || 0) > 0) {
-            console.warn('[dictationEditorModal] Обнаружен конфликт сохранения в очереди (409)');
+          // Вариант А: конфликт определяем ПО КЛЮЧУ текущей записи, а не по глобальному
+          // queueInfo.conflict. Иначе устаревшая conflict-запись этого же диктанта
+          // (оставшаяся от прошлой сессии) даёт ложный 409, и редактор навсегда
+          // зависает в лоадере «Збереження даних...».
+          if (savedMeta && savedMeta.conflict === true) {
+            console.warn('[dictationEditorModal] Обнаружен конфликт сохранения в очереди (409) для ключа ' + queueKey);
             var conflictResolved = await _resolveSaveConflict(saveData, token, null);
             if (conflictResolved === true) {
               // Убираем застрявшую конфликтную запись из очереди
@@ -4470,6 +4471,16 @@ async function _handleSave() {
             saved = true;
             _setDirtyFlags({ db: false, audio: false, cover: false });
             console.log('[dictationEditorModal] Данные сохранены через очередь');
+
+            // Очищаем устаревшие conflict-записи этого диктанта (если остались от
+            // прошлых сессий), чтобы они не мешали будущим сохранениям.
+            try {
+              if (typeof window.SaveQueueBatcher.clearConflict === 'function') {
+                await window.SaveQueueBatcher.clearConflict(normalizedId);
+              }
+            } catch (eCleanup) {
+              console.warn('[dictationEditorModal] Ошибка очистки устаревших конфликтов:', eCleanup);
+            }
 
             // Обновляем реальный ID диктанта из ответа сервера (на случай, если он изменился).
             if (savedMeta) {

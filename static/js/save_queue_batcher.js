@@ -241,6 +241,13 @@
                 console.warn(TAG, '[flushQueue] не удалось пометить конфликт:', String(ePut));
               }
               console.warn(TAG, '[flushQueue] конфликт 409 для:', item.key, conflictMsg);
+              // Возвращаем наружу метаданные конфликта, чтобы _handleSave() мог отличить
+              // конфликт ТЕКУЩЕЙ записи от устаревших conflict-записей в очереди.
+              results.push({
+                key: item.key,
+                conflict: true,
+                msg: conflictMsg,
+              });
               continue;
             }
             throw new Error('HTTP ' + dbResponse.status);
