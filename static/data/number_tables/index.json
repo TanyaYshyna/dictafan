@@ -13,6 +13,7 @@
     "es": { "file": "es.json", "label": "Español", "script": "latin" },
     "pl": { "file": "pl.json", "label": "Polski", "script": "latin" },
     "la": { "file": "la.json", "label": "Latine", "script": "latin" },
-    "nl": { "file": "nl.json", "label": "Nederlands", "script": "latin" }
+    "nl": { "file": "nl.json", "label": "Nederlands", "script": "latin" },
+    "no": { "file": "no.json", "label": "Norsk", "script": "latin" }
   }
 }

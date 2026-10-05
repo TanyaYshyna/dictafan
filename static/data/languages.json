@@ -195,5 +195,20 @@
       "transformer_asr:Xenova/mms-1b-fl102",
       "transformer_asr:Xenova/mms-1b-all"
     ]
+  },
+  "no": {
+    "country_cod": "no",
+    "country_cod_url": "no-NO",
+    "language_ru": "Норвежский",
+    "language_en": "Norwegian",
+    "language_uk": "Норвезька",
+    "language_tr": "Norveççe",
+    "language_ar": "النرويجية",
+    "language_no": "Norsk",
+    "applicable_model_keys": [
+      "whisper:Xenova/whisper-tiny",
+      "transformer_asr:Xenova/mms-1b-fl102",
+      "transformer_asr:Xenova/mms-1b-all"
+    ]
   }
 }
