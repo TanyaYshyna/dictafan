@@ -5,6 +5,120 @@
   flex-wrap: nowrap;
 }
 
+/* Селектор языка рабочего стола в шапке — слева от родного флага (аватара) */
+.desktop-user-meta .desktop-lang-selector {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+.desktop-user-meta .desktop-lang-selector .language-selector-group {
+  margin: 0;
+  padding: 0;
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-select-wrapper {
+  position: relative;
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-select-trigger {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  transition: background 0.2s ease, transform 0.2s ease;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-select-trigger:hover {
+  background: var(--color-hover, #f8f9fa);
+  transform: translateY(-1px);
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-select-trigger .language-flag {
+  width: 20px !important;
+  height: 15px !important;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-select-trigger i[data-lucide] {
+  width: 12px;
+  height: 12px;
+  margin-left: 1px;
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-select-options {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  width: max-content;
+  min-width: 180px;
+  max-width: 260px;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #dee2e6);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  /* Выше модалок библиотек (#home-library-modal 100180, #public-library-modal 100160) */
+  z-index: 200600;
+  display: none;
+  padding: 4px 0;
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-option:hover {
+  background: var(--color-hover, #f8f9fa);
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-option.selected {
+  background: var(--color-hover, #f0f0f0);
+  font-weight: 600;
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-option .language-flag {
+  width: 20px !important;
+  height: 15px !important;
+  border-radius: 2px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-option .option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1.2;
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-option .language-name {
+  font-size: 13px;
+  color: var(--color-text, #1f2933);
+}
+
+.desktop-user-meta .desktop-lang-selector .custom-option .native-name {
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b7280);
+}
+
 .desktop-user-meta .username {
   display: inline-flex;
   align-items: center;
@@ -419,7 +533,9 @@
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 200px;
-  z-index: 6000;
+  /* Меню пользователя должно лежать выше модалок библиотек
+     (#home-library-modal z-index 100180, #public-library-modal z-index 100160) */
+  z-index: 200600;
   overflow: hidden;
   display: none;
 }

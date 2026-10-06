@@ -12,6 +12,20 @@
       publicBooksLanguageSelectorInstance: null,
     };
 
+    // Запоминаем выбранный фильтр по языку между открытиями модалки и перезагрузками.
+    const FILTER_STORAGE_KEY = 'library:public_filter_language';
+
+    function getPersistedFilter() {
+      try {
+        const v = localStorage.getItem(FILTER_STORAGE_KEY);
+        return v ? String(v) : null;
+      } catch (e) { return null; }
+    }
+
+    function setPersistedFilter(v) {
+      try { localStorage.setItem(FILTER_STORAGE_KEY, String(v || 'all')); } catch (e) { }
+    }
+
     function getToken() {
       try {
         if (window.UM && window.UM.token) return window.UM.token;
@@ -193,6 +207,11 @@
 
         container.innerHTML = '';
 
+        // Восстанавливаем запомненный отбор, если он ещё не задан в state.
+        if (state.currentPublicBooksFilterLanguage == null) {
+          state.currentPublicBooksFilterLanguage = getPersistedFilter();
+        }
+
         const userSettings = window.USER_LANGUAGE_DATA;
         if (!userSettings) return;
 
@@ -215,6 +234,7 @@
             onLanguageChange: function (values) {
               const v = values && values.currentLearning ? String(values.currentLearning) : '';
               state.currentPublicBooksFilterLanguage = v || 'all';
+              setPersistedFilter(state.currentPublicBooksFilterLanguage);
               renderPublicBooksList();
             }
           };
