@@ -809,6 +809,16 @@ window.Desktop = window.Desktop || {
           return function (data) {
             if (data && data.currentLearning) {
               self._activeLanguage = data.currentLearning;
+
+              // Оповещаем остальные части приложения (например, открытые модалки
+              // библиотек), что язык оригинала в шапке изменился — чтобы они
+              // пересчитали отбор книг без собственного селектора языка.
+              try {
+                window.dispatchEvent(new CustomEvent('desktop:learning-language-changed', {
+                  detail: { currentLearning: data.currentLearning }
+                }));
+              } catch (e) {}
+
               if (self._allDeskItems && self._allDeskItems.length > 0) {
                 // Показываем спиннер, потом с небольшой задержкой перерисовываем
                 try {

@@ -7,48 +7,28 @@
     const state = {
       lastOwnBooks: [],
       lastShelfBooks: [],
-      currentBooksFilterLanguage: null,
       activeBookId: null,
-      booksLanguageSelectorInstance: null,
       _loadedAt: 0,
     };
 
-    // Запоминаем выбранный фильтр по языку между открытиями модалки и перезагрузками.
-    const FILTER_STORAGE_KEY = 'library:filter_language';
-
-    function getPersistedFilter() {
+    // Язык оригинала берём из флага в шапке рабочего стола (window.Desktop._activeLanguage),
+    // а не из отдельного селектора в модалке. Фолбэк — на данные пользователя.
+    function _resolveCurrentLearning() {
       try {
-        const v = localStorage.getItem(FILTER_STORAGE_KEY);
-        return v ? String(v) : null;
-      } catch (e) { return null; }
-    }
-
-    function setPersistedFilter(v) {
-      try { localStorage.setItem(FILTER_STORAGE_KEY, String(v || 'all')); } catch (e) { }
-    }
-
-    // Нормализуем данные о языках пользователя: window.USER_LANGUAGE_DATA может быть
-    // не установлен (ставится только при сохранении профиля), поэтому делаем fallback
-    // на window.UM.userData (snake_case).
-    function _resolveUserLanguageSettings() {
-      try {
-        const fromWindow = window.USER_LANGUAGE_DATA;
-        if (fromWindow) {
-          return {
-            nativeLanguage: fromWindow.nativeLanguage,
-            learningLanguages: fromWindow.learningLanguages,
-            currentLearning: fromWindow.currentLearning,
-          };
+        if (window.Desktop && window.Desktop._activeLanguage) {
+          const v = String(window.Desktop._activeLanguage).trim().toLowerCase();
+          if (v) return v;
         }
       } catch (e) { }
       try {
         const ud = window.UM && window.UM.userData ? window.UM.userData : null;
-        if (ud) {
-          return {
-            nativeLanguage: ud.native_language,
-            learningLanguages: ud.learning_languages,
-            currentLearning: ud.current_learning,
-          };
+        if (ud && ud.current_learning) {
+          return String(ud.current_learning).trim().toLowerCase();
+        }
+      } catch (e) { }
+      try {
+        if (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.currentLearning) {
+          return String(window.USER_LANGUAGE_DATA.currentLearning).trim().toLowerCase();
         }
       } catch (e) { }
       return null;
@@ -336,11 +316,8 @@
       const container = document.getElementById('booksList');
       if (!container) return;
 
-      const rawFilterLang = state.currentBooksFilterLanguage
-        || (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.currentLearning)
-        || (window.UM && window.UM.userData && window.UM.userData.current_learning)
-        || null;
-      const filterLang = rawFilterLang && String(rawFilterLang) === 'all' ? null : rawFilterLang;
+      // Язык оригинала берётся из флага в шапке рабочего стола.
+      const filterLang = _resolveCurrentLearning();
 
       const normalizeBookLang = (b) => {
         if (!b) return '';
@@ -446,52 +423,12 @@
       }
     }
 
+    // Отдельного селектора языка в модалке больше нет — фильтр берёт язык
+    // оригинала из флага в шапке. Оставляем заглушку для совместимости.
     function initializeBooksLanguageSelector() {
       try {
         const container = document.getElementById('booksLanguageSelector');
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        // Восстанавливаем запомненный отбор, если он ещё не задан в state.
-        if (state.currentBooksFilterLanguage == null) {
-          state.currentBooksFilterLanguage = getPersistedFilter();
-        }
-
-        const userSettings = _resolveUserLanguageSettings();
-        if (!userSettings) return;
-
-        if (typeof window.initLanguageSelector === 'function') {
-          const baseLanguageData = window.LanguageManager && typeof window.LanguageManager.getLanguageData === 'function'
-            ? window.LanguageManager.getLanguageData()
-            : {};
-
-          const languageData = Object.assign({
-            all: { language_ru: 'Все языки', language_en: 'All languages', country_cod: '' },
-          }, baseLanguageData || {});
-
-          const options = {
-            mode: 'learning-selector-compact',
-            currentLearning: (state.currentBooksFilterLanguage != null
-              ? state.currentBooksFilterLanguage
-              : (userSettings.currentLearning || userSettings.learningLanguages?.[0] || 'en')),
-            learningLanguages: userSettings.learningLanguages || [userSettings.currentLearning || 'en'],
-            languageData,
-            onLanguageChange: function (values) {
-              const v = values && values.currentLearning ? String(values.currentLearning) : '';
-              state.currentBooksFilterLanguage = v || 'all';
-              setPersistedFilter(state.currentBooksFilterLanguage);
-              renderBooksList(state.lastOwnBooks, state.lastShelfBooks);
-            }
-          };
-
-          state.booksLanguageSelectorInstance = window.initLanguageSelector('booksLanguageSelector', options);
-
-          if (!state.currentBooksFilterLanguage) {
-            const v = String(options.currentLearning || '');
-            state.currentBooksFilterLanguage = v || 'all';
-          }
-        }
+        if (container) container.innerHTML = '';
       } catch (e) {
       }
     }
@@ -560,6 +497,16 @@
     }
 
     function _bindOnce() {
+      // При смене языка оригинала в шапке (если модалка открыта) перерисовываем список.
+      window.addEventListener('desktop:learning-language-changed', () => {
+        try {
+          const modal = document.getElementById('home-library-modal');
+          if (!modal || modal.style.display === 'none') return;
+          renderBooksList(state.lastOwnBooks, state.lastShelfBooks);
+        } catch (e) {
+        }
+      });
+
       const closeBtn = document.getElementById('home-library-close');
       if (closeBtn && closeBtn.dataset.bound !== '1') {
         closeBtn.dataset.bound = '1';
