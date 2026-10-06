@@ -27,6 +27,33 @@
       try { localStorage.setItem(FILTER_STORAGE_KEY, String(v || 'all')); } catch (e) { }
     }
 
+    // Нормализуем данные о языках пользователя: window.USER_LANGUAGE_DATA может быть
+    // не установлен (ставится только при сохранении профиля), поэтому делаем fallback
+    // на window.UM.userData (snake_case).
+    function _resolveUserLanguageSettings() {
+      try {
+        const fromWindow = window.USER_LANGUAGE_DATA;
+        if (fromWindow) {
+          return {
+            nativeLanguage: fromWindow.nativeLanguage,
+            learningLanguages: fromWindow.learningLanguages,
+            currentLearning: fromWindow.currentLearning,
+          };
+        }
+      } catch (e) { }
+      try {
+        const ud = window.UM && window.UM.userData ? window.UM.userData : null;
+        if (ud) {
+          return {
+            nativeLanguage: ud.native_language,
+            learningLanguages: ud.learning_languages,
+            currentLearning: ud.current_learning,
+          };
+        }
+      } catch (e) { }
+      return null;
+    }
+
     function getToken() {
       try {
         if (window.UM && window.UM.token) return window.UM.token;
@@ -310,7 +337,8 @@
       if (!container) return;
 
       const rawFilterLang = state.currentBooksFilterLanguage
-        || window.USER_LANGUAGE_DATA?.currentLearning
+        || (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.currentLearning)
+        || (window.UM && window.UM.userData && window.UM.userData.current_learning)
         || null;
       const filterLang = rawFilterLang && String(rawFilterLang) === 'all' ? null : rawFilterLang;
 
@@ -344,7 +372,7 @@
         ? allBooksDeduped.filter(b => {
           if (b && b.is_workbook) return true;
           const lang = normalizeBookLang(b);
-          return !lang || lang === String(filterLang).toLowerCase();
+          return !!lang && lang === String(filterLang).toLowerCase();
         })
         : allBooksDeduped;
 
@@ -430,7 +458,7 @@
           state.currentBooksFilterLanguage = getPersistedFilter();
         }
 
-        const userSettings = window.USER_LANGUAGE_DATA;
+        const userSettings = _resolveUserLanguageSettings();
         if (!userSettings) return;
 
         if (typeof window.initLanguageSelector === 'function') {

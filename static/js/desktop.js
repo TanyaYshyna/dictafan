@@ -797,7 +797,7 @@ window.Desktop = window.Desktop || {
     try {
       this._langSelector = new LanguageSelector({
         container: container,
-        mode: 'learning-selector-compact',
+        mode: 'flag-pair-dropdown-left',
         nativeLanguage: (function () {
           try { return window.UM.userData.native_language || 'ru'; } catch (e) { return 'ru'; }
         })(),
@@ -943,6 +943,14 @@ window.Desktop = window.Desktop || {
       opts.learningLanguages = merged;
       opts.learningAvailableLanguages = merged;
       opts.currentLearning = nextCurrent;
+      opts.nativeLanguage = (function () {
+        try {
+          const n = String((window.UM && window.UM.userData && window.UM.userData.native_language) || '').trim().toLowerCase();
+          return n || 'ru';
+        } catch (e) {
+          return 'ru';
+        }
+      })();
 
       try {
         sel.render();

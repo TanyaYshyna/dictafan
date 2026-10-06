@@ -355,7 +355,11 @@ class UserManager {
     const streakElement = userSection.querySelector('.streak-days');
 
     try {
-      if (avatarElement && avatarElement.parentElement) {
+      // На рабочем столе (есть #desktopLangSelector) родной флаг теперь рисуется
+      // средствами LanguageSelector в паре «оригинал => перевод» (стрелка + флаг
+      // перевода через менеджер), поэтому дублирующий флаг рядом с аватаром не нужен.
+      const isDesktopPage = !!document.getElementById('desktopLangSelector');
+      if (avatarElement && avatarElement.parentElement && !isDesktopPage) {
         const parent = avatarElement.parentElement;
         let nativeLang = '';
         try {
