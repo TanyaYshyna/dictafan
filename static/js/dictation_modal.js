@@ -1186,7 +1186,7 @@
         // Собираем settingsJson из данных, доступных в контексте модального окна
         let modalSettingsJson = null;
         try {
-          const seq = typeof getPlaySequenceStartValue === 'function' ? getPlaySequenceStartValue() : (window.playSequenceStart || 'oto');
+          const seq = typeof getPlaySequenceStartValue === 'function' ? getPlaySequenceStartValue() : (window.playSequenceStart != null ? String(window.playSequenceStart) : 'oto');
           const repeatsEl = document.getElementById('modal-audioRepeatsInput');
           const repeats = repeatsEl && repeatsEl.value != null && String(repeatsEl.value).trim() ? String(repeatsEl.value).trim() : '3';
           modalSettingsJson = JSON.stringify({
@@ -3918,9 +3918,10 @@
     // выполнения. Раньше первым читался input #playSequenceStart из модалки ПРОФИЛЯ,
     // который не меняется при изменении настроек диктанта, из-за чего схема не применялась.
     try {
-      const v = window.playSequenceStart != null ? String(window.playSequenceStart) : '';
-      if (v.trim()) {
-        return v.trim();
+      if (window.playSequenceStart != null) {
+        // Явно установленное значение (в т.ч. пустая строка) имеет приоритет.
+        // Пустая строка означает "без аудио" — не подменяем её значением по умолчанию.
+        return String(window.playSequenceStart).trim();
       }
     } catch (e) {
     }
@@ -3972,7 +3973,7 @@
         if (raw) {
           const parsed = JSON.parse(raw);
           const audio = parsed && parsed.audio && typeof parsed.audio === 'object' ? parsed.audio : {};
-          if (audio.start != null && String(audio.start).trim()) {
+          if (audio.start != null) {
             window.playSequenceStart = String(audio.start).trim();
           }
           // Загружаем режим упражнения из настроек пользователя
@@ -3990,7 +3991,8 @@
     // fallback: если settings_json нет, пробуем audio_start
     try {
       const um = window.UM;
-      if (um && um.userData && um.userData.audio_start) {
+      if (um && um.userData && um.userData.audio_start != null) {
+        // Явное значение (в т.ч. пустая строка) сохраняем как есть — пустая строка означает "без аудио".
         window.playSequenceStart = String(um.userData.audio_start).trim();
         return;
       }
@@ -6930,7 +6932,7 @@
       const applyToRuntime = () => {
         try {
           const start = startInput ? String(startInput.value || '') : defaults.start;
-          window.playSequenceStart = start || defaults.start;
+          window.playSequenceStart = start;
         } catch (e) {
         }
         try {
@@ -7012,7 +7014,7 @@
           }
 
           if (!merged.audio || typeof merged.audio !== 'object') merged.audio = {};
-          merged.audio.start = settings.start || defaults.start;
+          merged.audio.start = settings.start;
           merged.audio.exercise_mode = settings.exercise_mode || defaults.exercise_mode;
           merged.star_counting = settings.star_counting || defaults.star_counting;
 
@@ -7497,7 +7499,7 @@
             // Получаем схему аудио из сессии
             let audioScheme = '';
             try {
-              const seq = typeof getPlaySequenceStartValue === 'function' ? getPlaySequenceStartValue() : (window.playSequenceStart || 'oto');
+              const seq = typeof getPlaySequenceStartValue === 'function' ? getPlaySequenceStartValue() : (window.playSequenceStart != null ? String(window.playSequenceStart) : 'oto');
               if (seq) audioScheme = `Схема аудио: ${seq}`;
             } catch (eScheme) {
             }
