@@ -968,7 +968,15 @@ def save_dictation_final():
         )
 
         try:
-            update_dictation(dictation_id=int(db_id), sentences_count=int(computed_sentences_count))
+            final_update = update_dictation(dictation_id=int(db_id), sentences_count=int(computed_sentences_count))
+            # ВАЖНО: это ВТОРОЙ UPDATE диктанта за один запрос (первый — выше, с title/level/audio_order).
+            # Каждый UPDATE ставит updated_at = CURRENT_TIMESTAMP, поэтому updated_at, снятый после
+            # первого UPDATE (saved_updated_at), УСТАРЕВАЕТ на один шаг. Из-за этого клиент получал
+            # протухший updated_at: следующее сохранение (или повтор очереди после 30s-таймаута)
+            # сразу ловило ложный 409 "Обнаружен конфликт сохранения", а в IndexedDB-кеш записывался
+            # неактуальный updated_at. Возвращаем ФИНАЛЬНЫЙ updated_at после всех UPDATE.
+            if final_update and final_update.get('updated_at'):
+                saved_updated_at = final_update.get('updated_at')
         except Exception:
             pass
 

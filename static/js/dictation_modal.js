@@ -6402,7 +6402,7 @@
 
       if (context === 'navigator') {
         // Из навигатора — "Продолжить" / "Continue"
-        startBtn.textContent = dictationT('start_button.continue', 'Г Р А Й М О   Д А Л І');
+        startBtn.textContent = dictationT('start_button.continue', 'Г Р А Й М О      Д А Л І');
         return;
       }
 
@@ -6427,9 +6427,9 @@
       })();
 
       if (isCompleted) {
-        startBtn.textContent = dictationT('start_button.new_start', 'Н О В И Й   С Т А Р Т');
+        startBtn.textContent = dictationT('start_button.new_start', 'Н О В И Й     С Т А Р Т');
       } else if (hasProgress) {
-        startBtn.textContent = dictationT('start_button.continue', 'Г Р А Й М О   Д А Л І');
+        startBtn.textContent = dictationT('start_button.continue', 'Г Р А Й М О     Д А Л І');
       } else {
         startBtn.textContent = dictationT('start_button.start', 'S T A R T');
       }

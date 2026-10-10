@@ -203,7 +203,8 @@
           console.log(TAG, '[flushQueue] отправляю БД:', item.key);
 
           var controller = new AbortController();
-          var abortTimer = setTimeout(function () { controller.abort(); }, 30000);
+          var timedOut = false;
+          var abortTimer = setTimeout(function () { timedOut = true; controller.abort(); }, 30000);
           var dbResponse;
           try {
             dbResponse = await fetch('/save_dictation_final', {
@@ -278,6 +279,13 @@
           success = true;
         } catch (e) {
           errorMessage = String(e && e.message ? e.message : e);
+          // Таймаут 30с — ожидаемая ситуация при медленном сохранении:
+          // НЕ путаем её с реальной ошибкой сервера. Запись остаётся pending и
+          // будет повторена. Такое сообщение встречалось в консоли как
+          // "signal is aborted without reason" и сбивало с толку.
+          if (timedOut || (e && (e.name === 'AbortError' || e.name === 'TimeoutError'))) {
+            errorMessage = 'timeout 30s (будет повторена)';
+          }
           console.warn(TAG, '[flushQueue] ошибка для', item.key, errorMessage);
         }
 
