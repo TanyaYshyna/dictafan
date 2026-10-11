@@ -98,6 +98,12 @@ class DictationsReport {
 
         document.getElementById('reportStartDate').value = this.formatDateForInput(startDate);
         document.getElementById('reportEndDate').value = this.formatDateForInput(endDate);
+
+        // Защита от «нереальных» дат: ограничиваем диапазон выбора.
+        if (window.DateRangeUtils) {
+            DateRangeUtils.applyLimits(document.getElementById('reportStartDate'));
+            DateRangeUtils.applyLimits(document.getElementById('reportEndDate'));
+        }
     }
 
     /**
@@ -274,6 +280,11 @@ class DictationsReport {
         const contentContainer = document.getElementById('dictationsReportContent');
 
         if (!startDateInput || !endDateInput || !languageSelect || !contentContainer) return;
+
+        // Защита от «нереальных» дат: нормализуем диапазон перед расчётом.
+        if (window.DateRangeUtils) {
+            DateRangeUtils.normalizeRange(startDateInput, endDateInput);
+        }
 
         const startDate = new Date(startDateInput.value);
         startDate.setHours(0, 0, 0, 0); // Начало дня

@@ -425,6 +425,12 @@ class StatisticsReport {
         dateFromInput.value = this.formatDateForInput(startDate);
         dateToInput.value = this.formatDateForInput(endDate);
 
+        // Защита от «нереальных» дат: ограничиваем диапазон выбора.
+        if (window.DateRangeUtils) {
+            DateRangeUtils.applyLimits(dateFromInput);
+            DateRangeUtils.applyLimits(dateToInput);
+        }
+
         try {
             this._renderFlagOptions();
         } catch (e) {
@@ -813,6 +819,11 @@ class StatisticsReport {
 
         if (!startDateInput || !endDateInput || !groupBySelect) return;
 
+        // Защита от «нереальных» дат: нормализуем диапазон перед расчётом.
+        if (window.DateRangeUtils) {
+            DateRangeUtils.normalizeRange(startDateInput, endDateInput);
+        }
+
         const chartContainer = document.getElementById('statisticsChart');
         if (chartContainer) {
             chartContainer.innerHTML = '<p class="no-data">Формируем отчет…</p>';
@@ -1123,19 +1134,24 @@ class RatingReport {
         const endInput = document.getElementById('ratingEndDate');
         if (!startInput || !endInput) return;
 
-        const s = String(startInput.value || '');
-        const e = String(endInput.value || '');
-        if (!s || !e) return;
-
-        const sd = new Date(s);
-        const ed = new Date(e);
-        if (Number.isNaN(sd.getTime()) || Number.isNaN(ed.getTime())) return;
-
-        // Если пользователь перепутал даты, подтягиваем вторую к первой.
-        if (sd.getTime() > ed.getTime()) {
-            endInput.value = s;
-        } else if (ed.getTime() < sd.getTime()) {
-            startInput.value = e;
+        // Защита от «нереальных» дат (например, 01.01.0001): ограничиваем
+        // диапазон и не даём повесить страницу бесконечным циклом по дням.
+        if (window.DateRangeUtils) {
+            DateRangeUtils.applyLimits(startInput);
+            DateRangeUtils.applyLimits(endInput);
+            DateRangeUtils.normalizeRange(startInput, endInput);
+        } else {
+            const s = String(startInput.value || '');
+            const e = String(endInput.value || '');
+            if (!s || !e) return;
+            const sd = new Date(s);
+            const ed = new Date(e);
+            if (Number.isNaN(sd.getTime()) || Number.isNaN(ed.getTime())) return;
+            if (sd.getTime() > ed.getTime()) {
+                endInput.value = s;
+            } else if (ed.getTime() < sd.getTime()) {
+                startInput.value = e;
+            }
         }
 
         this.customStartDate = String(startInput.value || '');
@@ -1485,6 +1501,9 @@ class RatingReport {
         if (!this.modal) {
             this.createModal();
         }
+        // Переоткрытие без перезагрузки: синхронизируем флаги с состоянием экземпляра,
+        // чтобы чекбоксы в DOM всегда совпадали с this.checkedParams.
+        this._renderPriorityHeader();
         this.modal.style.display = 'flex';
         await this.updateRating();
     }
@@ -1707,8 +1726,12 @@ class RatingReport {
     }
 
     static async open() {
-        const rep = new RatingReport();
-        await rep.show();
+        // Один и тот же экземпляр между открытиями модалки, чтобы состояние флагов
+        // (checkedParams) не сбрасывалось к дефолтам при повторном открытии.
+        if (!RatingReport._instance) {
+            RatingReport._instance = new RatingReport();
+        }
+        await RatingReport._instance.show();
     }
 }
 
@@ -2148,18 +2171,24 @@ class PlanFactReport {
         const endInput = document.getElementById('planfactEndDate');
         if (!startInput || !endInput) return;
 
-        const s = String(startInput.value || '');
-        const e = String(endInput.value || '');
-        if (!s || !e) return;
-
-        const sd = new Date(s);
-        const ed = new Date(e);
-        if (Number.isNaN(sd.getTime()) || Number.isNaN(ed.getTime())) return;
-
-        if (sd.getTime() > ed.getTime()) {
-            endInput.value = s;
-        } else if (ed.getTime() < sd.getTime()) {
-            startInput.value = e;
+        // Защита от «нереальных» дат (например, 01.01.0001): ограничиваем
+        // диапазон и не даём повесить страницу бесконечным циклом по дням.
+        if (window.DateRangeUtils) {
+            DateRangeUtils.applyLimits(startInput);
+            DateRangeUtils.applyLimits(endInput);
+            DateRangeUtils.normalizeRange(startInput, endInput);
+        } else {
+            const s = String(startInput.value || '');
+            const e = String(endInput.value || '');
+            if (!s || !e) return;
+            const sd = new Date(s);
+            const ed = new Date(e);
+            if (Number.isNaN(sd.getTime()) || Number.isNaN(ed.getTime())) return;
+            if (sd.getTime() > ed.getTime()) {
+                endInput.value = s;
+            } else if (ed.getTime() < sd.getTime()) {
+                startInput.value = e;
+            }
         }
     }
 
@@ -4013,6 +4042,12 @@ class DictationReport {
         dateToInput.id = 'dictation-report-date-to';
         dateToInput.value = this.formatDateForInput(now);
 
+        // Защита от «нереальных» дат: ограничиваем диапазон выбора.
+        if (window.DateRangeUtils) {
+            DateRangeUtils.applyLimits(dateFromInput);
+            DateRangeUtils.applyLimits(dateToInput);
+        }
+
         dateRange.appendChild(dateFromInput);
         dateRange.appendChild(dateSep);
         dateRange.appendChild(dateToInput);
@@ -4239,6 +4274,11 @@ class DictationReport {
                 this._selectedUserId = (uid != null) ? Number(uid) : null;
             } catch (e) {
             }
+        }
+
+        // Защита от «нереальных» дат: нормализуем диапазон перед запросом.
+        if (window.DateRangeUtils && this._dateFromInput && this._dateToInput) {
+            DateRangeUtils.normalizeRange(this._dateFromInput, this._dateToInput);
         }
 
         const userId = this._selectedUserId;
