@@ -116,6 +116,19 @@
     min-width: 0;
     align-items: flex-end;
   }
+
+  /* Бегунок (прогресс заданий) должен быть ровно по ширине часов,
+     а не шире их: даём бару сжиматься до нуля, чтобы лейбл «2/12» помещался. */
+  #dictationModal .dictation-task-progress {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  #dictationModal .dictation-task-progress-bar {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
 }
 
 /* Прогресс-бар выполнения заданий диктанта */
@@ -127,12 +140,13 @@
 }
 
 #dictationModal .dictation-task-progress-bar {
-  flex: 1;
+  flex: 1 1 auto;
   height: 8px;
   background: var(--color-button-gray, #eeede8);
   border-radius: 4px;
   overflow: hidden;
-  min-width: 100px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 #dictationModal .dictation-task-progress-fill {
@@ -1109,6 +1123,7 @@ gap: 10px;
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 #dictationModal .dictation-modal__logo {
@@ -1116,6 +1131,31 @@ gap: 10px;
   width: auto;
   max-height: 80px;
   cursor: pointer;
+  flex: 0 0 auto;
+}
+
+/* Блок из двух строк слева от ковера: сверху флаги, снизу название диктанта */
+#dictationModal .dictation-modal__title-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+#dictationModal .dictation-modal__title-block .dictation-langpair {
+  flex: 0 0 auto;
+}
+
+#dictationModal .dictation-modal__title-block .dictation-title {
+  margin: 0;
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #dictationModal .dictation-modal__logo--min {
@@ -1166,6 +1206,8 @@ gap: 10px;
   align-items: center;
   gap: 12px;
   min-width: 0;
+  flex: 0 0 auto;
+  z-index: 3;
 }
 
 #dictationModal .dictation-modal__user {
@@ -1235,9 +1277,9 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 }
 
 #dictationModal #originalAudioPlayer {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
-  width: 100%;
+  width: auto;
   margin-top: 6px;
 }
 
@@ -1252,6 +1294,13 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   white-space: nowrap;
   min-height: 43px;
   margin-top: 6px;
+  overflow: visible;
+}
+
+/* Лейба языка перевода не должна схлопываться при сужении */
+#dictationModal .translation-audio-button-wrapper .language {
+  flex: 0 0 auto;
+  max-width: none;
 }
 
 #dictationModal .translation-audio-button-wrapper .language {
@@ -2351,8 +2400,65 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   #dictationModal .audio-players-wrapper {
     flex-wrap: nowrap !important;
   }
+
+  /* Даём оригинальному плееру сжаться, чтобы лейба перевода осталась видна */
+  #dictationModal .custom-audio-player .controls .progress-bar {
+    min-width: 40px !important;
+  }
 }
 
+
+@media (max-width: 860px) {
+  /* При сужении скрываем логотип — остаётся только ковер диктанта */
+  #dictationModal .dictation-modal__logo--full,
+  #dictationModal .dictation-modal__logo--min {
+    display: none;
+  }
+
+  /* Панели шапки накладываются друг на друга, а не сжимают друг друга:
+     правая панель (аватар, настройки, крестик) позиционируется поверх левой */
+  #dictationModal .dictation-modal__header-right {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    gap: 8px;
+  }
+
+  #dictationModal .dictation-modal__header-left {
+    width: 100%;
+    padding-right: 164px;
+    box-sizing: border-box;
+  }
+
+  /* На узких экранах скрываем имя пользователя, оставляя аватар */
+  #dictationModal .dictation-modal__username {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  /* На телефонах оставляем чуть меньше места под правую панель */
+  #dictationModal .dictation-modal__header-left {
+    padding-right: 132px;
+  }
+
+  /* Бегунок прогресса заданий не должен уезжать за экран:
+     лейбл «2/12» остаётся видимым, бар подстраивается под ширину часов */
+  #dictationModal .panel-tablo .dictation-top-progress-wrap {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  #dictationModal .dictation-task-progress {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  #dictationModal .dictation-task-progress-label {
+    flex: 0 0 auto;
+  }
+}
 
 @media (max-width: 680px) {
   #dictationModal .dictation-modal__logo--full {
@@ -2360,11 +2466,6 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   }
 
   #dictationModal .dictation-modal__logo--min {
-    display: inline-block;
-  }
-
-  /* На узких экранах скрываем имя пользователя, оставляя аватар */
-  #dictationModal .dictation-modal__username {
     display: none;
   }
 }
