@@ -308,7 +308,8 @@
       "victory": "النصر! أحسنت!!!"
     },
     "countdown": {
-      "go": "انطلق"
+      "go": "انطلق",
+      "continue": "نواصل"
     },
     "start_modal": {
       "select_all": "تحديد الكل",

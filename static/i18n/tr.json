@@ -313,7 +313,8 @@
       "victory": "Zafer! Harika iş!!!"
     },
     "countdown": {
-      "go": "Başla"
+      "go": "Başla",
+      "continue": "Devam"
     },
     "start_modal": {
       "select_all": "Tümünü seç",

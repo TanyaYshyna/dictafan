@@ -313,7 +313,8 @@
       "victory": "Victory! Great job!!!"
     },
     "countdown": {
-      "go": "Go"
+      "go": "Go",
+      "continue": "Continue"
     },
     "start_modal": {
       "select_all": "Select all",

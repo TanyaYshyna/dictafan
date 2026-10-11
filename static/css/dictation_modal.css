@@ -2537,6 +2537,13 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   font-size: min(14vw, 160px);
 }
 
+/* Продолжение диктанта — корпоративный светло-зелёный цвет */
+#dictationCountdown .dictation-countdown__number--continue {
+  font-size: min(10vw, 96px);
+  color: var(--color-button-lightgreen, #bbf1ca);
+  text-shadow: 0 8px 32px rgba(54, 111, 64, 0.55);
+}
+
 /* Ритм «сердца» включается только при наличии класса --beat.
    JS перезапускает анимацию для каждого нового числа, снимая/добавляя класс. */
 #dictationCountdown .dictation-countdown__number--beat {

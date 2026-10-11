@@ -55,6 +55,8 @@
     _speechRecModeOverride: null,
     // Таймер обратного отсчёта 3-2-1-Пуск при автозапуске диктанта
     _countdownTimer: null,
+    // resolve текущего Promise отсчёта (создаётся createDictationCountdown)
+    _countdownResolve: null,
   };
 
   /**
@@ -6517,7 +6519,31 @@
     }
   }
 
-  function showDictationCountdown() {
+  function _countdownStepsForMode(mode) {
+    if (mode === 'continue') {
+      // Продолжение диктанта — одна фраза вместо счёта 3-2-1
+      return [{ text: dictationT('countdown.continue', 'Продолжаем'), ms: 1200, go: true, isContinue: true }];
+    }
+    return [
+      { text: '3', ms: 900 },
+      { text: '2', ms: 900 },
+      { text: '1', ms: 900 },
+      { text: dictationT('countdown.go', 'Пуск'), ms: 800, go: true },
+    ];
+  }
+
+  function _finishDictationCountdown() {
+    clearDictationCountdownTimer();
+    hideDictationCountdown();
+    if (dictationModalState._countdownResolve) {
+      const resolve = dictationModalState._countdownResolve;
+      dictationModalState._countdownResolve = null;
+      try { resolve(); } catch (e) {
+      }
+    }
+  }
+
+  function showDictationCountdown(mode) {
     try {
       const el = document.getElementById('dictationCountdown');
       if (!el) return null;
@@ -6528,8 +6554,8 @@
       el.style.display = 'flex';
       const num = document.getElementById('dictationCountdownNumber');
       if (num) {
-        num.textContent = '3';
         num.classList.remove('dictation-countdown__number--go');
+        num.classList.toggle('dictation-countdown__number--continue', mode === 'continue');
       }
       _restartCountdownBeat();
       return el;
@@ -6558,42 +6584,47 @@
     }
   }
 
-  function runDictationCountdown() {
-    clearDictationCountdownTimer();
-    const el = showDictationCountdown();
-    if (!el) {
-      return Promise.resolve();
-    }
+  // Создаёт Promise, который разрешится, когда текущая анимация отсчёта закончится.
+  // Перезапуск через startDictationCountdown() не создаёт новый Promise — он просто
+  // сбрасывает таймер и играет новую последовательность, а затем разрешает этот же Promise.
+  function createDictationCountdown() {
     return new Promise((resolve) => {
-      const steps = [
-        { text: '3', ms: 900 },
-        { text: '2', ms: 900 },
-        { text: '1', ms: 900 },
-        { text: dictationT('countdown.go', 'Пуск'), ms: 800, go: true },
-      ];
-      let idx = 0;
-      const next = () => {
-        if (idx >= steps.length) {
-          hideDictationCountdown();
-          resolve();
-          return;
-        }
-        const step = steps[idx++];
-        const num = document.getElementById('dictationCountdownNumber');
-        if (num) {
-          num.textContent = step.text;
-          // Слово «Пуск»/«Go» длиннее цифр — уменьшаем кегль, чтобы не вылезало за экран
-          if (step.go) {
-            num.classList.add('dictation-countdown__number--go');
-          } else {
-            num.classList.remove('dictation-countdown__number--go');
-          }
-        }
-        _restartCountdownBeat();
-        dictationModalState._countdownTimer = setTimeout(next, step.ms);
-      };
-      next();
+      dictationModalState._countdownResolve = resolve;
     });
+  }
+
+  function startDictationCountdown(mode) {
+    clearDictationCountdownTimer();
+    const el = showDictationCountdown(mode);
+    if (!el) {
+      _finishDictationCountdown();
+      return;
+    }
+    const steps = _countdownStepsForMode(mode);
+    let idx = 0;
+    const next = () => {
+      if (idx >= steps.length) {
+        _finishDictationCountdown();
+        return;
+      }
+      const step = steps[idx++];
+      const num = document.getElementById('dictationCountdownNumber');
+      if (num) {
+        num.textContent = step.text;
+        // Слова длиннее цифр — уменьшаем кегль, чтобы не вылезало за экран
+        if (step.go) {
+          num.classList.add('dictation-countdown__number--go');
+        } else {
+          num.classList.remove('dictation-countdown__number--go');
+        }
+        if (step.isContinue) {
+          num.classList.add('dictation-countdown__number--continue');
+        }
+      }
+      _restartCountdownBeat();
+      dictationModalState._countdownTimer = setTimeout(next, step.ms);
+    };
+    next();
   }
 
   try {
@@ -8073,7 +8104,8 @@
       let shouldAutoStart = false;
       if (parsed) {
         try {
-          countdownPromise = runDictationCountdown();
+          countdownPromise = createDictationCountdown();
+          startDictationCountdown('start');
           console.log('[DM:open] обратный отсчёт 3-2-1-Пуск запущен сразу после показа модалки');
         } catch (eCountdown) {
           console.error('[DM:open] ошибка запуска отсчёта:', eCountdown);
@@ -8289,6 +8321,30 @@
           // Стартуем диктант сразу (как будто нажали СТАРТ) после того,
           // как обратный отсчёт 3-2-1-Пуск закончится.
           shouldAutoStart = true;
+
+          // Если это ПРОДОЛЖЕНИЕ диктанта (в сессии уже есть прогресс),
+          // вместо счёта 3-2-1-Пуск показываем анимацию с фразой «Продолжаем»
+          // в корпоративном светло-зелёном цвете.
+          try {
+            const hasProgress = (() => {
+              try {
+                const keys = session && session.content ? session.content.getAllKeys() : [];
+                for (const key of keys) {
+                  const st = session.getState(key);
+                  if (st && (Number(st.number_of_perfect) > 0 || Number(st.number_of_corrected) > 0 || Number(st.number_of_audio) > 0)) {
+                    return true;
+                  }
+                }
+              } catch (e) {}
+              return false;
+            })();
+            if (hasProgress) {
+              startDictationCountdown('continue');
+              console.log('[DM:open] продолжение диктанта — отсчёт заменён анимацией «Продолжаем»');
+            }
+          } catch (eCont) {
+            console.error('[DM:open] ошибка определения продолжения диктанта:', eCont);
+          }
 
           try {
             updateNavigatorFromSession(session);
