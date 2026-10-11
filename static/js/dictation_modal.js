@@ -8066,6 +8066,20 @@
       modal.classList.add('show');
       dictationModalState.isOpen = true;
 
+      // Запускаем обратный отсчёт 3-2-1-Пуск СРАЗУ, как только модалка показана.
+      // Всё остальное (загрузка deps, контента, создание сессии) идёт параллельно,
+      // чтобы между появлением модалки и стартом анимации не было паузы.
+      let countdownPromise = null;
+      let shouldAutoStart = false;
+      if (parsed) {
+        try {
+          countdownPromise = runDictationCountdown();
+          console.log('[DM:open] обратный отсчёт 3-2-1-Пуск запущен сразу после показа модалки');
+        } catch (eCountdown) {
+          console.error('[DM:open] ошибка запуска отсчёта:', eCountdown);
+        }
+      }
+
       // Биндим сохранение времени предложения при закрытии/скрытии страницы
       try {
         if (!window.__dictationModalBeforeUnloadBound) {
@@ -8128,7 +8142,9 @@
       } catch (e) {
       }
 
+      const _tDeps = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       await ensureDictationDepsLoaded();
+      console.log('[DM:open] ensureDictationDepsLoaded заняло ' + Math.round(((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - _tDeps) + 'ms (отсчёт уже идёт параллельно)');
  
       // Загружаем настройки схемы пользователя при открытии модалки диктанта
       try {
@@ -8148,24 +8164,19 @@
       // Загружаем контент диктанта (предложения) в runtime.
       // Если загрузка не удалась — не создаём сессию, показываем ошибку.
       //
-      // Запускаем обратный отсчёт 3-2-1-Пуск ПАРАЛЛЕЛЬНО с загрузкой контента:
+      // Обратный отсчёт 3-2-1-Пуск уже запущен выше (сразу после показа модалки)
+      // и идёт ПАРАЛЛЕЛЬНО с этой загрузкой:
       //   - данные в кеше (быстро)  -> отсчёт доиграет и диктант стартует сразу;
       //   - данные с сервера (долго) -> отсчёт доиграет, а под ним уже
-      //     показывается общий лоадер с жёлтым кружочком (DesktopLoadingModal),
-      //     который поднимает ensureDictationContentLoadedToRuntime.
-      let countdownPromise = null;
-      let shouldAutoStart = false;
-      try {
-        countdownPromise = runDictationCountdown();
-      } catch (eCountdown) {
-      }
+      //     показывается общий лоадер с жёлтым кружочком (DesktopLoadingModal).
       let contentLoaded = false;
+      const _tContent = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       try {
         if (parsed) {
           console.log('[DM:open] вызываю ensureDictationContentLoadedToRuntime для dictationId=', parsed.dictationIdFormatted);
           await ensureDictationContentLoadedToRuntime(parsed);
           contentLoaded = true;
-          console.log('[DM:open] ensureDictationContentLoadedToRuntime — УСПЕШНО');
+          console.log('[DM:open] ensureDictationContentLoadedToRuntime — УСПЕШНО за ' + Math.round(((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - _tContent) + 'ms');
 
           // После загрузки контента перерисовываем флаги языков —
           // теперь доступны langBlocks для определения всех языков перевода

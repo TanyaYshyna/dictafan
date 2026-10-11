@@ -101,13 +101,18 @@
   min-width: 0;
 }
 
+/* На узких экранах панель результатов должна оставаться в той же строке,
+   что и навигатор "<- 1/24 ->", а не перепрыгивать на отдельную строку.
+   Поэтому НЕ включаем flex-wrap и не растягиваем прогресс на всю ширину. */
 @media (max-width: 860px) {
   #dictationModal .panel-tablo .panels-row {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    gap: 8px;
   }
 
   #dictationModal .panel-tablo .dictation-top-progress-wrap {
-    width: 100%;
+    flex: 0 0 auto;
+    width: auto;
     min-width: 0;
     align-items: flex-end;
   }
@@ -281,30 +286,34 @@ html[dir="rtl"] #dictationModal .sentence-nav-bottom-inner {
 }
 
 /* Минималистичная панель результатов в модалке диктанта: только часы/время.
-   Остальные ячейки (точность, деньги, строка со звёздами/ошибками) скрываем,
-   чтобы часы помещались в одну строку с навигатором "<- 1/24 ->". */
-#dictationModal #progressPanelContainer .table-progress {
-  min-width: 0;
-}
+   Применяется ТОЛЬКО при сужении (узкий экран): остальные ячейки
+   (точность, деньги, строка со звёздами/ошибками) скрываем, чтобы часы
+   помещались в одну строку с навигатором "<- 1/24 ->".
+   На широких экранах панель остаётся полной (старая большая панель). */
+@media (max-width: 860px) {
+  #dictationModal #progressPanelContainer .table-progress {
+    min-width: 0;
+  }
 
-#dictationModal #progressPanelContainer .table-progress tr:nth-child(2) {
-  display: none;
-}
+  #dictationModal #progressPanelContainer .table-progress tr:nth-child(2) {
+    display: none;
+  }
 
-#dictationModal #progressPanelContainer .table-progress tr:first-child td:not(:first-child) {
-  display: none;
-}
+  #dictationModal #progressPanelContainer .table-progress tr:first-child td:not(:first-child) {
+    display: none;
+  }
 
-#dictationModal #progressPanelContainer .table-progress button {
-  height: 40px;
-  padding: 0 10px;
-  font-size: 16px;
-  gap: 6px;
-}
+  #dictationModal #progressPanelContainer .table-progress button {
+    height: 40px;
+    padding: 0 10px;
+    font-size: 16px;
+    gap: 6px;
+  }
 
-#dictationModal #progressPanelContainer .table-progress button i {
-  width: 16px;
-  height: 16px;
+  #dictationModal #progressPanelContainer .table-progress button i {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 #dictationModal .table-progress {
@@ -1197,10 +1206,13 @@ gap: 10px;
 #dictationModal .dictation-modal__body .panel {
   margin: 0;
   border-radius: 0;
+  padding-top: 20px;
   padding-left: 20px;
   padding-right: 20px;
   box-shadow: none;
   flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -2513,8 +2525,9 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   font-size: min(28vw, 240px);
   line-height: 1;
   font-weight: 800;
-  color: #e11d48;
-  text-shadow: 0 8px 32px rgba(225, 29, 72, 0.45);
+  /* Корпоративный розовый; тёмная тень создаёт объём на тёмном фоне оверлея */
+  color: var(--color-button-pink, #f5c0ca);
+  text-shadow: 0 8px 32px rgba(128, 44, 53, 0.55);
   user-select: none;
   will-change: transform;
   transform-origin: center;
