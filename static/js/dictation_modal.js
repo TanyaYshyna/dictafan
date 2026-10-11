@@ -10,7 +10,6 @@
     '/static/js/audio_manager.js',
     '/static/js/audio_player_visual.js',
     '/static/js/user_activity_history.js',
-    '/static/js/dictation_statistics.js',
     '/static/js/progress_panel.js',
     '/static/js/dictation_runtime/dictation_store.js',
     '/static/js/dictation_runtime/proverka_na_oshibki.js',
@@ -162,6 +161,24 @@
     }
   }
 
+  /**
+   * «Живое» суммарное время диктанта по предложениям для табло.
+   * Сначала сбрасывает текущее живое время предложения в st.time_count
+   * (идемпотентно), затем возвращает сумму всех time_count.
+   * Это тот же источник, что и lead_time в history_by_day и Telegram-отчёт.
+   */
+  function _getLiveDictationTimeMs(session) {
+    try {
+      if (!session) return 0;
+      if (dictationModalState.dictationStarted) {
+        _flushCurrentSentenceTime(session);
+      }
+      return _getSessionSentenceTimeTotalMs(session);
+    } catch (e) {
+      return 0;
+    }
+  }
+
   function getCurrentDictationIdForDb() {
     try {
       const session = window.__dictationModalActiveSession;
@@ -283,12 +300,13 @@
         } catch (e2) {
         }
 
-        // Используем session.timer для консистентности времени
+        // Единый источник времени — сумма времени по предложениям (time_count),
+        // с предварительным сбросом живого времени текущего предложения.
         let totalTimeMs = 0;
         try {
           const s = window.__dictationModalActiveSession;
-          if (s && s.timer) {
-            totalTimeMs = s.timer.accumulatedMs || 0;
+          if (s) {
+            totalTimeMs = _getLiveDictationTimeMs(s) || 0;
           }
         } catch (eTimer) {
         }
@@ -1175,12 +1193,11 @@
           }
         }
 
-        // Используем progressPanel как единственный источник времени,
-        // т.к. session.timer не запускается при старте диктанта
+        // Единый источник времени — сумма времени по предложениям (time_count),
+        // ровно то, что уходит в lead_time (history_by_day) для «Отчёта по диктантам».
         let totalTimeMs = 0;
         try {
-          const snap = getProgressTimerSnapshot();
-          totalTimeMs = snap.accumulatedMs || 0;
+          totalTimeMs = _getSessionSentenceTimeTotalMs(session) || 0;
         } catch (e) {
           totalTimeMs = session.timer ? (session.timer.accumulatedMs || 0) : 0;
         }
@@ -2880,9 +2897,15 @@
    * даёт чистое время работы в этом заходе) и перезаходы (previousAccumulatedTime
    * хранит время, уже накопленное в предыдущих заходах).
    */
-  function _saveSentenceTime(session) {
+  /**
+   * Сбрасывает живое время текущего предложения в st.time_count (идемпотентно).
+   * Не трогает DOM — используется как из _saveSentenceTime, так и из провайдера
+   * табло (который вызывается на каждом тике прогресс-панели).
+   */
+  function _flushCurrentSentenceTime(session) {
     try {
       if (!session) return;
+      if (!dictationModalState.dictationStarted) return;
       const key = session.getCurrentKey();
       if (key == null) return;
       const st = session.getState(key);
@@ -2897,6 +2920,16 @@
         // Если таймер не продвинулся — оставляем предыдущее накопленное значение
         st.time_count = prevTimeCount;
       }
+    } catch (e) {
+    }
+  }
+
+  function _saveSentenceTime(session) {
+    _flushCurrentSentenceTime(session);
+    try {
+      if (!session) return;
+      const key = session.getCurrentKey();
+      if (key == null) return;
       // Обновляем время в строке таблицы модального окна выбора предложений
       try { updateStartModalSentenceRow(session, key); } catch (e0row) {}
     } catch (e) {
@@ -8424,6 +8457,15 @@
               }
             }
           } catch (eAcc) {
+          }
+
+          // Единый источник времени: сумма времени по предложениям (time_count).
+          // Табло, Telegram-отчёт и lead_time теперь считаются из одного места.
+          try {
+            if (window.progressPanel && typeof window.progressPanel.setTimeProvider === 'function') {
+              window.progressPanel.setTimeProvider(() => _getLiveDictationTimeMs(window.__dictationModalActiveSession));
+            }
+          } catch (eProv) {
           }
 
           // Обновляем панель прогресса данными из сессии (т.к. при создании

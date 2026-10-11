@@ -56,6 +56,7 @@ class ProgressPanel {
             countdownRemainingMs: 0,
             lastTickTs: null
         };
+        this.timeProvider = null;
 
         // Настройки режима времени
         this.timerMode = 'clock'; // clock | countdown
@@ -351,6 +352,15 @@ class ProgressPanel {
     }
 
     /**
+     * Устанавливает внешний источник времени (сумма времени по предложениям).
+     * Когда задан — табло и getTimerSnapshot() используют его вместо
+     * настенного накопления dictationAccumulatedMs.
+     */
+    setTimeProvider(fn) {
+        this.timeProvider = (typeof fn === 'function') ? fn : null;
+    }
+
+    /**
      * Обновляет отображение таймера на основе текущего состояния.
      */
     updateTimer() {
@@ -402,14 +412,6 @@ class ProgressPanel {
 
         if (this.history.currentSession) {
             this.history.currentSession.timer_seconds = timerValue;
-        }
-
-        if (window.dictationStatistics && typeof window.dictationStatistics.updateTimer === 'function') {
-            try {
-                window.dictationStatistics.updateTimer(timerValue);
-            } catch (error) {
-                console.warn('dictationStatistics.updateTimer error:', error);
-            }
         }
 
         // Обновляем широкую кнопку таймера: либо слово "Таймер", либо оставшееся время
@@ -467,6 +469,9 @@ class ProgressPanel {
     getTimerSnapshot() {
         const now = Date.now();
         const elapsedMs = this._computeClockMs(now);
+        const accumulatedMs = this.timeProvider
+            ? elapsedMs
+            : this.timerState.dictationAccumulatedMs;
         const countdownMs = this._computeCountdownMs(now);
 
         return {
@@ -475,7 +480,7 @@ class ProgressPanel {
             elapsedMs,
             countdownRemainingMs: countdownMs,
             displaySeconds: this._computeTimerSeconds(now),
-            accumulatedMs: this.timerState.dictationAccumulatedMs,
+            accumulatedMs,
             periodStart: this.timerState.dictationPeriodStart,
             periodEnd: this.timerState.dictationPeriodEnd,
             defaultCountdownSeconds: this.timerState.countdownDefaultSeconds
@@ -538,7 +543,16 @@ class ProgressPanel {
             ?? now;
         const delta = Math.max(0, now - lastTick);
 
-        this.timerState.dictationAccumulatedMs += delta;
+        if (this.timeProvider) {
+            // Единый источник времени — внешний провайдер (сумма по предложениям).
+            // Настенное время не накапливаем, чтобы сон/залипание не раздували счётчик.
+            try {
+                this.timerState.dictationAccumulatedMs = Math.max(0, Math.floor(Number(this.timeProvider()) || 0));
+            } catch (e) {
+            }
+        } else {
+            this.timerState.dictationAccumulatedMs += delta;
+        }
 
         if (this.countdownEnabled) {
             this.timerState.countdownRemainingMs = Math.max(0, this.timerState.countdownRemainingMs - delta);
@@ -555,6 +569,12 @@ class ProgressPanel {
     }
 
     _computeClockMs(now = Date.now()) {
+        if (this.timeProvider) {
+            try {
+                return Math.max(0, Math.floor(Number(this.timeProvider()) || 0));
+            } catch (e) {
+            }
+        }
         let base = this.timerState.dictationAccumulatedMs;
         if (this.timerState.sessionActive) {
             const lastTick = this.timerState.lastTickTs

@@ -307,6 +307,18 @@ html[dir="rtl"] #dictationModal .sentence-nav-bottom-inner {
 @media (max-width: 860px) {
   #dictationModal #progressPanelContainer .table-progress {
     min-width: 0;
+    width: fit-content;
+    margin-left: auto;
+  }
+
+  /* Скрытые ячейки не должны резервировать ширину через <col>, иначе
+     часы остаются слева, а справа висит пустота от невидимых колонок. */
+  #dictationModal #progressPanelContainer .table-progress col.progress-col-fixed {
+    width: 0;
+  }
+
+  #dictationModal #progressPanelContainer .table-progress col.progress-col-flex {
+    width: 0;
   }
 
   #dictationModal #progressPanelContainer .table-progress tr:nth-child(2) {
@@ -315,6 +327,16 @@ html[dir="rtl"] #dictationModal .sentence-nav-bottom-inner {
 
   #dictationModal #progressPanelContainer .table-progress tr:first-child td:not(:first-child) {
     display: none;
+  }
+
+  /* Часы — единственная видимая ячейка, прижимаем её содержимое вправо */
+  #dictationModal #progressPanelContainer .table-progress tr:first-child td:first-child {
+    text-align: right;
+  }
+
+  #dictationModal #progressPanelContainer .table-progress .pp-clock {
+    width: auto;
+    justify-content: flex-end;
   }
 
   #dictationModal #progressPanelContainer .table-progress button {

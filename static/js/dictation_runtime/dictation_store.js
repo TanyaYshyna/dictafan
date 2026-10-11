@@ -17,6 +17,21 @@
     return Array.from(new Set(nums)).sort((a, b) => a - b);
   }
 
+  /**
+   * Монотонные «часы» для таймера диктанта.
+   * performance.now() не идёт вперёд во время системного сна (в отличие от Date.now()),
+   * поэтому время сна не попадает в учёт. Фолбэк — Date.now().
+   */
+  function _nowMs() {
+    try {
+      if (typeof performance !== 'undefined' && performance && typeof performance.now === 'function') {
+        return Math.floor(performance.now());
+      }
+    } catch (e) {
+    }
+    return Date.now();
+  }
+
   class DictationContent {
     constructor({ dictationId, langBlocks, audio_or_order, audio_or_shared }) {
       this.dictationId = dictationId;
@@ -438,19 +453,19 @@
     startTimer() {
       if (this.timer.running) return;
       this.timer.running = true;
-      this.timer.startedAtMs = Date.now();
+      this.timer.startedAtMs = _nowMs();
     }
 
     stopTimer() {
       if (!this.timer.running) return;
-      const elapsed = Date.now() - this.timer.startedAtMs;
+      const elapsed = Math.max(0, _nowMs() - this.timer.startedAtMs);
       this.timer.accumulatedMs += elapsed;
       this.timer.running = false;
     }
 
     getElapsedMs() {
       if (this.timer.running) {
-        return this.timer.accumulatedMs + (Date.now() - this.timer.startedAtMs);
+        return this.timer.accumulatedMs + Math.max(0, _nowMs() - this.timer.startedAtMs);
       }
       return this.timer.accumulatedMs;
     }
