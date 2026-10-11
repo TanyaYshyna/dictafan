@@ -35,6 +35,11 @@
     // _sentencePreviousAccumulatedTime — st.time_count на момент входа в предложение
     _sentenceTimeAccumulatedAtStart: 0,
     _sentencePreviousAccumulatedTime: 0,
+    // Ключ предложения, для которого актуальны _sentenceTimeAccumulatedAtStart и
+    // _sentencePreviousAccumulatedTime. Нужен, чтобы _flushCurrentSentenceTime не
+    // записал время новому предложению по устаревшим аккумуляторам предыдущего
+    // (источник двойного суммирования времени при переходе «Далее»/«Назад»).
+    _sentenceTimeKey: null,
     // Доступные языки перевода (из карточки data-available-translations)
     _availableTranslations: [],
     // Ссылка на материалы автора (из карточки data-author-materials-url)
@@ -2952,6 +2957,21 @@
       if (!dictationModalState.dictationStarted) return;
       const key = session.getCurrentKey();
       if (key == null) return;
+      // Защита от двойного суммирования: аккумуляторы
+      // (_sentenceTimeAccumulatedAtStart/_sentencePreviousAccumulatedTime) валидны
+      // ТОЛЬКО для ключа, запомненного в _initSentenceTime. Если текущий ключ уже
+      // сменился (goNextIncomplete/goPrev), а _initSentenceTime ещё не успел
+      // переинициализировать аккумуляторы, флаш по устаревшим значениям записал бы
+      // в новое предложение всё накопленное время предыдущего. Пропускаем такой флаш.
+      if (dictationModalState._sentenceTimeKey == null || String(dictationModalState._sentenceTimeKey) !== String(key)) {
+        try {
+          console.log('[DM:time] flushSentence SKIP (ключ сменился, аккумуляторы не инициализированы)', JSON.stringify({
+            key,
+            sentenceTimeKey: dictationModalState._sentenceTimeKey,
+          }));
+        } catch (eLog) {}
+        return;
+      }
       const st = session.getState(key);
       if (!st) return;
       const elapsed = session.getElapsedMs();
@@ -2967,6 +2987,7 @@
       try {
         console.log('[DM:time] flushSentence', JSON.stringify({
           key,
+          sentenceTimeKey: dictationModalState._sentenceTimeKey,
           elapsed,
           prevAcc,
           prevTimeCount,
@@ -3004,6 +3025,9 @@
       dictationModalState._sentenceTimeAccumulatedAtStart = accStart;
       // Запоминаем уже накопленное время для этого предложения (если мы уже заходили в него)
       const key = session.getCurrentKey();
+      // Фиксируем ключ, для которого актуальны аккумуляторы — см. guard в
+      // _flushCurrentSentenceTime (защита от двойного суммирования времени).
+      dictationModalState._sentenceTimeKey = key;
       let prevCount = 0;
       if (key != null) {
         const st = session.getState(key);
@@ -7456,6 +7480,7 @@
       try { dictationModalState._timeStarted = false; } catch (e) {}
       try { dictationModalState._sentenceTimeAccumulatedAtStart = 0; } catch (e) {}
       try { dictationModalState._sentencePreviousAccumulatedTime = 0; } catch (e) {}
+      try { dictationModalState._sentenceTimeKey = null; } catch (e) {}
       // Сбрасываем dictationModalState._completionShown, чтобы окно успеха могло появиться снова
       try {
         dictationModalState._completionShown = false;
@@ -8096,8 +8121,17 @@
       if (errorLabel) errorLabel.textContent = '';
     } catch (e) {
     }
+    // Сбрасываем привязку аккумуляторов времени к ключу предложения при открытии
+    // нового диктанта. Иначе _flushCurrentSentenceTime мог бы записать устаревшее
+    // время (по аккумуляторам предыдущего диктанта) в первое предложение нового.
+    try {
+      dictationModalState._sentenceTimeKey = null;
+      dictationModalState._sentenceTimeAccumulatedAtStart = 0;
+      dictationModalState._sentencePreviousAccumulatedTime = 0;
+    } catch (e) {
+    }
   }
-
+ 
   function bindHeaderButtons() {
     const closeBtn = document.getElementById('dictationModalCloseBtn');
     if (closeBtn && closeBtn.dataset.bound !== '1') {
