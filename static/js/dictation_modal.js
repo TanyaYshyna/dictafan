@@ -165,6 +165,25 @@
   }
 
   /**
+   * Есть ли у сессии «настоящий» прогресс: хотя бы одна звезда, исправление
+   * или аудиозапись. Используется для различения «продолжить» (continue) и
+   * «новая игра» (fresh start) — ровно та же логика, что и в updateStartButton.
+   */
+  function _sessionHasRealProgress(session) {
+    try {
+      if (!session || !session.content) return false;
+      const keys = session.content.getAllKeys();
+      for (const key of keys) {
+        const st = session.getState(key);
+        if (st && (Number(st.number_of_perfect) > 0 || Number(st.number_of_corrected) > 0 || Number(st.number_of_audio) > 0)) {
+          return true;
+        }
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  /**
    * «Живое» суммарное время диктанта по предложениям для табло.
    * Сначала сбрасывает текущее живое время предложения в st.time_count
    * (идемпотентно), затем возвращает сумму всех time_count.
@@ -8343,6 +8362,53 @@
             }
           } catch (eReset) {
             console.error('[DM:open] ошибка resetDictationProgressForSession:', eReset);
+          }
+
+          // Если сессия восстановлена из IndexedDB как «незавершённая» (пользователь
+          // просто закрыл модалку/вкладку, не дойдя до конца и не нажав «всё по новой»),
+          // но реального прогресса в ней нет (ни одной звезды/исправления/аудио),
+          // это брошенный диктант. Его устаревшее время (st.time_count и timer.accumulatedMs)
+          // не должно подхватываться при новом входе: пользователь открывает диктант
+          // заново и ожидает увидеть 0:00. Обнуляем только время, оставляя выбор предложений.
+          try {
+            const hasProgress = _sessionHasRealProgress(session);
+            const staleTimeMs = _getSessionSentenceTimeTotalMs(session) + (Number(session.timer && session.timer.accumulatedMs) || 0);
+            console.log('[DM:open] fresh-start check', JSON.stringify({
+              hasProgress,
+              sentenceTotalMs: _getSessionSentenceTimeTotalMs(session),
+              timerAccumulatedMs: session.timer ? session.timer.accumulatedMs : null,
+              staleTimeMs,
+            }));
+            if (!hasProgress && staleTimeMs > 0) {
+              console.log('[DM:open] брошенный диктант без прогресса — обнуляем устаревшее время');
+              try {
+                const keys = session.content ? session.content.getAllKeys() : [];
+                for (const key of keys) {
+                  const st = session.getState(key);
+                  if (st) st.time_count = 0;
+                }
+              } catch (eTime) {
+                console.error('[DM:open] ошибка обнуления time_count:', eTime);
+              }
+              try {
+                if (session.timer) {
+                  session.stopTimer();
+                  session.timer.accumulatedMs = 0;
+                  session.timer.startedAtMs = 0;
+                }
+              } catch (eTimer) {
+                console.error('[DM:open] ошибка обнуления timer:', eTimer);
+              }
+              // Сохраняем обнулённое время в IndexedDB, чтобы при следующем открытии
+              // (или перезагрузке страницы) устаревшее время не подхватилось снова.
+              try {
+                await _persistSessionToIdb();
+              } catch (ePersist) {
+                console.error('[DM:open] ошибка persist после обнуления времени:', ePersist);
+              }
+            }
+          } catch (eFresh) {
+            console.error('[DM:open] ошибка fresh-start check:', eFresh);
           }
 
           try {
