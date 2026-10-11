@@ -312,6 +312,9 @@
       "new_start": "НОВЫЙ СТАРТ",
       "victory": "Победа! Ты красавчик!!!"
     },
+    "countdown": {
+      "go": "Пуск"
+    },
     "start_modal": {
       "select_all": "отметить все",
       "original": "оригинал",

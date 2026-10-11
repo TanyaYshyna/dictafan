@@ -312,6 +312,9 @@
       "new_start": "YENİDEN BAŞLA",
       "victory": "Zafer! Harika iş!!!"
     },
+    "countdown": {
+      "go": "Başla"
+    },
     "start_modal": {
       "select_all": "Tümünü seç",
       "original": "orijinal",

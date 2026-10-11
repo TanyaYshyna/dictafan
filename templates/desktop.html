@@ -53,10 +53,6 @@
                                 <i data-lucide="user"></i>
                                 <span>{{ t('private_library.user_menu.profile') }}</span>
                             </button>
-                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-license" role="menuitem">
-                                <i data-lucide="key"></i>
-                                <span>{{ t('private_library.user_menu.license') }}</span>
-                            </button>
                             <button type="button" class="dropdown-menu-item" data-action="desktop-menu-tracker" role="menuitem">
                                 <i data-lucide="calendar"></i>
                                 <span>{{ t('private_library.user_menu.tracker') }}</span>
@@ -81,12 +77,16 @@
                                 <i data-lucide="coffee"></i>
                                 <span>{{ t('private_library.user_menu.coffee') }}</span>
                             </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-license" role="menuitem">
+                                <i data-lucide="key"></i>
+                                <span>{{ t('private_library.user_menu.license') }}</span>
+                            </button>
                             <button type="button" class="dropdown-menu-item" data-action="desktop-menu-admin-panel" role="menuitem" style="display: none;" id="desktopAdminLicenseMenuItem">
                                 <i data-lucide="shield-check"></i>
                                 <span>{{ t('private_library.user_menu.admin_panel') }}</span>
                             </button>
                             <div class="dropdown-menu-separator"></div>
-                            <button type="button" class="dropdown-menu-item dropdown-menu-item-danger" data-action="desktop-menu-logout" role="menuitem" id="desktopLogoutMenuItem">
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-logout" role="menuitem" id="desktopLogoutMenuItem">
                                 <i data-lucide="log-out"></i>
                                 <span>{{ t('private_library.user_menu.switch_user') }}</span>
                             </button>

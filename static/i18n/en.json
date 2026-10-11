@@ -312,6 +312,9 @@
       "new_start": "NEW START",
       "victory": "Victory! Great job!!!"
     },
+    "countdown": {
+      "go": "Go"
+    },
     "start_modal": {
       "select_all": "Select all",
       "original": "original",

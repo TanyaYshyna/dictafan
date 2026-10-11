@@ -70,9 +70,12 @@
     display: none;
   }
   .logo--min {
+    /* Наследует height: 5em у .logo; viewBox логотипа квадратный (120×120),
+       поэтому width: auto даёт квадрат той же высоты, что и полный логотип
+       (как это уже работает в шапке модального окна диктанта). */
     display: inline-block;
-    height: 40px;
-    width: 40px;
+    width: auto;
+    max-height: 80px;
   }
 }
 

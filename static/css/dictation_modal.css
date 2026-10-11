@@ -7,6 +7,11 @@
   backdrop-filter: blur(1px);
 }
 
+/* Пока идёт обратный отсчёт — поднимаем модалку над #desktopLoadingModal (z-index 100500) */
+#dictationModal.dictation-modal.dictation-modal--countdown {
+  z-index: 100505;
+}
+
 #dictationModal .modal {
   z-index: 100255;
 }
@@ -93,7 +98,7 @@
   align-items: flex-end;
   justify-content: flex-start;
   gap: 8px;
-  min-width: 320px;
+  min-width: 0;
 }
 
 @media (max-width: 860px) {
@@ -273,6 +278,33 @@ html[dir="rtl"] #dictationModal .sentence-nav-bottom-inner {
 
 #dictationModal .progress-panel-modal-r .table-progress {
   min-width: 320px;
+}
+
+/* Минималистичная панель результатов в модалке диктанта: только часы/время.
+   Остальные ячейки (точность, деньги, строка со звёздами/ошибками) скрываем,
+   чтобы часы помещались в одну строку с навигатором "<- 1/24 ->". */
+#dictationModal #progressPanelContainer .table-progress {
+  min-width: 0;
+}
+
+#dictationModal #progressPanelContainer .table-progress tr:nth-child(2) {
+  display: none;
+}
+
+#dictationModal #progressPanelContainer .table-progress tr:first-child td:not(:first-child) {
+  display: none;
+}
+
+#dictationModal #progressPanelContainer .table-progress button {
+  height: 40px;
+  padding: 0 10px;
+  font-size: 16px;
+  gap: 6px;
+}
+
+#dictationModal #progressPanelContainer .table-progress button i {
+  width: 16px;
+  height: 16px;
 }
 
 #dictationModal .table-progress {
@@ -2319,8 +2351,9 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
     display: inline-block;
   }
 
+  /* На узких экранах скрываем имя пользователя, оставляя аватар */
   #dictationModal .dictation-modal__username {
-    max-width: 38vw;
+    display: none;
   }
 }
 
@@ -2459,5 +2492,55 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 
   #dictationModal #sentences-table th {
     position: static !important;
+  }
+}
+
+/* --- Обратный отсчёт 3-2-1-Пуск при автозапуске диктанта ---
+   Экономная анимация: ритм «сердца» реализован CSS-анимацией
+   transform: scale() (GPU-композитинг, без layout/reflow). */
+#dictationCountdown.dictation-countdown {
+  position: fixed;
+  inset: 0;
+  z-index: 100510;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(17, 24, 39, 0.38);
+  pointer-events: none;
+}
+
+#dictationCountdown .dictation-countdown__number {
+  font-size: min(28vw, 240px);
+  line-height: 1;
+  font-weight: 800;
+  color: #e11d48;
+  text-shadow: 0 8px 32px rgba(225, 29, 72, 0.45);
+  user-select: none;
+  will-change: transform;
+  transform-origin: center;
+}
+
+#dictationCountdown .dictation-countdown__number--go {
+  font-size: min(14vw, 160px);
+}
+
+/* Ритм «сердца» включается только при наличии класса --beat.
+   JS перезапускает анимацию для каждого нового числа, снимая/добавляя класс. */
+#dictationCountdown .dictation-countdown__number--beat {
+  animation: dictation-countdown-beat 0.9s ease-in-out infinite;
+}
+
+@keyframes dictation-countdown-beat {
+  0% { transform: scale(0.72); }
+  22% { transform: scale(1.16); }
+  38% { transform: scale(0.94); }
+  55% { transform: scale(1.08); }
+  72% { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #dictationCountdown .dictation-countdown__number {
+    animation: none;
   }
 }

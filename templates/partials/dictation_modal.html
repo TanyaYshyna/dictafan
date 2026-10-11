@@ -12,6 +12,7 @@
             <span id="dictationModalMedalCount">0</span>
           </div>
         </div>
+        <div id="dictationLangPair" class="dictation-langpair"></div>
       </div>
 
       <div class="dictation-modal__header-right">
@@ -41,7 +42,6 @@
               <tr class="sentence-nav-top-row">
                 <td class="sentence-nav-cell">
                   <div class="sentence-nav-top-inner">
-                    <div id="dictationLangPair" class="dictation-langpair"></div>
                     <h2 class="dictation-title" id="dictationTitle"></h2>
                     <div id="dictationRecordLabel" class="dictation-record-label" style="display:none; font-size:13px; color:var(--color-button-gray); margin-top:4px; align-items:center; gap:8px; flex-wrap:wrap;">
                       <span class="record-label-item">
@@ -231,6 +231,11 @@
       <!-- Передаем только метаданные диктанта (предложения загружаются через API) -->
       <div id="dictation-data" data-language-original="" data-language-translation="" data-lang-notice="" data-title-orig="" data-dictation-id="" data-is-dialog="false" data-speakers='[]' style="display: none;">
       </div>
+    </div>
+
+    <!-- dictation-countdown: обратный отсчёт 3-2-1-Пуск при автозапуске диктанта -->
+    <div id="dictationCountdown" class="dictation-countdown" aria-hidden="true">
+      <div class="dictation-countdown__number" id="dictationCountdownNumber">3</div>
     </div>
   </div>
 

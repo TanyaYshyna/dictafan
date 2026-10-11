@@ -312,6 +312,9 @@
       "new_start": "Н О В И Й    С Т А Р Т",
       "victory": "П Е Р Е М О Г А! Хороша робота!!!"
     },
+    "countdown": {
+      "go": "Старт"
+    },
     "start_modal": {
       "select_all": "позначити все",
       "original": "оригінал",

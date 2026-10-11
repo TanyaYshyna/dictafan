@@ -307,6 +307,9 @@
       "new_start": "بداية جديدة",
       "victory": "النصر! أحسنت!!!"
     },
+    "countdown": {
+      "go": "انطلق"
+    },
     "start_modal": {
       "select_all": "تحديد الكل",
       "original": "الأصل",

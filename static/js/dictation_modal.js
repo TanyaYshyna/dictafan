@@ -53,6 +53,8 @@
     // Локальный (в рамках текущего диктанта) режим распознавания, установленный
     // кликом по иконке. Не персистится: при новом открытии диктанта сбрасывается.
     _speechRecModeOverride: null,
+    // Таймер обратного отсчёта 3-2-1-Пуск при автозапуске диктанта
+    _countdownTimer: null,
   };
 
   /**
@@ -6498,6 +6500,102 @@
     _resumeDictationTimer();
   }
 
+  // --- Обратный отсчёт 3-2-1-Пуск перед автозапуском диктанта ---
+  // Экономная анимация: числа меняются через setTimeout, а ритм «сердца»
+  // (увеличение/уменьшение) делает CSS-анимация через transform: scale() —
+  // это GPU-композитинг, без перерисовки layout и reflow.
+
+  function _restartCountdownBeat() {
+    try {
+      const num = document.getElementById('dictationCountdownNumber');
+      if (!num) return;
+      num.classList.remove('dictation-countdown__number--beat');
+      // Принудительный reflow, чтобы перезапустить CSS-анимацию для нового числа
+      void num.offsetWidth;
+      num.classList.add('dictation-countdown__number--beat');
+    } catch (e) {
+    }
+  }
+
+  function showDictationCountdown() {
+    try {
+      const el = document.getElementById('dictationCountdown');
+      if (!el) return null;
+      const modal = getModal();
+      // Поднимаем #dictationModal над #desktopLoadingModal (z-index 100500),
+      // чтобы отсчёт перекрывал жёлтый кружочек, пока контент ещё грузится.
+      if (modal) modal.classList.add('dictation-modal--countdown');
+      el.style.display = 'flex';
+      const num = document.getElementById('dictationCountdownNumber');
+      if (num) {
+        num.textContent = '3';
+        num.classList.remove('dictation-countdown__number--go');
+      }
+      _restartCountdownBeat();
+      return el;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function hideDictationCountdown() {
+    try {
+      const el = document.getElementById('dictationCountdown');
+      if (el) el.style.display = 'none';
+      const modal = getModal();
+      if (modal) modal.classList.remove('dictation-modal--countdown');
+    } catch (e) {
+    }
+  }
+
+  function clearDictationCountdownTimer() {
+    try {
+      if (dictationModalState._countdownTimer) {
+        clearTimeout(dictationModalState._countdownTimer);
+        dictationModalState._countdownTimer = null;
+      }
+    } catch (e) {
+    }
+  }
+
+  function runDictationCountdown() {
+    clearDictationCountdownTimer();
+    const el = showDictationCountdown();
+    if (!el) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      const steps = [
+        { text: '3', ms: 900 },
+        { text: '2', ms: 900 },
+        { text: '1', ms: 900 },
+        { text: dictationT('countdown.go', 'Пуск'), ms: 800, go: true },
+      ];
+      let idx = 0;
+      const next = () => {
+        if (idx >= steps.length) {
+          hideDictationCountdown();
+          resolve();
+          return;
+        }
+        const step = steps[idx++];
+        const num = document.getElementById('dictationCountdownNumber');
+        if (num) {
+          num.textContent = step.text;
+          // Слово «Пуск»/«Go» длиннее цифр — уменьшаем кегль, чтобы не вылезало за экран
+          if (step.go) {
+            num.classList.add('dictation-countdown__number--go');
+          } else {
+            num.classList.remove('dictation-countdown__number--go');
+          }
+        }
+        _restartCountdownBeat();
+        dictationModalState._countdownTimer = setTimeout(next, step.ms);
+      };
+      next();
+    });
+  }
+
   try {
     if (typeof window.showStartModal !== 'function') window.showStartModal = showStartModal;
     if (typeof window.hideStartModal !== 'function') window.hideStartModal = hideStartModal;
@@ -8049,6 +8147,18 @@
 
       // Загружаем контент диктанта (предложения) в runtime.
       // Если загрузка не удалась — не создаём сессию, показываем ошибку.
+      //
+      // Запускаем обратный отсчёт 3-2-1-Пуск ПАРАЛЛЕЛЬНО с загрузкой контента:
+      //   - данные в кеше (быстро)  -> отсчёт доиграет и диктант стартует сразу;
+      //   - данные с сервера (долго) -> отсчёт доиграет, а под ним уже
+      //     показывается общий лоадер с жёлтым кружочком (DesktopLoadingModal),
+      //     который поднимает ensureDictationContentLoadedToRuntime.
+      let countdownPromise = null;
+      let shouldAutoStart = false;
+      try {
+        countdownPromise = runDictationCountdown();
+      } catch (eCountdown) {
+      }
       let contentLoaded = false;
       try {
         if (parsed) {
@@ -8071,6 +8181,12 @@
             window.showNoSelectionModal('Не удалось загрузить диктант. Проверь интернет и обнови страницу.');
           }
         } catch (e1) {
+        }
+        // Останавливаем отсчёт, чтобы он не висел поверх окна ошибки
+        try {
+          clearDictationCountdownTimer();
+          hideDictationCountdown();
+        } catch (eCd) {
         }
       }
 
@@ -8158,12 +8274,10 @@
           }
 
           dictationModalState.startModalContext = 'open';
-          try {
-            showStartModal();
-            console.log('[DM:open] showStartModal done, display=', document.getElementById('start-modal') ? document.getElementById('start-modal').style.display : 'start-modal не найден');
-          } catch (eShow) {
-            console.error('[DM:open] ошибка в showStartModal:', eShow);
-          }
+          // Автозапуск: НЕ показываем панель выбора предложений.
+          // Стартуем диктант сразу (как будто нажали СТАРТ) после того,
+          // как обратный отсчёт 3-2-1-Пуск закончится.
+          shouldAutoStart = true;
 
           try {
             updateNavigatorFromSession(session);
@@ -8230,6 +8344,40 @@
       try {
         bindStartModalControls();
       } catch (e) {
+      }
+
+      // Автозапуск диктанта: дожидаемся конца отсчёта 3-2-1-Пуск,
+      // затем стартуем сразу, как будто нажали СТАРТ.
+      // (bindStartModalControls уже привязал обработчики, поэтому
+      //  логика контекста 'open' идентична клику по confirmStartBtn.)
+      try {
+        if (shouldAutoStart) {
+          if (countdownPromise) {
+            try {
+              await countdownPromise;
+            } catch (eCd) {
+            }
+          }
+          // Если контент всё ещё грузится — под отсчётом уже показан
+          // общий лоадер с жёлтым кружочком; дожидаемся завершения загрузки.
+          // (ensureDictationContentLoadedToRuntime сам скроет лоадер.)
+          if (contentLoaded) {
+            try {
+              if (typeof window.startGame === 'function') {
+                window.startGame();
+              }
+            } catch (eStart) {
+            }
+          }
+        }
+      } catch (eAuto) {
+        console.error('[DM:open] ошибка автозапуска диктанта:', eAuto);
+      } finally {
+        try {
+          clearDictationCountdownTimer();
+          hideDictationCountdown();
+        } catch (eCd) {
+        }
       }
 
       // Legacy dictation runtime (script_dictation.js) intentionally not used here.
@@ -8304,6 +8452,13 @@
   async function close(clearSession = false) {
     const modal = getModal();
     if (!modal) return;
+
+    // Гасим обратный отсчёт, если он вдруг ещё идёт
+    try {
+      clearDictationCountdownTimer();
+      hideDictationCountdown();
+    } catch (eCd) {
+    }
 
     // Если диктант завершён (session.completed === true), всегда очищаем сессию
     try {

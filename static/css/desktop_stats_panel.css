@@ -50,8 +50,8 @@
 /* ---- Кольцевые диаграммы (компактные) ---- */
 .desktop-stats-rings {
     position: relative;
-    width: 44px;
-    height: 44px;
+    width: 53px;
+    height: 53px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -114,7 +114,8 @@
     font-size: 11px;
     font-weight: 700;
     line-height: 1;
-    color: var(--color-text-secondary, #6b7280);
+    /* Часы и подпись — тёмно-жёлтые (та же дуга, что и внешнее кольцо) */
+    color: var(--color-stats-ring-time-arc, #d97706);
     white-space: nowrap;
     display: flex;
     align-items: center;
@@ -128,7 +129,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-stats-ring-time, #f59e0b);
+    color: var(--color-stats-ring-time-arc, #d97706);
     flex-shrink: 0;
 }
 
