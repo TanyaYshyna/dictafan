@@ -453,7 +453,8 @@
       "ratings": "Derecelendirmeler",
       "dictation_report": "Dikte raporu",
       "coffee": "Bana kahve ısmarla",
-      "admin_panel": "Yönetici paneli"
+      "admin_panel": "Yönetici paneli",
+      "switch_user": "Kullanıcı değiştir"
     },
     "delete_modal": {
       "title": "Dikteyi sil",

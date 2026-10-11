@@ -33,30 +33,31 @@
 {% block topbar %}
     <div class="topbar">
         <a href="/" class="logo-link">
-            <img src="/static/icons/logo.svg" class="logo">
+            <img src="/static/icons/logo.svg" class="logo logo--full">
+            <img src="/static/icons/logo_min.svg" class="logo logo--min">
         </a>
+        <div class="desktop-lang-selector" id="desktopLangSelector"></div>
         {% include 'partials/desktop_stats_panel.html' %}
         <div class="user-section" id="user-section">
             <div class="auth-buttons" style="display: none;"></div>
             <div class="user-info" style="display: none;">
                 <div class="desktop-user-meta">
-                    <div class="desktop-lang-selector" id="desktopLangSelector"></div>
                     <div class="dropdown-menu-wrapper" id="desktopUserMenuWrapper">
                         <button type="button" class="username" id="desktopUserMenuToggle" aria-haspopup="true" aria-expanded="false">
                             <div class="user-avatar-small"></div>
                             <span class="username-text"></span>
-                            <i data-lucide="chevron-down"></i>
+                            <i data-lucide="menu"></i>
                         </button>
                         <div class="dropdown-menu" id="desktopUserMenuDropdown" role="menu">
                             <button type="button" class="dropdown-menu-item" data-action="desktop-menu-profile" role="menuitem">
                                 <i data-lucide="user"></i>
                                 <span>{{ t('private_library.user_menu.profile') }}</span>
-                                </button>
-                                <button type="button" class="dropdown-menu-item" data-action="desktop-menu-license" role="menuitem">
-                                    <i data-lucide="key"></i>
-                                    <span>{{ t('private_library.user_menu.license') }}</span>
-                                </button>
-                                <button type="button" class="dropdown-menu-item" data-action="desktop-menu-tracker" role="menuitem">
+                            </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-license" role="menuitem">
+                                <i data-lucide="key"></i>
+                                <span>{{ t('private_library.user_menu.license') }}</span>
+                            </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-tracker" role="menuitem">
                                 <i data-lucide="calendar"></i>
                                 <span>{{ t('private_library.user_menu.tracker') }}</span>
                             </button>
@@ -79,17 +80,18 @@
                             <button type="button" class="dropdown-menu-item" data-action="desktop-menu-coffee" role="menuitem">
                                 <i data-lucide="coffee"></i>
                                 <span>{{ t('private_library.user_menu.coffee') }}</span>
-                                </button>
-                                <button type="button" class="dropdown-menu-item" data-action="desktop-menu-admin-panel" role="menuitem" style="display: none;" id="desktopAdminLicenseMenuItem">
-                                    <i data-lucide="shield-check"></i>
-                                    <span>{{ t('private_library.user_menu.admin_panel') }}</span>
-                                </button>
-                            </div>
+                            </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-admin-panel" role="menuitem" style="display: none;" id="desktopAdminLicenseMenuItem">
+                                <i data-lucide="shield-check"></i>
+                                <span>{{ t('private_library.user_menu.admin_panel') }}</span>
+                            </button>
+                            <div class="dropdown-menu-separator"></div>
+                            <button type="button" class="dropdown-menu-item dropdown-menu-item-danger" data-action="desktop-menu-logout" role="menuitem" id="desktopLogoutMenuItem">
+                                <i data-lucide="log-out"></i>
+                                <span>{{ t('private_library.user_menu.switch_user') }}</span>
+                            </button>
+                        </div>
                     </div>
-                    <button id="logoutBtn" class="logout-btn" title="">
-                        <i data-lucide="log-out"></i>
-                        <span class="logout-text"></span>
-                    </button>
                 </div>
             </div>
         </div>

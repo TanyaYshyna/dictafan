@@ -1,12 +1,13 @@
 /**
- * Панель статистики «Время / Деньги» на рабочем столе.
+ * Панель статистики «Время / Стрик» на рабочем столе.
  *
  * Встраивается в шапку (topbar), рядом с логотипом.
  *
  * Минимальный режим (по умолчанию):
- *   — Две кольцевые SVG-диаграммы (уменьшенные): внутренняя (жёлтая) — время, внешняя (розовая) — деньги
+ *   — Две кольцевые SVG-диаграммы (уменьшенные): внутренняя (жёлтая) и
+ *     внешняя (тёмно-жёлтая дуга) — обе отвечают за время
  *   — В центре колец: огонь + число несгораемых дней
- *   — Справа от колец: сверху время, снизу деньги
+ *   — Под кружком: компактное время (чч:мм)
  *   — Pull-tab (язычок) в правом нижнем углу для открытия расширенной панели
  *
  * Расширенная панель (открывается по клику на pull-tab):
@@ -146,21 +147,14 @@ window.DesktopStatsPanel = {
             timeCompact.textContent = this._formatTimeCompact(timeFact);
         }
 
-        // --- Деньги компактно ---
-        const moneyCompact = document.getElementById('statsTodayMoneyCompact');
-        if (moneyCompact) {
-            moneyCompact.textContent = this._formatMoney(moneyFact);
-        }
+        // --- Кольцевые диаграммы (обе отвечают за ВРЕМЯ) ---
 
-        // --- Кольцевые диаграммы ---
-
-        // Внутренний сектор — время (жёлтое), 2*PI*14.5 ≈ 91.11
+        // Внутренний жёлтый сектор — время, 2*PI*14.5 ≈ 91.11
         const timeRatio = timePlan > 0 ? Math.min(timeFact / timePlan, 1) : 0;
         this._updateRing('statsRingTime', timeRatio, 91.11);
 
-        // Внешнее кольцо — деньги (розовое), 2*PI*34 ≈ 213.63
-        const moneyRatio = moneyPlan > 0 ? Math.min(moneyFact / moneyPlan, 1) : 0;
-        this._updateRing('statsRingMoney', moneyRatio, 213.63);
+        // Внешняя тёмно-жёлтая дуга — время, 2*PI*34 ≈ 213.63
+        this._updateRing('statsRingTimeArc', timeRatio, 213.63);
 
         // --- Расширенная панель ---
 

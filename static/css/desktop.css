@@ -5,24 +5,102 @@
   flex-wrap: nowrap;
 }
 
+/* ---- Шапка рабочего стола: флаги остаются слева у логотипа,
+        а панель «время/стрик» + блок пользователя прижаты вправо.
+        Убираем дублирующий auto-отступ у .user-section, чтобы свободное
+        место не делилось между двумя auto-полями. ---- */
+.page-index .topbar {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.page-index .user-section {
+  margin-inline-start: 0;
+}
+
+/* ---- Гибкость шапки при узких экранах: не даём фиксированным
+        элементам распирать шапку шире панели рабочего стола ---- */
+.page-index .topbar > * {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .page-index .topbar {
+    gap: 6px;
+    padding-inline-end: 6px;
+  }
+
+  .page-index .desktop-lang-selector {
+    flex: 0 1 auto;
+    overflow: hidden;
+  }
+
+  .page-index .desktop-user-meta {
+    gap: 6px;
+  }
+
+  .page-index .desktop-user-meta .username-text {
+    max-width: 90px;
+  }
+}
+
+/* ---- Гибкость панели рабочего стола: карточки/книги не должны
+        задавать минимальную ширину всей страницы, а прокручиваться
+        внутри зоны рабочего стола ---- */
+.page-index .panel {
+  min-width: 0;
+}
+
+.page-index .desk-scroll-container {
+  min-width: 0;
+}
+
+.page-index .desk-cards-container {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* ---- Логотип в шапке: полный / минимальный (лицо) ---- */
+.logo--min {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .logo--full {
+    display: none;
+  }
+  .logo--min {
+    display: inline-block;
+    height: 40px;
+    width: 40px;
+  }
+}
+
+/* ---- Разделитель в выпадающем меню пользователя (перед «Сменить пользователя») ---- */
+.dropdown-menu-separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--color-border-light, #dee2e6);
+}
+
 /* Селектор языка рабочего стола в шапке — слева от родного флага (аватара) */
-.desktop-user-meta .desktop-lang-selector {
+.desktop-lang-selector {
   position: relative;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
 }
 
-.desktop-user-meta .desktop-lang-selector .language-selector-group {
+.desktop-lang-selector .language-selector-group {
   margin: 0;
   padding: 0;
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-select-wrapper {
+.desktop-lang-selector .custom-select-wrapper {
   position: relative;
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-select-trigger {
+.desktop-lang-selector .custom-select-trigger {
   width: 36px;
   height: 36px;
   border-radius: 10px;
@@ -38,25 +116,25 @@
   color: var(--color-text-secondary, #6b7280);
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-select-trigger:hover {
+.desktop-lang-selector .custom-select-trigger:hover {
   background: var(--color-hover, #f8f9fa);
   transform: translateY(-1px);
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-select-trigger .language-flag {
+.desktop-lang-selector .custom-select-trigger .language-flag {
   width: 20px !important;
   height: 15px !important;
   border-radius: 2px;
   object-fit: cover;
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-select-trigger i[data-lucide] {
+.desktop-lang-selector .custom-select-trigger i[data-lucide] {
   width: 12px;
   height: 12px;
   margin-left: 1px;
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-select-options {
+.desktop-lang-selector .custom-select-options {
   position: absolute;
   left: 0;
   top: calc(100% + 4px);
@@ -75,7 +153,7 @@
   padding: 4px 0;
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-option {
+.desktop-lang-selector .custom-option {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -85,16 +163,16 @@
   transition: background 0.15s ease;
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-option:hover {
+.desktop-lang-selector .custom-option:hover {
   background: var(--color-hover, #f8f9fa);
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-option.selected {
+.desktop-lang-selector .custom-option.selected {
   background: var(--color-hover, #f0f0f0);
   font-weight: 600;
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-option .language-flag {
+.desktop-lang-selector .custom-option .language-flag {
   width: 20px !important;
   height: 15px !important;
   border-radius: 2px;
@@ -102,19 +180,19 @@
   flex-shrink: 0;
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-option .option-text {
+.desktop-lang-selector .custom-option .option-text {
   display: flex;
   flex-direction: column;
   gap: 0;
   line-height: 1.2;
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-option .language-name {
+.desktop-lang-selector .custom-option .language-name {
   font-size: 13px;
   color: var(--color-text, #1f2933);
 }
 
-.desktop-user-meta .desktop-lang-selector .custom-option .native-name {
+.desktop-lang-selector .custom-option .native-name {
   font-size: 11px;
   color: var(--color-text-secondary, #6b7280);
 }
@@ -122,7 +200,7 @@
 /* Пара «оригинал => перевод» (flag-pair-dropdown-left) — как в диктанте:
    левый флаг (изучаемый язык) + стрелка + правый флаг (родной/перевод),
    оба флага рисуются через LanguageSelector (менеджер). */
-.desktop-user-meta .desktop-lang-selector .flag-pair-combo {
+.desktop-lang-selector .flag-pair-combo {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -134,31 +212,31 @@
   position: relative;
 }
 
-.desktop-user-meta .desktop-lang-selector .flag-pair-combo:hover {
+.desktop-lang-selector .flag-pair-combo:hover {
   background: var(--color-hover, #f8f9fa);
 }
 
-.desktop-user-meta .desktop-lang-selector .flag-pair-side {
+.desktop-lang-selector .flag-pair-side {
   display: inline-flex;
   align-items: center;
   line-height: 0;
 }
 
-.desktop-user-meta .desktop-lang-selector .flag-pair-combo .language-flag {
+.desktop-lang-selector .flag-pair-combo .language-flag {
   width: 20px !important;
   height: 15px !important;
   border-radius: 2px;
   object-fit: cover;
 }
 
-.desktop-user-meta .desktop-lang-selector .flag-pair-combo i[data-lucide] {
+.desktop-lang-selector .flag-pair-combo i[data-lucide] {
   width: 16px;
   height: 16px;
   color: var(--color-text-secondary, #6b7280);
 }
 
 /* Выпадающий список изучаемых языков (левая сторона пары) */
-.desktop-user-meta .desktop-lang-selector .flag-pair-dropdown {
+.desktop-lang-selector .flag-pair-dropdown {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
@@ -172,13 +250,13 @@
   overflow: hidden;
 }
 
-.desktop-user-meta .desktop-lang-selector .header-dropdown-options {
+.desktop-lang-selector .header-dropdown-options {
   max-height: 300px;
   overflow-y: auto;
   padding: 4px 0;
 }
 
-.desktop-user-meta .desktop-lang-selector .header-dropdown-option {
+.desktop-lang-selector .header-dropdown-option {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -188,16 +266,16 @@
   transition: background 0.15s ease;
 }
 
-.desktop-user-meta .desktop-lang-selector .header-dropdown-option:hover {
+.desktop-lang-selector .header-dropdown-option:hover {
   background: var(--color-hover, #f8f9fa);
 }
 
-.desktop-user-meta .desktop-lang-selector .header-dropdown-option.selected {
+.desktop-lang-selector .header-dropdown-option.selected {
   background: var(--color-hover, #f0f0f0);
   font-weight: 600;
 }
 
-.desktop-user-meta .desktop-lang-selector .header-dropdown-option .language-flag {
+.desktop-lang-selector .header-dropdown-option .language-flag {
   width: 20px !important;
   height: 15px !important;
   border-radius: 2px;
@@ -205,7 +283,7 @@
   flex-shrink: 0;
 }
 
-.desktop-user-meta .desktop-lang-selector .header-dropdown-option .header-option-text {
+.desktop-lang-selector .header-dropdown-option .header-option-text {
   font-size: 13px;
   color: var(--color-text, #1f2933);
 }

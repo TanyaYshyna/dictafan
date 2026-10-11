@@ -1,4 +1,4 @@
-<!-- desktop-stats-panel: панель статистики «Время / Деньги» в шапке рабочего стола -->
+<!-- desktop-stats-panel: панель статистики «Время / Стрик» в шапке рабочего стола -->
 <div class="desktop-stats-panel" id="desktopStatsPanel">
     <!-- Кольцевые диаграммы + центр (огонь + число несгораемых дней) -->
     <div class="desktop-stats-rings" id="desktopStatsRings">
@@ -6,9 +6,9 @@
             <!-- Внутренний сектор (время) — r=14.5, закрашен от центра. Ширина задаётся в CSS (.stats-ring-time*) -->
             <circle cx="50" cy="50" r="14.5" fill="none" class="stats-ring-time-bg"></circle>
             <circle id="statsRingTime" cx="50" cy="50" r="14.5" fill="none" class="stats-ring-time" stroke-linecap="butt" stroke-dasharray="0 91.11" transform="rotate(-90 50 50)"></circle>
-            <!-- Внешнее кольцо (деньги) — r=34. Ширина задаётся в CSS (.stats-ring-money*) -->
-            <circle cx="50" cy="50" r="34" fill="none" class="stats-ring-money-bg"></circle>
-            <circle id="statsRingMoney" cx="50" cy="50" r="34" fill="none" class="stats-ring-money" stroke-linecap="round" stroke-dasharray="0 213.63" transform="rotate(-90 50 50)"></circle>
+            <!-- Внешняя дуга (время) — r=34. Ширина задаётся в CSS (.stats-ring-time-arc*) -->
+            <circle cx="50" cy="50" r="34" fill="none" class="stats-ring-time-arc-bg"></circle>
+            <circle id="statsRingTimeArc" cx="50" cy="50" r="34" fill="none" class="stats-ring-time-arc" stroke-linecap="round" stroke-dasharray="0 213.63" transform="rotate(-90 50 50)"></circle>
         </svg>
         <div class="desktop-stats-rings-center">
             <div class="desktop-stats-fire-row">
@@ -18,16 +18,10 @@
         </div>
     </div>
 
-    <!-- Инфо справа от колец: время сверху, деньги снизу -->
-    <div class="desktop-stats-info">
-        <div class="desktop-stats-time-row">
-            <span class="stats-label-icon"><i data-lucide="clock"></i></span>
-            <span id="statsTodayTimeCompact">—</span>
-        </div>
-        <div class="desktop-stats-money-row">
-            <span class="stats-money-icon"><i data-lucide="dollar-sign"></i></span>
-            <span id="statsTodayMoneyCompact">—</span>
-        </div>
+    <!-- Время под кружком -->
+    <div class="desktop-stats-time-row">
+        <span class="stats-label-icon"><i data-lucide="clock"></i></span>
+        <span id="statsTodayTimeCompact">—</span>
     </div>
 
     <!-- Pull-tab (правый нижний угол) -->

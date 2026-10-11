@@ -456,6 +456,19 @@ window.Desktop = window.Desktop || {
 
   stubAction(name) {
     try {
+      if (name === 'desktop-menu-logout') {
+        try {
+          if (window.UM && typeof window.UM.logout === 'function') {
+            window.UM.logout();
+          } else {
+            localStorage.removeItem('jwt_token');
+            window.location.reload();
+          }
+        } catch (e) {
+          try { localStorage.removeItem('jwt_token'); } catch (e2) {}
+        }
+        return;
+      }
       if (name === 'desktop-menu-profile') {
         try {
           const modal = document.getElementById('user-profile-modal');
@@ -1089,7 +1102,7 @@ window.Desktop = window.Desktop || {
         const action = btn.getAttribute('data-action');
 
         // Исключаем действия, которые уже обрабатываются в initUserMenu
-        if (action === 'desktop-menu-profile' || action === 'desktop-menu-license' || action === 'desktop-menu-admin-panel') {
+        if (action === 'desktop-menu-profile' || action === 'desktop-menu-license' || action === 'desktop-menu-admin-panel' || action === 'desktop-menu-logout') {
           return;
         }
 

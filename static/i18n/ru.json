@@ -453,7 +453,8 @@
       "ratings": "Рейтинги",
       "dictation_report": "Отчет по диктантам",
       "coffee": "На кофе",
-      "admin_panel": "Админ-панель"
+      "admin_panel": "Админ-панель",
+      "switch_user": "Сменить пользователя"
     },
     "delete_modal": {
       "title": "Удалить диктант",

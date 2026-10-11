@@ -1,32 +1,38 @@
-/* ==================== ПАНЕЛЬ СТАТИСТИКИ «ВРЕМЯ / ДЕНЬГИ» ==================== */
+/* ==================== ПАНЕЛЬ СТАТИСТИКИ «ВРЕМЯ / СТРИК» ==================== */
 
-/* ---- Кольцевые диаграммы: цвета фона и активных дуг ---- */
-.stats-ring-money-bg { stroke: var(--color-panel-bg, #f5f3f0); }
-.stats-ring-money     { stroke: var(--color-stats-ring-money, #ec4899); }
-.stats-ring-time-bg   { stroke: var(--color-panel-bg, #f5f3f0); }
-.stats-ring-time      { stroke: var(--color-stats-ring-time, #f59e0b); }
+/* ---- Кольцевые диаграммы: цвета фона и активных дуг ----
+   Внутренний сектор — время (светло-жёлтый), внешняя дуга — время (тёмно-жёлтый). */
+.stats-ring-time-bg      { stroke: var(--color-panel-bg, #f5f3f0); }
+.stats-ring-time         { stroke: var(--color-stats-ring-time, #f59e0b); }
+.stats-ring-time-arc-bg  { stroke: var(--color-panel-bg, #f5f3f0); }
+.stats-ring-time-arc     { stroke: var(--color-stats-ring-time-arc, #d97706); }
 
 /* ---- ШИРИНА КОЛЕЦ (регулируется ЗДЕСЬ, для экспериментов) ----
    Единицы — user-units viewBox (0 0 100 100).
    Жёлтое внутреннее кольцо (время): r=14.5 + ширина 29 (= 2r) → сектор закрашен
-   от центра до радиуса 29, без «дырки от бублика» и не перекрывая фиолетовое
-   кольцо (r=34, ширина 7.5 → внутренний край 30.25).
-   Фиолетовое внешнее кольцо (деньги): 7.5 = 5 * 1.5 (в 1.5 раза шире исходной). */
+   от центра до радиуса 29, без «дырки от бублика» и не перекрывая внешнюю
+   дугу (r=34, ширина 7.5 → внутренний край 30.25).
+   Тёмно-жёлтая внешняя дуга (время): 7.5 = 5 * 1.5. */
 .stats-ring-time-bg,
 .stats-ring-time {
     stroke-width: 29;
 }
-.stats-ring-money-bg,
-.stats-ring-money {
+.stats-ring-time-arc-bg,
+.stats-ring-time-arc {
     stroke-width: 7.5;
 }
 
 /* ---- Контейнер панели (в шапке) ---- */
 .desktop-stats-panel {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
+    gap: 2px;
     flex-shrink: 0;
+    /* Прижимаем «горячую» панель и следующий за ней блок пользователя вправо,
+       оставляя флаги (desktop-lang-selector) прижатыми к логотипу слева. */
+    margin-inline-start: auto;
     background: transparent;
     border: none;
     border-radius: 0;
@@ -41,11 +47,11 @@
     background: transparent;
 }
 
-/* ---- Кольцевые диаграммы (на весь 60x60, без отступов) ---- */
+/* ---- Кольцевые диаграммы (компактные) ---- */
 .desktop-stats-rings {
     position: relative;
-    width: 60px;
-    height: 60px;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -103,29 +109,22 @@
     color: var(--color-text-primary, #1f2937);
 }
 
-/* ---- Инфо справа от колец: время сверху, деньги снизу ---- */
-.desktop-stats-info {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1px;
-    min-width: 0;
-}
-
+/* ---- Время под кружком ---- */
 .desktop-stats-time-row {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1;
     color: var(--color-text-secondary, #6b7280);
     white-space: nowrap;
     display: flex;
     align-items: center;
     gap: 3px;
+    flex-shrink: 0;
 }
 
 .desktop-stats-time-row .stats-label-icon {
-    width: 12px;
-    height: 12px;
+    width: 11px;
+    height: 11px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -134,36 +133,8 @@
 }
 
 .desktop-stats-time-row .stats-label-icon svg {
-    width: 12px;
-    height: 12px;
-}
-
-.desktop-stats-money-row {
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 1.2;
-    color: var(--color-text-secondary, #6b7280);
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-}
-
-.desktop-stats-money-row .stats-money-icon {
-    width: 12px;
-    height: 12px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-stats-ring-money, #7b7ce3);
-    flex-shrink: 0;
-}
-
-/* Иконка доллара — жирная (увеличиваем толщину обводки Lucide) */
-.desktop-stats-money-row .stats-money-icon svg {
-    width: 12px;
-    height: 12px;
-    stroke-width: 3;
+    width: 11px;
+    height: 11px;
 }
 
 /* ---- Pull-tab (язычок) ---- */

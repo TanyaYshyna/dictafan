@@ -1072,9 +1072,9 @@ class RatingReport {
         this.selectedLanguage = 'all';
         this.topLimit = 10;
 
-        // Флаги параметров сравнения (порядок фиксированный, стрелки убраны)
-        this.priorityOrder = ['money', 'time', 'symbols'];
-        this.checkedParams = { money: true, time: false, symbols: false };
+        // Флаги параметров сравнения (порядок: время, деньги, символы; стрелки убраны)
+        this.priorityOrder = ['time', 'money', 'symbols'];
+        this.checkedParams = { time: true, money: false, symbols: false };
     }
 
     getLanguageData() {

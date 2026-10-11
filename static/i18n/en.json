@@ -453,7 +453,8 @@
       "ratings": "Ratings",
       "dictation_report": "Dictation report",
       "coffee": "Buy me a coffee",
-      "admin_panel": "Admin panel"
+      "admin_panel": "Admin panel",
+      "switch_user": "Switch user"
     },
     "delete_modal": {
       "title": "Delete dictation",

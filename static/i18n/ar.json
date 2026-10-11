@@ -448,7 +448,8 @@
       "ratings": "التصنيفات",
       "dictation_report": "تقرير الإملاء",
       "coffee": "ادعمني بقهوة",
-      "admin_panel": "لوحة الإدارة"
+      "admin_panel": "لوحة الإدارة",
+      "switch_user": "تبديل المستخدم"
     },
     "delete_modal": {
       "title": "حذف الإملاء",
