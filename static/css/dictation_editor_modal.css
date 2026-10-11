@@ -651,6 +651,37 @@
   .dictation-editor-modal__editor-header-panel-1 {
     align-self: flex-start;
   }
+
+  /* На узких экранах панель закладок занимает весь экран, а таблица
+     предложений внизу оказывается недоступной. Возвращаем общую
+     вертикальную прокрутку и разрешаем контенту занимать естественную
+     высоту, чтобы до таблицы можно было доскроллить. */
+  .dictation-editor-modal__body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dictation-editor-modal__tabs-panel {
+    flex: none;
+  }
+
+  .dictation-editor-modal__tabs-body {
+    flex: none;
+  }
+
+  .dictation-editor-modal__tab-content {
+    flex: none;
+    overflow: visible;
+  }
+
+  .dictation-editor-modal__table-section {
+    flex: none;
+  }
+
+  .dictation-editor-modal__sentences-table-wrapper {
+    flex: none;
+  }
 }
 
 /* ===== ВКЛАДКА "АВТОЗАПОВНЕННЯ ОРИГІНАЛУ" (voice-original-auto) ===== */

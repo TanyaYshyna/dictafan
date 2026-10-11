@@ -2664,6 +2664,11 @@
           if (session && session.timer) {
             session.timer.accumulatedMs = Math.max(0, (Number(session.timer.accumulatedMs) || 0) - inactivityTime);
           }
+          console.log('[DM:time] pauseGame(inactivity)', JSON.stringify({
+            inactivityTime,
+            sessionAccumulatedMs: session && session.timer ? session.timer.accumulatedMs : null,
+            panelAccumulatedMs: p && p.timerState ? p.timerState.dictationAccumulatedMs : null,
+          }));
         } catch (e) {
         }
       }
@@ -2920,6 +2925,18 @@
         // Если таймер не продвинулся — оставляем предыдущее накопленное значение
         st.time_count = prevTimeCount;
       }
+      try {
+        console.log('[DM:time] flushSentence', JSON.stringify({
+          key,
+          elapsed,
+          prevAcc,
+          prevTimeCount,
+          delta: elapsed > prevAcc ? elapsed - prevAcc : 0,
+          newTimeCount: st.time_count,
+          timer: session.timer ? { running: session.timer.running, startedAtMs: session.timer.startedAtMs, accumulatedMs: session.timer.accumulatedMs } : null,
+          sentenceTotalMs: _getSessionSentenceTimeTotalMs(session),
+        }));
+      } catch (eLog) {}
     } catch (e) {
     }
   }
@@ -2944,15 +2961,26 @@
   function _initSentenceTime(session) {
     try {
       if (!session) return;
-      dictationModalState._sentenceTimeAccumulatedAtStart = session.getElapsedMs();
+      const accStart = session.getElapsedMs();
+      dictationModalState._sentenceTimeAccumulatedAtStart = accStart;
       // Запоминаем уже накопленное время для этого предложения (если мы уже заходили в него)
       const key = session.getCurrentKey();
+      let prevCount = 0;
       if (key != null) {
         const st = session.getState(key);
-        dictationModalState._sentencePreviousAccumulatedTime = Number(st && st.time_count) || 0;
+        prevCount = Number(st && st.time_count) || 0;
+        dictationModalState._sentencePreviousAccumulatedTime = prevCount;
       } else {
         dictationModalState._sentencePreviousAccumulatedTime = 0;
       }
+      try {
+        console.log('[DM:time] initSentence', JSON.stringify({
+          key,
+          accumulatedAtStart: accStart,
+          previousTimeCount: prevCount,
+          timer: session.timer ? { running: session.timer.running, startedAtMs: session.timer.startedAtMs, accumulatedMs: session.timer.accumulatedMs } : null,
+        }));
+      } catch (eLog) {}
     } catch (e) {
     }
   }
@@ -2987,6 +3015,18 @@
    */
   function _pauseDictationTimer() {
     try {
+      console.log('[DM:time] pauseTimer BEFORE', JSON.stringify({
+        sessionTimer: (() => {
+          const s = window.__dictationModalActiveSession;
+          return s && s.timer ? { running: s.timer.running, startedAtMs: s.timer.startedAtMs, accumulatedMs: s.timer.accumulatedMs } : null;
+        })(),
+        panelAccumulatedMs: (() => {
+          const p = getProgressPanelInstance();
+          return p && p.timerState ? p.timerState.dictationAccumulatedMs : null;
+        })(),
+      }));
+    } catch (eLog) {}
+    try {
       const session = window.__dictationModalActiveSession;
       if (session && typeof session.stopTimer === 'function') {
         session.stopTimer();
@@ -3007,6 +3047,18 @@
    * Используется при закрытии модалок (start-modal, audio settings) и в resumeGame().
    */
   function _resumeDictationTimer() {
+    try {
+      console.log('[DM:time] resumeTimer BEFORE', JSON.stringify({
+        sessionTimer: (() => {
+          const s = window.__dictationModalActiveSession;
+          return s && s.timer ? { running: s.timer.running, startedAtMs: s.timer.startedAtMs, accumulatedMs: s.timer.accumulatedMs } : null;
+        })(),
+        panelAccumulatedMs: (() => {
+          const p = getProgressPanelInstance();
+          return p && p.timerState ? p.timerState.dictationAccumulatedMs : null;
+        })(),
+      }));
+    } catch (eLog) {}
     try {
       const session = window.__dictationModalActiveSession;
       if (session && typeof session.startTimer === 'function') {
@@ -8451,6 +8503,11 @@
             const session = window.__dictationModalActiveSession;
             if (session && window.progressPanel) {
               const accMs = Number(session.timer && session.timer.accumulatedMs) || 0;
+              console.log('[DM:time] openRestore', JSON.stringify({
+                sessionTimer: session.timer ? { running: session.timer.running, startedAtMs: session.timer.startedAtMs, accumulatedMs: session.timer.accumulatedMs } : null,
+                sentenceTotalMs: _getSessionSentenceTimeTotalMs(session),
+                panelAccumulatedMsBefore: window.progressPanel.timerState ? window.progressPanel.timerState.dictationAccumulatedMs : null,
+              }));
               if (accMs > 0) {
                 window.progressPanel.timerState.dictationAccumulatedMs = accMs;
                 window.progressPanel.updateTimer();
@@ -8573,9 +8630,16 @@
       // «раздуется» до дней/часов).
       try {
         const session = window.__dictationModalActiveSession;
+        console.log('[DM:time] close BEFORE stop', JSON.stringify({
+          sessionTimer: session && session.timer ? { running: session.timer.running, startedAtMs: session.timer.startedAtMs, accumulatedMs: session.timer.accumulatedMs } : null,
+          sentenceTotalMs: session ? _getSessionSentenceTimeTotalMs(session) : null,
+        }));
         if (session && typeof session.stopTimer === 'function') {
           session.stopTimer();
         }
+        console.log('[DM:time] close AFTER stop', JSON.stringify({
+          sessionTimer: session && session.timer ? { running: session.timer.running, startedAtMs: session.timer.startedAtMs, accumulatedMs: session.timer.accumulatedMs } : null,
+        }));
       } catch (eStop) {
       }
 

@@ -558,6 +558,19 @@ class ProgressPanel {
             this.timerState.countdownRemainingMs = Math.max(0, this.timerState.countdownRemainingMs - delta);
         }
 
+        try {
+            const wallNow = Date.now();
+            if (!this._lastTimeDebugLog || wallNow - this._lastTimeDebugLog >= 1000) {
+                this._lastTimeDebugLog = wallNow;
+                console.log('[DM:panel] tick', JSON.stringify({
+                    hasTimeProvider: !!this.timeProvider,
+                    accumulatedMs: this.timerState.dictationAccumulatedMs,
+                    delta,
+                    sessionActive: this.timerState.sessionActive,
+                }));
+            }
+        } catch (e) {}
+
         this.timerState.lastTickTs = now;
     }
 

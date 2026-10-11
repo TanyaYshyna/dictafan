@@ -454,6 +454,9 @@
       if (this.timer.running) return;
       this.timer.running = true;
       this.timer.startedAtMs = _nowMs();
+      try {
+        console.log('[DM:session] startTimer', JSON.stringify({ dictationId: this.dictationId, running: this.timer.running, startedAtMs: this.timer.startedAtMs, accumulatedMs: this.timer.accumulatedMs, nowPerf: _nowMs(), nowWall: Date.now() }));
+      } catch (e) {}
     }
 
     stopTimer() {
@@ -461,13 +464,26 @@
       const elapsed = Math.max(0, _nowMs() - this.timer.startedAtMs);
       this.timer.accumulatedMs += elapsed;
       this.timer.running = false;
+      try {
+        console.log('[DM:session] stopTimer', JSON.stringify({ dictationId: this.dictationId, elapsedAdded: elapsed, accumulatedMs: this.timer.accumulatedMs, nowWall: Date.now() }));
+      } catch (e) {}
     }
 
     getElapsedMs() {
+      let elapsed;
       if (this.timer.running) {
-        return this.timer.accumulatedMs + Math.max(0, _nowMs() - this.timer.startedAtMs);
+        elapsed = this.timer.accumulatedMs + Math.max(0, _nowMs() - this.timer.startedAtMs);
+      } else {
+        elapsed = this.timer.accumulatedMs;
       }
-      return this.timer.accumulatedMs;
+      try {
+        const nowWall = Date.now();
+        if (!this._lastGetElapsedLogMs || nowWall - this._lastGetElapsedLogMs >= 2000) {
+          this._lastGetElapsedLogMs = nowWall;
+          console.log('[DM:session] getElapsedMs', JSON.stringify({ dictationId: this.dictationId, running: this.timer.running, startedAtMs: this.timer.startedAtMs, accumulatedMs: this.timer.accumulatedMs, elapsedMs: elapsed, nowPerf: _nowMs(), nowWall }));
+        }
+      } catch (e) {}
+      return elapsed;
     }
 
     addTimeToSentence(key, ms) {
@@ -761,10 +777,6 @@
         // silent
       }
     }
-  }
-
-  function _nowMs() {
-    return Date.now();
   }
 
   window.DictationRuntime = {
