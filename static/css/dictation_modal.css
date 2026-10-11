@@ -543,10 +543,13 @@ html[dir="rtl"] #dictationModal .sentence-nav-bottom-inner {
   padding: 24px;
   max-width: 700px;
   width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 24px;
+  box-sizing: border-box;
 }
 
 #dictationModal #completionModal .completion-main {
@@ -560,10 +563,23 @@ html[dir="rtl"] #dictationModal .sentence-nav-bottom-inner {
 @media (max-width: 480px) {
   #dictationModal #completionModal .modal-content {
     flex-direction: column;
+    gap: 16px;
+    padding: 20px 16px;
   }
   #dictationModal #completionModal #multContainer {
     flex: 0 0 auto;
     align-self: center;
+  }
+  #dictationModal #completionModal #multContainer,
+  #dictationModal #completionModal #multCanvas {
+    width: 160px;
+    height: 160px;
+  }
+  #dictationModal #completionModal .completion-buttons {
+    flex-wrap: wrap;
+  }
+  #dictationModal #completionModal .completion-buttons button {
+    flex: 1 1 100%;
   }
 }
 

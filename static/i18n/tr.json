@@ -359,9 +359,11 @@
     "completion_modal": {
       "title": "Tebrikler!",
       "message": "Dikteyi başarıyla tamamladınız!",
-      "results_title": "Özet ve yeni oyun",
-      "results": "Özet ve yeni oyun",
-      "exit": "Çık"
+      "results_title": "Sonuçlar",
+      "results": "Sonuçlar",
+      "exit": "Çık",
+      "record_first": "🏆 Yeni rekor! Bu sizin en iyi sonucunuz!",
+      "record_again": "🏆 Yeni rekor! Önceki en iyi sonucunuzu geçtiniz!"
     },
     "no_selection": {
       "title": "Dikkat! Bir sorunumuz var!",

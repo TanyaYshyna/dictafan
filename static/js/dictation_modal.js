@@ -1006,7 +1006,7 @@
     try {
       const msgEl = document.getElementById('completionMessage');
       if (msgEl) {
-        msgEl.textContent = 'Вы успешно завершили диктант!';
+        msgEl.textContent = dictationT('completion_modal.message', 'Вы успешно завершили диктант!');
       }
     } catch (eMsgReset) {
     }
@@ -1138,7 +1138,7 @@
     try {
       const resultsBtn = document.getElementById('completionResultsBtn');
       if (resultsBtn && typeof resultsBtn.focus === 'function') {
-        // Фокусируем кнопку "Посмотреть результаты" отложенно (setTimeout),
+        // Фокусируем кнопку "Результаты" отложенно (setTimeout),
         // чтобы фокус гарантированно установился ПОСЛЕ всех синхронных операций,
         // которые могут сработать после showCompletionModal (например,
         // updateNavigatorFromSession из checkText или фокус из onRecognitionComplete)
@@ -1263,9 +1263,9 @@
             const msgEl = document.getElementById('completionMessage');
             if (msgEl) {
               if (detail.is_first) {
-                msgEl.textContent = '🏆 Новый рекорд! Это ваш лучший результат!';
+                msgEl.textContent = dictationT('completion_modal.record_first', '🏆 Новый рекорд! Это ваш лучший результат!');
               } else {
-                msgEl.textContent = '🏆 Новый рекорд! Вы побили свой предыдущий лучший результат!';
+                msgEl.textContent = dictationT('completion_modal.record_again', '🏆 Новый рекорд! Вы побили свой предыдущий лучший результат!');
               }
             }
             // Обновляем лейбл рекорда под заголовком
@@ -1322,7 +1322,7 @@
     const resultsBtn = document.getElementById('completionResultsBtn');
     if (!completionModal || !exitBtn) return;
 
-    // Фокус-ловушка: Tab перемещает фокус между "Посмотреть результаты" и "Выйти"
+    // Фокус-ловушка: Tab перемещает фокус между "Результаты" и "Выйти"
     // и обратно, не уходя на элементы под модальным окном.
     try {
       if (completionModal.dataset.boundFocusTrap !== '1') {

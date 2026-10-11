@@ -359,9 +359,11 @@
     "completion_modal": {
       "title": "Congratulations!",
       "message": "You have successfully completed the dictation!",
-      "results_title": "Summary and new game",
-      "results": "Summary and new game",
-      "exit": "Exit"
+      "results_title": "Results",
+      "results": "Results",
+      "exit": "Exit",
+      "record_first": "🏆 New record! This is your best result!",
+      "record_again": "🏆 New record! You beat your previous best result!"
     },
     "no_selection": {
       "title": "Attention! We have a problem!",
