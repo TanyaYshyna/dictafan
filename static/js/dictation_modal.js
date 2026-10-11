@@ -25,6 +25,9 @@
     opening: false,
     dictationStarted: false,
     rewardCycleId: 0,
+    // Флаг: отсчёт времени диктанта начат (первая набранная буква или первая аудиозапись).
+    // До этого момента таймер не идёт — пользователь считается бездельничающим.
+    _timeStarted: false,
     // Контекст открытия start-modal: 'open' (из карточки), 'navigator' (btn-new-circle), 'success' (completion)
     startModalContext: 'open',
     // Для корректного расчёта времени предложения при перезаходах:
@@ -170,7 +173,7 @@
   function _getLiveDictationTimeMs(session) {
     try {
       if (!session) return 0;
-      if (dictationModalState.dictationStarted) {
+      if (dictationModalState.dictationStarted && dictationModalState._timeStarted) {
         _flushCurrentSentenceTime(session);
       }
       return _getSessionSentenceTimeTotalMs(session);
@@ -1627,17 +1630,17 @@
             //   - Новая игра / СТАРТ после сброса: dateStart сброшен в null,
             //     поэтому устанавливается новая дата
             _ensureDateStart(session);
-            try {
-              const p = getProgressPanelInstance();
-              if (p && typeof p.startTimer === 'function') p.startTimer();
-            } catch (e1) {}
+            // Время НЕ стартуем здесь. По требованию: отсчёт начинается только с
+            // первой набранной буквы (или первой аудиозаписи). До этого пользователь
+            // считается бездельничающим, поэтому таймер останавливаем и ждём первую
+            // активность (см. _autoResumeTimer).
+            try { dictationModalState._timeStarted = false; } catch (e0ts) {}
+            _pauseDictationTimer();
             try { resetInactivityTimer(); } catch (e2) {}
             try {
               const m = document.getElementById('start-modal');
               if (m) m.style.display = 'none';
             } catch (e3) {}
-            // Возобновляем таймер при старте игры (кнопка Start)
-            _resumeDictationTimer();
             session.ensureDefaultSelection();
             // Переходим на первое предложение, которое ещё не закрыто (нет звезды или не закрыт микрофон)
             session.currentSelectedIndex = findFirstIncompleteIndex(session);
@@ -2696,6 +2699,23 @@
 
   function _autoResumeTimer() {
     try {
+      if (!dictationModalState.dictationStarted) {
+        try { resetInactivityTimer(); } catch (e) {}
+        return;
+      }
+    } catch (e0) {
+    }
+    try {
+      // Первая набранная буква или первая аудиозапись — с этого момента
+      // начинается отсчёт времени диктанта. До этого пользователь считается
+      // бездельничающим и время не идёт.
+      if (!dictationModalState._timeStarted) {
+        dictationModalState._timeStarted = true;
+        console.log('[DM:time] firstActivityStart');
+      }
+    } catch (eLog) {
+    }
+    try {
       const snap = getProgressTimerSnapshot();
       if (!snap || !snap.isRunning) {
         _resumeDictationTimer();
@@ -3047,6 +3067,18 @@
    * Используется при закрытии модалок (start-modal, audio settings) и в resumeGame().
    */
   function _resumeDictationTimer() {
+    try {
+      // Отсчёт времени не должен начинаться, пока пользователь не набрал хотя бы
+      // одну букву (или не начал аудиозапись). Все вызовы resume до этого момента
+      // игнорируются — иначе таймер раздуется за счёт простоя/чтения задания.
+      // Также не возобновляем, если диктант вообще не стартовал (например, при
+      // закрытии стартовой модалки до нажатия СТАРТ).
+      if (!dictationModalState.dictationStarted || !dictationModalState._timeStarted) {
+        console.log('[DM:time] resumeTimer SKIP (время ещё не стартовало)');
+        return;
+      }
+    } catch (eGuard) {
+    }
     try {
       console.log('[DM:time] resumeTimer BEFORE', JSON.stringify({
         sessionTimer: (() => {
@@ -7401,6 +7433,10 @@
         dictationModalState.dictationStarted = false;
       } catch (e) {
       }
+      // Сбрасываем учёт времени: отсчёт начнётся заново с первой набранной буквы.
+      try { dictationModalState._timeStarted = false; } catch (e) {}
+      try { dictationModalState._sentenceTimeAccumulatedAtStart = 0; } catch (e) {}
+      try { dictationModalState._sentencePreviousAccumulatedTime = 0; } catch (e) {}
       // Сбрасываем dictationModalState._completionShown, чтобы окно успеха могло появиться снова
       try {
         dictationModalState._completionShown = false;
@@ -7920,6 +7956,10 @@
             const session = window.__dictationModalActiveSession;
             if (!session) return;
             await resetDictationProgressForSession(session);
+            // После сброса возвращаем контекст "из карточки", чтобы кнопка стала "СТАРТ"
+            // (а не "Продолжить"/"Граймо далі", как из навигатора).
+            try { dictationModalState.startModalContext = 'open'; } catch (eCtx) {}
+            try { dictationModalState._timeStarted = false; } catch (eTs) {}
             // Обновляем текст кнопки после сброса прогресса
             updateStartButton();
           } catch (e1) {
