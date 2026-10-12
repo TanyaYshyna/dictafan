@@ -2,10 +2,10 @@
 
 /* ---- Кольцевые диаграммы: цвета фона и активных дуг ----
    Внутренний сектор — время (светло-жёлтый), внешняя дуга — время (тёмно-жёлтый). */
-.stats-ring-time-bg      { stroke: var(--color-panel-bg, #f5f3f0); }
-.stats-ring-time         { stroke: var(--color-stats-ring-time, #f59e0b); }
-.stats-ring-time-arc-bg  { stroke: var(--color-panel-bg, #f5f3f0); }
-.stats-ring-time-arc     { stroke: var(--color-stats-ring-time-arc, #d97706); }
+.stats-ring-time-bg      { stroke: var(--color-hover, #f5f3f0); }
+.stats-ring-time         { stroke: var(--color-button-yellow, #fcdd55); }
+.stats-ring-time-arc-bg  { stroke: var(--color-hover, #f5f3f0); }
+.stats-ring-time-arc     { stroke: var(--color-button-text-yellow, #f8d062); }
 
 /* ---- ШИРИНА КОЛЕЦ (регулируется ЗДЕСЬ, для экспериментов) ----
    Единицы — user-units viewBox (0 0 100 100).
