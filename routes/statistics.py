@@ -2285,6 +2285,8 @@ def save_success():
             money_earned = int(money_earned) if money_earned else 0
         except Exception:
             money_earned = 0
+        lead_time_ms_total = data.get('lead_time_ms_total')
+        money_earned_total = data.get('money_earned_total')
         date_start = data.get('date_start')
         plan_date = data.get('plan_date')
         source_group_id = data.get('source_group_id')
@@ -2371,6 +2373,8 @@ def save_success():
             plan_date=plan_date,
             completion_count=completion_count,
             money_earned=money_earned,
+            cumulative_time_ms=lead_time_ms_total,
+            cumulative_money_earned=money_earned_total,
         )
 
         print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')

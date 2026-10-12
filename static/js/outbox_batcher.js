@@ -537,6 +537,8 @@
             activity_count: activityCountDelta,
             money_count: moneyCountDelta,
             lead_time_ms: leadTimeDelta,
+            lead_time_ms_total: Number(currentRow.lead_time_ms_total) || 0,
+            money_earned_total: Number(currentRow.money_earned) || 0,
             selected_sentence_positions: currentRow.selected_sentence_positions || undefined,
             date_start: currentRow.date_start || undefined,
             plan_date: currentRow.date_plan || undefined,

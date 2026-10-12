@@ -1207,7 +1207,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None, date_start=None, plan_date=None, completion_count=None, money_earned=None):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None, date_start=None, plan_date=None, completion_count=None, money_earned=None, cumulative_time_ms=None, cumulative_money_earned=None):
     """
     Добавляет запись успешного завершения диктанта в history_by_day
     
@@ -1287,6 +1287,52 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
             # Нормализуем selected_sentence_positions для history_by_day
             positions_for_hbd = _normalize_selected_sentence_positions(selected_sentence_positions)
 
+            # Защита от повторной отправки (at-least-once доставка): сервер
+            # накапливает дельты, поэтому если клиент потерял baseline synced_*
+            # (вкладка закрылась/уснула между флашами) и повторно отправил полную
+            # кумулятивную сумму, накопление для сессии (date_start) не должно
+            # превысить авторитетное клиентское значение cumulative_time_ms.
+            lead_time_delta = int(time_ms or 0)
+            money_dt_delta = int(money_earned or 0)
+            if date_start is not None:
+                try:
+                    cur.execute(
+                        """
+                        SELECT COALESCE(SUM(lead_time), 0) AS lead_total,
+                               COALESCE(SUM(money_dt_count), 0) AS money_total
+                        FROM history_by_day
+                        WHERE user_id = %s
+                          AND dictation_id = %s
+                          AND positions = %s
+                          AND date_start = %s::timestamp
+                        """,
+                        (int(user_id), int(dictation_id), positions_for_hbd, date_start_parsed),
+                    )
+                    row = cur.fetchone()
+                    existing_lead = int(row[0] or 0) if row else 0
+                    existing_money = int(row[1] or 0) if row else 0
+                except Exception:
+                    existing_lead = 0
+                    existing_money = 0
+
+                try:
+                    cum_time = int(cumulative_time_ms) if cumulative_time_ms is not None else None
+                except Exception:
+                    cum_time = None
+                if cum_time is not None:
+                    allowed_lead = max(0, cum_time - existing_lead)
+                    lead_time_delta = min(lead_time_delta, allowed_lead)
+                    print(f'🔒 [HISTORY_BY_DAY] clamp lead_time: delta={time_ms}, existing={existing_lead}, cumulative={cum_time}, applied={lead_time_delta}')
+
+                try:
+                    cum_money = int(cumulative_money_earned) if cumulative_money_earned is not None else None
+                except Exception:
+                    cum_money = None
+                if cum_money is not None:
+                    allowed_money = max(0, cum_money - existing_money)
+                    money_dt_delta = min(money_dt_delta, allowed_money)
+                    print(f'🔒 [HISTORY_BY_DAY] clamp money: delta={money_earned}, existing={existing_money}, cumulative={cum_money}, applied={money_dt_delta}')
+
             _upsert_history_by_day(
                 cur,
                 user_id=int(user_id),
@@ -1306,10 +1352,10 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 audio_delta=int(audio_count or 0),
                 mistake_delta=int(mistake_count or 0),
                 monenumber_of_characters_delta=int(monenumber_of_characters or 0),
-                lead_time_delta=int(time_ms or 0),
+                lead_time_delta=lead_time_delta,
                 successes_delta=int(completion_count) if completion_count else 0,
                 activity_count_delta=0,
-                money_dt_delta=int(money_earned or 0),
+                money_dt_delta=money_dt_delta,
             )
 
             # Обновляем history_current — актуальное количество побед для этого упражнения
