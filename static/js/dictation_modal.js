@@ -3174,6 +3174,21 @@
     return 1;
   }
 
+  /**
+   * Эффективное требование повторов аудио с учётом режима упражнения.
+   * - no-record (текст без аудио): аудио не требуется вовсе — кнопка "Далее"
+   *   активируется только по тексту (звезда/полузвезда).
+   * - audio-only-no-hint / audio-only-hint (только аудио): аудио нужно выполнить
+   *   ровно один раз. Механизм "повторы аудио" устарел и в этих режимах не используется.
+   * - record (текст + аудио): значение берётся из настроек (getRequiredAudioRepeatsValue).
+   */
+  function getEffectiveRequiredAudioRepeatsValue(mode) {
+    const m = (mode != null && String(mode)) ? String(mode) : getExerciseMode();
+    if (m === 'no-record') return 0;
+    if (m === 'audio-only-no-hint' || m === 'audio-only-hint') return 1;
+    return getRequiredAudioRepeatsValue();
+  }
+
   function focusUserInput() {
     try {
       const input = document.getElementById('userInput');
@@ -3246,8 +3261,8 @@
     const perfect = Number(st && st.number_of_perfect) || 0;
     const corrected = Number(st && st.number_of_corrected) || 0;
     const audioDone = Number(st && st.number_of_audio) || 0;
-    const requiresAudio = getRequiredAudioRepeatsValue();
     const mode = getExerciseMode();
+    const requiresAudio = getEffectiveRequiredAudioRepeatsValue(mode);
     // В режимах p3 и p4 текст не проверяется, поэтому textOk всегда true
     const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1 || corrected > 0);
     const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
@@ -3286,8 +3301,8 @@
   function computeSentenceStrongCompletionState(st) {
     const perfect = Number(st && st.number_of_perfect) || 0;
     const audioDone = Number(st && st.number_of_audio) || 0;
-    const requiresAudio = getRequiredAudioRepeatsValue();
     const mode = getExerciseMode();
+    const requiresAudio = getEffectiveRequiredAudioRepeatsValue(mode);
     // В режимах p3 и p4 текст не проверяется, поэтому textOk всегда true
     const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1);
     const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
@@ -3324,8 +3339,8 @@
       if (!st) return false;
       const perfect = Number(st.number_of_perfect) || 0;
       const audioDone = Number(st.number_of_audio) || 0;
-      const requiresAudio = getRequiredAudioRepeatsValue();
       const mode = getExerciseMode();
+      const requiresAudio = getEffectiveRequiredAudioRepeatsValue(mode);
       // В режимах без текста текст всегда ок
       const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1);
       const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
