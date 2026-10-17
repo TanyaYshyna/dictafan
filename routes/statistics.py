@@ -3123,8 +3123,13 @@ def api_dictation_report_data():
                     FROM history_by_day hbd
                     LEFT JOIN dictations d ON d.id = hbd.dictation_id
                     WHERE hbd.user_id = %s
-                      AND hbd.date_fact >= %s::date
-                      AND hbd.date_fact <= %s::date
+                      -- Фильтр по дате старта сессии (date_start — локальное время
+                      -- начала диктанта), а не по date_fact (дата, которую сервер
+                      -- ставит в момент flush). При отложенной/офлайн-синхронизации
+                      -- date_fact может сильно отличаться от реальной даты занятия,
+                      -- из-за чего в узкий период попадали диктанты за месяцы.
+                      AND hbd.date_start::date >= %s::date
+                      AND hbd.date_start::date <= %s::date
                       {lang_filter}
                     ORDER BY hbd.dictation_id, hbd.positions, hbd.date_start, hbd.date_fact
                     """,
