@@ -3264,7 +3264,17 @@
     const mode = getExerciseMode();
     const requiresAudio = getEffectiveRequiredAudioRepeatsValue(mode);
     // В режимах p3 и p4 текст не проверяется, поэтому textOk всегда true
-    const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1 || corrected > 0);
+    let textOk;
+    if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
+      textOk = true;
+    } else if (getStarCountingMode() === 'star') {
+      // Перфекционист: для закрытия текста нужна целая звезда.
+      // Полузвезда (corrected) НЕ считается — ни для кнопки "Далее",
+      // ни для завершения диктанта.
+      textOk = perfect >= 1;
+    } else {
+      textOk = (perfect >= 1 || corrected > 0);
+    }
     const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
     // console.log('[DM:computeSentenceCompletionState] perfect=' + perfect + ' corrected=' + corrected + ' audioDone=' + audioDone + ' requiresAudio=' + requiresAudio + ' → textOk=' + textOk + ' audioOk=' + audioOk);
     return { textOk, audioOk, requiresAudio };
