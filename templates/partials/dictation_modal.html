@@ -417,12 +417,24 @@
                           <span class="dictation-settings-inline"><i data-lucide="mic-off"></i><i data-lucide="keyboard"></i><span>{{ t('profile.audio.exercise_mode.no_record') }}</span></span>
                         </label>
                         <label class="dictation-settings-audio-mode">
-                          <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeOnlyNoHint" value="audio-only-no-hint" />
-                          <span class="dictation-settings-inline"><i data-lucide="mic"></i><i data-lucide="keyboard-off"></i><span>{{ t('profile.audio.exercise_mode.audio_only_no_hint') }}</span></span>
+                          <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeAudioOnly" value="audio-only" />
+                          <span class="dictation-settings-inline"><i data-lucide="mic"></i><i data-lucide="keyboard-off"></i><span>{{ t('profile.audio.exercise_mode.audio_only') }}</span></span>
                         </label>
-                        <label class="dictation-settings-audio-mode">
-                          <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeOnlyHint" value="audio-only-hint" />
-                          <span class="dictation-settings-inline"><i data-lucide="mic"></i><i data-lucide="keyboard-off"></i><i data-lucide="type"></i><span>{{ t('profile.audio.exercise_mode.audio_only_hint') }}</span></span>
+                      </div>
+                      <div class="dictation-settings-hint-flags">
+                        <label class="dictation-settings-hint-flag">
+                          <span>{{ t('profile.audio.exercise_mode.hint_translation') }}</span>
+                          <span class="dictation-settings-hint-toggle" id="modal-audioExerciseHintTranslation" role="switch" aria-checked="false" tabindex="0">
+                            <span class="dictation-settings-hint-toggle-track"></span>
+                            <span class="dictation-settings-hint-toggle-thumb"></span>
+                          </span>
+                        </label>
+                        <label class="dictation-settings-hint-flag">
+                          <span>{{ t('profile.audio.exercise_mode.hint_original') }}</span>
+                          <span class="dictation-settings-hint-toggle" id="modal-audioExerciseHintOriginal" role="switch" aria-checked="false" tabindex="0">
+                            <span class="dictation-settings-hint-toggle-track"></span>
+                            <span class="dictation-settings-hint-toggle-thumb"></span>
+                          </span>
                         </label>
                       </div>
                     </td>

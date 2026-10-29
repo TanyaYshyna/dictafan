@@ -122,8 +122,9 @@
         "label": "Görev türleri",
         "record": "sesi kaydet",
         "no_record": "sesi kaydetme",
-        "audio_only_no_hint": "yalnızca ses (ipucu yok)",
-        "audio_only_hint": "yalnızca ses (ipucu ile)"
+        "audio_only": "yalnızca ses",
+        "hint_translation": "Çeviri ipucu:",
+        "hint_original": "Orijinal ipucu:"
       }
     },
     "star_counting": {

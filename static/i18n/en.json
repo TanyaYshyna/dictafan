@@ -122,8 +122,9 @@
         "label": "Task types",
         "record": "record audio",
         "no_record": "don't record audio",
-        "audio_only_no_hint": "audio only (no hint)",
-        "audio_only_hint": "audio only (with hint)"
+        "audio_only": "audio only",
+        "hint_translation": "Translation hint:",
+        "hint_original": "Original hint:"
       }
     },
     "star_counting": {

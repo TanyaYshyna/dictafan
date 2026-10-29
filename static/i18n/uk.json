@@ -122,8 +122,9 @@
         "label": "Типи завдань",
         "record": "записувати аудіо",
         "no_record": "не записувати аудіо",
-        "audio_only_no_hint": "лише аудіо (без підказки)",
-        "audio_only_hint": "лише аудіо (з підказкою)"
+        "audio_only": "лише аудіо",
+        "hint_translation": "Підказка переклад:",
+        "hint_original": "Підказка оригінал:"
       }
     },
     "star_counting": {

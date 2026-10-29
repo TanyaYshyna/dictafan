@@ -524,15 +524,36 @@
   const INACTIVITY_TIMEOUT_DEFAULT = 60000; // 1 минута — таймер бездействия
   const AUDIO_CHECK_TIMEOUT = 30000; // 30 секунд — таймер проверки аудио
 
+  function normalizeAudioExerciseModeValue(mode) {
+    const v = String(mode || '');
+    if (v === 'audio-only-no-hint' || v === 'audio-only-hint') return 'audio-only';
+    if (v === 'record' || v === 'no-record' || v === 'audio-only') return v;
+    return 'record';
+  }
+
   function getExerciseMode() {
     try {
       const mode = window.audioExerciseMode || '';
-      if (mode === 'record' || mode === 'no-record' || mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
-        return mode;
-      }
+      return normalizeAudioExerciseModeValue(mode);
     } catch (e) {
     }
     return 'record';
+  }
+
+  function getExerciseHintOriginal() {
+    try {
+      return !!window.audioExerciseHintOriginal;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function getExerciseHintTranslation() {
+    try {
+      return !!window.audioExerciseHintTranslation;
+    } catch (e) {
+      return false;
+    }
   }
 
   function applyExerciseMode(session) {
@@ -566,48 +587,44 @@
         return;
       }
 
-      if (mode === 'audio-only-no-hint') {
-        // p3: только аудио, без подсказки — текст скрыт
+      if (mode === 'audio-only') {
+        // p3/p4: только аудио. Флаг «подсказка оригинала» показывает оригинал в поле ввода,
+        // флаг «подсказка перевода» показывает перевод над полем ввода (склеенный с explanation).
         if (audioPanel) {
           audioPanel.style.visibility = 'visible';
           audioPanel.style.pointerEvents = 'auto';
         }
-        if (textBlock) textBlock.style.display = 'none';
-        if (input) {
-          input.setAttribute('contenteditable', 'false');
-          input.textContent = '';
-        }
-        if (correctAnswer) {
-          correctAnswer.textContent = '';
-          correctAnswer.style.display = 'none';
-        }
-        return;
-      }
-
-      if (mode === 'audio-only-hint') {
-        // p4: только аудио, с подсказкой — текст показан, но кнопка проверки скрыта
-        if (audioPanel) {
-          audioPanel.style.visibility = 'visible';
-          audioPanel.style.pointerEvents = 'auto';
-        }
-        if (textBlock) textBlock.style.display = '';
-        if (checkGroup) checkGroup.style.display = 'none';
 
         const view = getCurrentSentenceViewFromSession(session);
         const originalText = String(view && view.text_original != null ? view.text_original : (view && view.text != null ? view.text : ''));
-        const translationText = String(view && view.text_translation != null ? view.text_translation : (view && view.translation != null ? view.translation : ''));
+        const hintOriginal = getExerciseHintOriginal();
 
-        if (input) {
-          input.setAttribute('contenteditable', 'false');
-          input.textContent = originalText;
-        }
-        if (correctAnswer) {
-          correctAnswer.textContent = translationText;
-          correctAnswer.style.display = 'block';
-          try {
-            correctAnswer.style.color = 'var(--color-button-text-gray)';
-          } catch (e) {
+        if (hintOriginal) {
+          if (textBlock) textBlock.style.display = '';
+          if (checkGroup) checkGroup.style.display = 'none';
+          if (input) {
+            input.setAttribute('contenteditable', 'false');
+            input.textContent = originalText;
           }
+          if (correctAnswer) {
+            correctAnswer.textContent = '';
+            correctAnswer.style.display = 'none';
+          }
+        } else {
+          if (textBlock) textBlock.style.display = 'none';
+          if (input) {
+            input.setAttribute('contenteditable', 'false');
+            input.textContent = '';
+          }
+          if (correctAnswer) {
+            correctAnswer.textContent = '';
+            correctAnswer.style.display = 'none';
+          }
+        }
+
+        try {
+          renderSentenceExplanation(session);
+        } catch (eHint) {
         }
         return;
       }
@@ -620,8 +637,8 @@
       const panel = document.querySelector('#dictationModal .audio-user-panel');
       if (!panel) return;
       const mode = getExerciseMode();
-      // В режимах p3 и p4 аудио-панель всегда видна
-      if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
+      // В режиме «только аудио» аудио-панель всегда видна
+      if (mode === 'audio-only') {
         panel.style.visibility = 'visible';
         panel.style.pointerEvents = 'auto';
         return;
@@ -1446,8 +1463,20 @@
       if (!el) return;
       const view = getCurrentSentenceViewFromSession(session);
       const explanation = view ? String(view.explanation != null ? view.explanation : '') : '';
-      if (explanation) {
-        el.textContent = explanation;
+
+      // В режиме «только аудио» при включённой «подсказке перевода» показываем перевод
+      // над полем ввода, склеивая его с per-sentence explanation.
+      let translation = '';
+      if (getExerciseMode() === 'audio-only' && getExerciseHintTranslation()) {
+        translation = view ? String(view.text_translation != null ? view.text_translation : (view.translation != null ? view.translation : '')) : '';
+      }
+
+      const parts = [];
+      if (translation) parts.push(translation);
+      if (explanation) parts.push(explanation);
+      const text = parts.join(' — ');
+      if (text) {
+        el.textContent = text;
         el.style.display = 'block';
       } else {
         el.textContent = '';
@@ -1760,7 +1789,7 @@
         // В режимах p3 и p4 проверка текста не используется
         try {
           const mode = getExerciseMode();
-          if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') return;
+          if (mode === 'audio-only') return;
         } catch (e0mode) {
         }
 
@@ -3178,14 +3207,14 @@
    * Эффективное требование повторов аудио с учётом режима упражнения.
    * - no-record (текст без аудио): аудио не требуется вовсе — кнопка "Далее"
    *   активируется только по тексту (звезда/полузвезда).
-   * - audio-only-no-hint / audio-only-hint (только аудио): аудио нужно выполнить
-   *   ровно один раз. Механизм "повторы аудио" устарел и в этих режимах не используется.
+   * - audio-only (только аудио): аудио нужно выполнить
+   *   ровно один раз. Механизм "повторы аудио" устарел и в этом режиме не используется.
    * - record (текст + аудио): значение берётся из настроек (getRequiredAudioRepeatsValue).
    */
   function getEffectiveRequiredAudioRepeatsValue(mode) {
     const m = (mode != null && String(mode)) ? String(mode) : getExerciseMode();
     if (m === 'no-record') return 0;
-    if (m === 'audio-only-no-hint' || m === 'audio-only-hint') return 1;
+    if (m === 'audio-only') return 1;
     return getRequiredAudioRepeatsValue();
   }
 
@@ -3265,7 +3294,7 @@
     const requiresAudio = getEffectiveRequiredAudioRepeatsValue(mode);
     // В режимах p3 и p4 текст не проверяется, поэтому textOk всегда true
     let textOk;
-    if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
+    if (mode === 'audio-only') {
       textOk = true;
     } else if (getStarCountingMode() === 'star') {
       // Перфекционист: для закрытия текста нужна целая звезда.
@@ -3313,8 +3342,8 @@
     const audioDone = Number(st && st.number_of_audio) || 0;
     const mode = getExerciseMode();
     const requiresAudio = getEffectiveRequiredAudioRepeatsValue(mode);
-    // В режимах p3 и p4 текст не проверяется, поэтому textOk всегда true
-    const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1);
+    // В режиме «только аудио» текст не проверяется, поэтому textOk всегда true
+    const textOk = (mode === 'audio-only') ? true : (perfect >= 1);
     const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
     return !!(textOk && audioOk);
   }
@@ -3352,7 +3381,7 @@
       const mode = getExerciseMode();
       const requiresAudio = getEffectiveRequiredAudioRepeatsValue(mode);
       // В режимах без текста текст всегда ок
-      const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1);
+      const textOk = (mode === 'audio-only') ? true : (perfect >= 1);
       const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
       return !!(textOk && audioOk);
     } catch (e) {
@@ -3541,8 +3570,8 @@
     try {
       const starWrap = document.getElementById('tablo_result_star');
       if (starWrap) {
-        // В режимах p3 и p4 текст не проверяется — показываем звезду как выполненную
-        if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
+        // В режиме «только аудио» текст не проверяется — показываем звезду как выполненную
+        if (mode === 'audio-only') {
           _setIcon(starWrap, 'star', '--color-button-mint', 1);
         } else if (perfect >= 1) {
           _setIcon(starWrap, 'star', '--color-button-mint', 1);
@@ -4168,9 +4197,20 @@
           // Загружаем режим упражнения из настроек пользователя
           if (audio.exercise_mode != null && String(audio.exercise_mode).trim()) {
             const mode = String(audio.exercise_mode).trim();
-            if (mode === 'record' || mode === 'no-record' || mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
-              window.audioExerciseMode = mode;
-            }
+            window.audioExerciseMode = normalizeAudioExerciseModeValue(mode);
+          }
+          // Загружаем флаги подсказок (перевод/оригинал)
+          window.audioExerciseHintTranslation = !!audio.hint_translation;
+          window.audioExerciseHintOriginal = !!audio.hint_original;
+          // Миграция старых значений: audio-only-hint → audio-only + подсказка оригинала
+          if (audio.exercise_mode === 'audio-only-hint') {
+            window.audioExerciseMode = 'audio-only';
+            window.audioExerciseHintOriginal = true;
+            window.audioExerciseHintTranslation = false;
+          } else if (audio.exercise_mode === 'audio-only-no-hint') {
+            window.audioExerciseMode = 'audio-only';
+            window.audioExerciseHintOriginal = false;
+            window.audioExerciseHintTranslation = false;
           }
           return;
         }
@@ -5182,10 +5222,10 @@
   function updateStartModalColumnsForMode() {
     try {
       const mode = getExerciseMode();
-      // Режимы p1 (record) и p2 (no-record) — показываем колонку звезды, скрываем микрофон
-      // Режимы p3 (audio-only-no-hint) и p4 (audio-only-hint) — показываем колонку микрофона, скрываем звезду
+      // Режимы record и no-record — показываем колонку звезды, скрываем микрофон
+      // Режим audio-only — показываем колонку микрофона, скрываем звезду
       const showStar = (mode === 'record' || mode === 'no-record');
-      const showMic = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint');
+      const showMic = (mode === 'audio-only');
       setColumnsVisibilityByClass({ className: 'col-star', visible: showStar });
       setColumnsVisibilityByClass({ className: 'col-mic', visible: showMic });
     } catch (e) {
@@ -6278,7 +6318,7 @@
 
         // В режимах p3 и p4 фокус на кнопку записи аудио
         const mode = getExerciseMode();
-        if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
+        if (mode === 'audio-only') {
           const rb = document.getElementById('recordButton');
           if (rb && typeof rb.focus === 'function') {
             rb.focus();
@@ -6309,7 +6349,7 @@
           if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
           // В режимах p3 и p4 Enter не запускает проверку текста
           const mode = getExerciseMode();
-          if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') return;
+          if (mode === 'audio-only') return;
           e.preventDefault();
           e.stopPropagation();
           if (typeof window.checkText === 'function') window.checkText();
@@ -7048,8 +7088,9 @@
       const startInput = document.getElementById('modal-playSequenceStart');
       const rbRecord = document.getElementById('modal-audioExerciseModeRecord');
       const rbNoRecord = document.getElementById('modal-audioExerciseModeNoRecord');
-      const rbOnlyNoHint = document.getElementById('modal-audioExerciseModeOnlyNoHint');
-      const rbOnlyHint = document.getElementById('modal-audioExerciseModeOnlyHint');
+      const rbOnly = document.getElementById('modal-audioExerciseModeAudioOnly');
+      const hintTranslationToggle = document.getElementById('modal-audioExerciseHintTranslation');
+      const hintOriginalToggle = document.getElementById('modal-audioExerciseHintOriginal');
       const starCountingToggle = document.getElementById('modal-starCountingToggle');
       const star = document.getElementById('audioSettingsDirtyStar');
       const saveBtn = document.getElementById('saveAudioSettingsModalBtn');
@@ -7058,6 +7099,19 @@
         start: 'oto',
         exercise_mode: 'record',
         star_counting: 'star',
+        hint_translation: false,
+        hint_original: false,
+      };
+
+      const setAudioHintToggleState = (toggleEl, isOn) => {
+        if (!toggleEl) return;
+        toggleEl.classList.toggle('is-on', !!isOn);
+        toggleEl.setAttribute('aria-checked', isOn ? 'true' : 'false');
+      };
+
+      const getAudioHintToggleState = (toggleEl) => {
+        if (!toggleEl) return false;
+        return toggleEl.classList.contains('is-on');
       };
 
       const updateModalStarCountingToggleUI = (value) => {
@@ -7103,9 +7157,21 @@
             const parsed = JSON.parse(raw);
             const audio = parsed && parsed.audio && typeof parsed.audio === 'object' ? parsed.audio : {};
             const starCounting = parsed && parsed.star_counting != null ? String(parsed.star_counting || '') : '';
+            const rawMode = audio.exercise_mode != null ? String(audio.exercise_mode || '') : defaults.exercise_mode;
+            let mode = normalizeAudioExerciseModeValue(rawMode);
+            let hintTranslation = !!audio.hint_translation;
+            let hintOriginal = !!audio.hint_original;
+            // Миграция старых значений
+            if (rawMode === 'audio-only-hint') {
+              mode = 'audio-only'; hintOriginal = true; hintTranslation = false;
+            } else if (rawMode === 'audio-only-no-hint') {
+              mode = 'audio-only'; hintOriginal = false; hintTranslation = false;
+            }
             return {
               start: audio.start != null ? String(audio.start || '') : defaults.start,
-              exercise_mode: audio.exercise_mode != null ? String(audio.exercise_mode || '') : defaults.exercise_mode,
+              exercise_mode: mode,
+              hint_translation: hintTranslation,
+              hint_original: hintOriginal,
               star_counting: starCounting === 'half' ? 'half' : defaults.star_counting,
             };
           }
@@ -7114,6 +7180,8 @@
         return {
           start: defaults.start,
           exercise_mode: defaults.exercise_mode,
+          hint_translation: defaults.hint_translation,
+          hint_original: defaults.hint_original,
           star_counting: defaults.star_counting,
         };
       };
@@ -7188,9 +7256,14 @@
         try {
           if (rbRecord) rbRecord.checked = mode === 'record';
           if (rbNoRecord) rbNoRecord.checked = mode === 'no-record';
-          if (rbOnlyNoHint) rbOnlyNoHint.checked = mode === 'audio-only-no-hint';
-          if (rbOnlyHint) rbOnlyHint.checked = mode === 'audio-only-hint';
+          if (rbOnly) rbOnly.checked = mode === 'audio-only';
         } catch (e2) {
+        }
+
+        try {
+          setAudioHintToggleState(hintTranslationToggle, !!(settings && settings.hint_translation));
+          setAudioHintToggleState(hintOriginalToggle, !!(settings && settings.hint_original));
+        } catch (eHint) {
         }
 
         const starCounting = (settings && settings.star_counting) ? String(settings.star_counting || '') : defaults.star_counting;
@@ -7211,7 +7284,9 @@
         } catch (e) {
         }
         try {
-          window.audioExerciseMode = getSelectedExerciseMode();
+          window.audioExerciseMode = normalizeAudioExerciseModeValue(getSelectedExerciseMode());
+          window.audioExerciseHintTranslation = getAudioHintToggleState(hintTranslationToggle);
+          window.audioExerciseHintOriginal = getAudioHintToggleState(hintOriginalToggle);
         } catch (e2) {
         }
         // Применяем режим упражнения к текущему UI
@@ -7274,7 +7349,9 @@
 
           const settings = {
             start: startInput ? String(startInput.value || '') : defaults.start,
-            exercise_mode: getSelectedExerciseMode(),
+            exercise_mode: normalizeAudioExerciseModeValue(getSelectedExerciseMode()),
+            hint_translation: getAudioHintToggleState(hintTranslationToggle),
+            hint_original: getAudioHintToggleState(hintOriginalToggle),
             star_counting: getSelectedStarCounting(),
           };
 
@@ -7291,6 +7368,8 @@
           if (!merged.audio || typeof merged.audio !== 'object') merged.audio = {};
           merged.audio.start = settings.start;
           merged.audio.exercise_mode = settings.exercise_mode || defaults.exercise_mode;
+          merged.audio.hint_translation = !!settings.hint_translation;
+          merged.audio.hint_original = !!settings.hint_original;
           merged.star_counting = settings.star_counting || defaults.star_counting;
 
           await um.updateProfile({
@@ -7303,6 +7382,8 @@
             settingsState.snapshot = {
               start: merged.audio.start,
               exercise_mode: merged.audio.exercise_mode,
+              hint_translation: !!merged.audio.hint_translation,
+              hint_original: !!merged.audio.hint_original,
               star_counting: merged.star_counting || defaults.star_counting,
             };
           } catch (e1) {
@@ -7349,9 +7430,35 @@
       }
 
       try {
-        [rbRecord, rbNoRecord, rbOnlyNoHint, rbOnlyHint].forEach((rb) => {
+        [rbRecord, rbNoRecord, rbOnly].forEach((rb) => {
           if (!rb) return;
           rb.addEventListener('change', () => onAnyChange());
+        });
+      } catch (e) {
+      }
+
+      try {
+        [hintTranslationToggle, hintOriginalToggle].forEach((toggle) => {
+          if (!toggle || toggle.dataset.boundDictafanHintToggle === '1') return;
+          toggle.dataset.boundDictafanHintToggle = '1';
+          const activate = (ev) => {
+            try {
+              const isOn = toggle.classList.contains('is-on');
+              setAudioHintToggleState(toggle, !isOn);
+              onAnyChange();
+              if (ev) ev.preventDefault();
+            } catch (e) {
+            }
+          };
+          toggle.addEventListener('click', activate);
+          toggle.addEventListener('keydown', (ev) => {
+            try {
+              if (ev && (ev.key === 'Enter' || ev.key === ' ')) {
+                activate(ev);
+              }
+            } catch (e) {
+            }
+          });
         });
       } catch (e) {
       }

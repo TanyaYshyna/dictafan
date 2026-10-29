@@ -1432,6 +1432,75 @@
   height: 18px;
 }
 
+#user-profile-modal .dictation-settings-hint-flags {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+#user-profile-modal .dictation-settings-hint-flag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+}
+
+/* «Бигунок-чек»: серый в выключенном состоянии, жёлтый во включенном */
+#user-profile-modal .dictation-settings-hint-toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  flex: 0 0 auto;
+  cursor: pointer;
+  border-radius: 999px;
+  background-color: var(--color-button-gray, #eeede8ff);
+  transition: background-color 0.2s ease;
+  outline: none;
+}
+
+#user-profile-modal .dictation-settings-hint-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+}
+
+#user-profile-modal .dictation-settings-hint-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(17, 24, 39, 0.35);
+  transition: transform 0.2s ease;
+}
+
+#user-profile-modal .dictation-settings-hint-toggle.is-on {
+  background-color: var(--color-button-yellow, rgb(252, 235, 163));
+}
+
+#user-profile-modal .dictation-settings-hint-toggle.is-on .dictation-settings-hint-toggle-thumb {
+  transform: translateX(18px);
+}
+
+#user-profile-modal .dictation-settings-hint-toggle:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
+}
+
+[dir="rtl"] #user-profile-modal .dictation-settings-hint-toggle-thumb {
+  left: auto;
+  right: 3px;
+}
+
+[dir="rtl"] #user-profile-modal .dictation-settings-hint-toggle.is-on .dictation-settings-hint-toggle-thumb {
+  transform: translateX(-18px);
+}
+
 #user-profile-modal .dictation-settings-legend {
   display: flex;
   flex-direction: column;
