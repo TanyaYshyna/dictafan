@@ -570,6 +570,14 @@
         // p1: стандартный режим — аудио по необходимости, текст доступен
         if (textBlock) textBlock.style.display = '';
         if (checkGroup) checkGroup.style.display = '';
+        // Поле ввода доступно, пока по предложению не получена звезда.
+        // (если звезда уже есть — resetSentenceUiFromSession показал оригинал и запретил ввод)
+        try {
+          const st = getCurrentSentenceStateFromSession(session);
+          const perfect = Number(st && st.number_of_perfect) || 0;
+          if (input && perfect < 1) input.setAttribute('contenteditable', 'true');
+        } catch (eInputMode) {
+        }
         updateAudioUserPanelVisibilityFromSession(session);
         // НЕ очищаем input/correctAnswer — они могут содержать результаты проверки
         return;
@@ -584,6 +592,13 @@
         }
         if (textBlock) textBlock.style.display = '';
         if (checkGroup) checkGroup.style.display = '';
+        // Поле ввода доступно, пока по предложению не получена звезда.
+        try {
+          const st = getCurrentSentenceStateFromSession(session);
+          const perfect = Number(st && st.number_of_perfect) || 0;
+          if (input && perfect < 1) input.setAttribute('contenteditable', 'true');
+        } catch (eInputMode) {
+        }
         try {
           renderSentenceExplanation(session);
         } catch (eHintNoRecord) {
@@ -7120,17 +7135,16 @@
       };
 
       // Тумблер подсказки виден только для «своего» режима.
-      // При переключении на другой режим чек сбрасывается в ноль.
+      // При переключении на другой режим чек НЕ сбрасывается — только скрывается,
+      // чтобы сохранить выбор пользователя.
       const syncHintTogglesForMode = (mode) => {
         const isNoRecord = mode === 'no-record';
         const isAudioOnly = mode === 'audio-only';
         if (hintTranslationToggle) {
           hintTranslationToggle.style.display = isNoRecord ? '' : 'none';
-          if (!isNoRecord) setAudioHintToggleState(hintTranslationToggle, false);
         }
         if (hintOriginalToggle) {
           hintOriginalToggle.style.display = isAudioOnly ? '' : 'none';
-          if (!isAudioOnly) setAudioHintToggleState(hintOriginalToggle, false);
         }
       };
 

@@ -1779,7 +1779,8 @@ function setAudioHintToggleState(toggleEl, isOn) {
 }
 
 // Тумблер подсказки виден только для «своего» режима.
-// При переключении на другой режим чек сбрасывается в ноль.
+// При переключении на другой режим чек НЕ сбрасывается — только скрывается,
+// чтобы сохранить выбор пользователя.
 function syncProfileHintTogglesForMode(mode) {
     const isNoRecord = mode === 'no-record';
     const isAudioOnly = mode === 'audio-only';
@@ -1787,11 +1788,9 @@ function syncProfileHintTogglesForMode(mode) {
     const hintOriginalToggle = document.getElementById('audioExerciseHintOriginal');
     if (hintTranslationToggle) {
         hintTranslationToggle.style.display = isNoRecord ? '' : 'none';
-        if (!isNoRecord) setAudioHintToggleState(hintTranslationToggle, false);
     }
     if (hintOriginalToggle) {
         hintOriginalToggle.style.display = isAudioOnly ? '' : 'none';
-        if (!isAudioOnly) setAudioHintToggleState(hintOriginalToggle, false);
     }
 }
 
