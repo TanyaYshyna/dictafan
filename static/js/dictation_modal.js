@@ -64,6 +64,9 @@
     _countdownTimer: null,
     // resolve текущего Promise отсчёта (создаётся createDictationCountdown)
     _countdownResolve: null,
+    // Флаг: поле ввода сейчас показывает подсказку оригинала (режим «лише аудіо»).
+    // Нужен, чтобы при смене режима убрать текст подсказки из поля ввода.
+    _audioOnlyOriginalShown: false,
   };
 
   /**
@@ -575,7 +578,15 @@
         try {
           const st = getCurrentSentenceStateFromSession(session);
           const perfect = Number(st && st.number_of_perfect) || 0;
-          if (input && perfect < 1) input.setAttribute('contenteditable', 'true');
+          if (input && perfect < 1) {
+            input.setAttribute('contenteditable', 'true');
+            // Если поле ввода показывало подсказку оригинала (режим «лише аудіо»),
+            // то при переходе на другой режим убираем её.
+            if (dictationModalState._audioOnlyOriginalShown) {
+              input.textContent = '';
+              dictationModalState._audioOnlyOriginalShown = false;
+            }
+          }
         } catch (eInputMode) {
         }
         updateAudioUserPanelVisibilityFromSession(session);
@@ -596,7 +607,15 @@
         try {
           const st = getCurrentSentenceStateFromSession(session);
           const perfect = Number(st && st.number_of_perfect) || 0;
-          if (input && perfect < 1) input.setAttribute('contenteditable', 'true');
+          if (input && perfect < 1) {
+            input.setAttribute('contenteditable', 'true');
+            // Если поле ввода показывало подсказку оригинала (режим «лише аудіо»),
+            // то при переходе на другой режим убираем её.
+            if (dictationModalState._audioOnlyOriginalShown) {
+              input.textContent = '';
+              dictationModalState._audioOnlyOriginalShown = false;
+            }
+          }
         } catch (eInputMode) {
         }
         try {
@@ -630,12 +649,14 @@
             correctAnswer.textContent = '';
             correctAnswer.style.display = 'none';
           }
+          dictationModalState._audioOnlyOriginalShown = true;
         } else {
           if (textBlock) textBlock.style.display = 'none';
           if (input) {
             input.setAttribute('contenteditable', 'false');
             input.textContent = '';
           }
+          dictationModalState._audioOnlyOriginalShown = false;
           if (correctAnswer) {
             correctAnswer.textContent = '';
             correctAnswer.style.display = 'none';
@@ -7428,6 +7449,12 @@
           } catch (e1) {
           }
           setDirty(false);
+
+          // Применяем сохранённые настройки к текущему диктанту.
+          try {
+            applyToRuntime();
+          } catch (eApply) {
+          }
         } catch (e) {
         }
       };
@@ -7446,10 +7473,8 @@
       };
 
       const onAnyChange = () => {
-        try {
-          applyToRuntime();
-        } catch (e) {
-        }
+        // Не применяем изменения к диктанту «на лету»: они должны отразиться
+        // только после сохранения настроек (см. __dictafanSaveAudioSettingsModal).
         setDirty(true);
       };
 
