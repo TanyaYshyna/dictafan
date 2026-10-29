@@ -115,11 +115,9 @@
       },
       "exercise_mode": {
         "label": "أنواع المهام",
-        "record": "تسجيل الصوت",
-        "no_record": "عدم تسجيل الصوت",
-        "audio_only": "صوت فقط",
-        "hint_translation": "تلميح الترجمة:",
-        "hint_original": "تلميح النص الأصلي:"
+        "record": "صوت + نص",
+        "no_record": "نص فقط. تلميح الترجمة:",
+        "audio_only": "صوت فقط. تلميح النص الأصلي:"
       }
     },
     "star_counting": {

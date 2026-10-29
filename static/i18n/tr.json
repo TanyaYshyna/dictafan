@@ -120,11 +120,9 @@
       },
       "exercise_mode": {
         "label": "Görev türleri",
-        "record": "sesi kaydet",
-        "no_record": "sesi kaydetme",
-        "audio_only": "yalnızca ses",
-        "hint_translation": "Çeviri ipucu:",
-        "hint_original": "Orijinal ipucu:"
+        "record": "ses + metin",
+        "no_record": "Yalnızca metin. Çeviri ipucu:",
+        "audio_only": "Yalnızca ses. Orijinal ipucu:"
       }
     },
     "star_counting": {

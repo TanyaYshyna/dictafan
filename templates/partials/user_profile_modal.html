@@ -246,23 +246,15 @@
                                                 <label style="display:flex; align-items:center; gap:10px;">
                                                     <input type="radio" name="audioExerciseMode" id="audioExerciseModeNoRecord" value="no-record" />
                                                     <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic-off"></i><i data-lucide="keyboard"></i><span>{{ t('profile.audio.exercise_mode.no_record') }}</span></span>
-                                                </label>
-                                                <label style="display:flex; align-items:center; gap:10px;">
-                                                    <input type="radio" name="audioExerciseMode" id="audioExerciseModeAudioOnly" value="audio-only" />
-                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic"></i><i data-lucide="keyboard-off"></i><span>{{ t('profile.audio.exercise_mode.audio_only') }}</span></span>
-                                                </label>
-                                            </div>
-                                            <div class="dictation-settings-hint-flags">
-                                                <label class="dictation-settings-hint-flag">
-                                                    <span>{{ t('profile.audio.exercise_mode.hint_translation') }}</span>
-                                                    <span class="dictation-settings-hint-toggle" id="audioExerciseHintTranslation" role="switch" aria-checked="false" tabindex="0">
+                                                    <span class="dictation-settings-hint-toggle" id="audioExerciseHintTranslation" role="switch" aria-checked="false" tabindex="0" style="display:none;">
                                                         <span class="dictation-settings-hint-toggle-track"></span>
                                                         <span class="dictation-settings-hint-toggle-thumb"></span>
                                                     </span>
                                                 </label>
-                                                <label class="dictation-settings-hint-flag">
-                                                    <span>{{ t('profile.audio.exercise_mode.hint_original') }}</span>
-                                                    <span class="dictation-settings-hint-toggle" id="audioExerciseHintOriginal" role="switch" aria-checked="false" tabindex="0">
+                                                <label style="display:flex; align-items:center; gap:10px;">
+                                                    <input type="radio" name="audioExerciseMode" id="audioExerciseModeAudioOnly" value="audio-only" />
+                                                    <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic"></i><i data-lucide="keyboard-off"></i><span>{{ t('profile.audio.exercise_mode.audio_only') }}</span></span>
+                                                    <span class="dictation-settings-hint-toggle" id="audioExerciseHintOriginal" role="switch" aria-checked="false" tabindex="0" style="display:none;">
                                                         <span class="dictation-settings-hint-toggle-track"></span>
                                                         <span class="dictation-settings-hint-toggle-thumb"></span>
                                                     </span>

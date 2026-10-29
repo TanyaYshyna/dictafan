@@ -120,11 +120,9 @@
       },
       "exercise_mode": {
         "label": "Task types",
-        "record": "record audio",
-        "no_record": "don't record audio",
-        "audio_only": "audio only",
-        "hint_translation": "Translation hint:",
-        "hint_original": "Original hint:"
+        "record": "audio + text",
+        "no_record": "Text only. Translation hint:",
+        "audio_only": "Audio only. Original hint:"
       }
     },
     "star_counting": {

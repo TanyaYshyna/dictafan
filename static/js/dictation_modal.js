@@ -576,13 +576,18 @@
       }
 
       if (mode === 'no-record') {
-        // p2: аудио скрыто, только текст
+        // p2: аудио скрыто, только текст.
+        // При включённой «подсказке перевода» показываем перевод над полем ввода.
         if (audioPanel) {
           audioPanel.style.visibility = 'hidden';
           audioPanel.style.pointerEvents = 'none';
         }
         if (textBlock) textBlock.style.display = '';
         if (checkGroup) checkGroup.style.display = '';
+        try {
+          renderSentenceExplanation(session);
+        } catch (eHintNoRecord) {
+        }
         // НЕ очищаем input/correctAnswer — они могут содержать результаты проверки
         return;
       }
@@ -1464,10 +1469,10 @@
       const view = getCurrentSentenceViewFromSession(session);
       const explanation = view ? String(view.explanation != null ? view.explanation : '') : '';
 
-      // В режиме «только аудио» при включённой «подсказке перевода» показываем перевод
+      // В режиме «только текст» при включённой «подсказке перевода» показываем перевод
       // над полем ввода, склеивая его с per-sentence explanation.
       let translation = '';
-      if (getExerciseMode() === 'audio-only' && getExerciseHintTranslation()) {
+      if (getExerciseMode() === 'no-record' && getExerciseHintTranslation()) {
         translation = view ? String(view.text_translation != null ? view.text_translation : (view.translation != null ? view.translation : '')) : '';
       }
 
@@ -7114,6 +7119,21 @@
         return toggleEl.classList.contains('is-on');
       };
 
+      // Тумблер подсказки виден только для «своего» режима.
+      // При переключении на другой режим чек сбрасывается в ноль.
+      const syncHintTogglesForMode = (mode) => {
+        const isNoRecord = mode === 'no-record';
+        const isAudioOnly = mode === 'audio-only';
+        if (hintTranslationToggle) {
+          hintTranslationToggle.style.display = isNoRecord ? '' : 'none';
+          if (!isNoRecord) setAudioHintToggleState(hintTranslationToggle, false);
+        }
+        if (hintOriginalToggle) {
+          hintOriginalToggle.style.display = isAudioOnly ? '' : 'none';
+          if (!isAudioOnly) setAudioHintToggleState(hintOriginalToggle, false);
+        }
+      };
+
       const updateModalStarCountingToggleUI = (value) => {
         const toggle = starCountingToggle;
         if (!toggle) return;
@@ -7264,6 +7284,11 @@
           setAudioHintToggleState(hintTranslationToggle, !!(settings && settings.hint_translation));
           setAudioHintToggleState(hintOriginalToggle, !!(settings && settings.hint_original));
         } catch (eHint) {
+        }
+
+        try {
+          syncHintTogglesForMode(mode);
+        } catch (eSync) {
         }
 
         const starCounting = (settings && settings.star_counting) ? String(settings.star_counting || '') : defaults.star_counting;
@@ -7432,7 +7457,10 @@
       try {
         [rbRecord, rbNoRecord, rbOnly].forEach((rb) => {
           if (!rb) return;
-          rb.addEventListener('change', () => onAnyChange());
+          rb.addEventListener('change', () => {
+            syncHintTogglesForMode(getSelectedExerciseMode());
+            onAnyChange();
+          });
         });
       } catch (e) {
       }

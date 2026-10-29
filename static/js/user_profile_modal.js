@@ -1778,6 +1778,23 @@ function setAudioHintToggleState(toggleEl, isOn) {
     toggleEl.setAttribute('aria-checked', isOn ? 'true' : 'false');
 }
 
+// Тумблер подсказки виден только для «своего» режима.
+// При переключении на другой режим чек сбрасывается в ноль.
+function syncProfileHintTogglesForMode(mode) {
+    const isNoRecord = mode === 'no-record';
+    const isAudioOnly = mode === 'audio-only';
+    const hintTranslationToggle = document.getElementById('audioExerciseHintTranslation');
+    const hintOriginalToggle = document.getElementById('audioExerciseHintOriginal');
+    if (hintTranslationToggle) {
+        hintTranslationToggle.style.display = isNoRecord ? '' : 'none';
+        if (!isNoRecord) setAudioHintToggleState(hintTranslationToggle, false);
+    }
+    if (hintOriginalToggle) {
+        hintOriginalToggle.style.display = isAudioOnly ? '' : 'none';
+        if (!isAudioOnly) setAudioHintToggleState(hintOriginalToggle, false);
+    }
+}
+
 function toggleAudioHintFlag(toggleEl) {
     if (!toggleEl) return;
     const isOn = toggleEl.classList.contains('is-on');
@@ -1880,6 +1897,7 @@ async function initializeAudioSettings() {
             setChecked('audioExerciseModeAudioOnly', 'audio-only');
             setAudioHintToggleState(document.getElementById('audioExerciseHintTranslation'), normalized.hint_translation);
             setAudioHintToggleState(document.getElementById('audioExerciseHintOriginal'), normalized.hint_original);
+            syncProfileHintTogglesForMode(normalized.mode);
         } catch (e) { }
 
         try {
@@ -1897,7 +1915,11 @@ async function initializeAudioSettings() {
             ['audioExerciseModeRecord', 'audioExerciseModeNoRecord', 'audioExerciseModeAudioOnly'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (!el) return;
-                el.addEventListener('change', () => checkForChanges());
+                el.addEventListener('change', () => {
+                    const current = document.querySelector('input[name="audioExerciseMode"]:checked');
+                    syncProfileHintTogglesForMode(current ? current.value : 'record');
+                    checkForChanges();
+                });
             });
             const bindHintToggle = (id) => {
                 const el = document.getElementById(id);
