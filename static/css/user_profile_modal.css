@@ -1342,9 +1342,9 @@
   gap: 10px;
   width: 100%;
   padding: 10px 14px;
-  border: 1px solid var(--color-border-light, rgba(0, 0, 0, 0.12));
+  border: 1px solid transparent;
   border-radius: 10px;
-  background: #ffffff;
+  background: transparent;
   color: var(--color-text, #1f2933);
   font-size: 15px;
   font-weight: 600;
@@ -1354,14 +1354,14 @@
 }
 
 #user-profile-modal .dictation-settings-star-counting-toggle:hover {
-  border-color: var(--color-button-text-pink, #e75480);
-  background: #fdf2f7;
+  border-color: var(--color-border-light, rgba(0, 0, 0, 0.12));
+  background: transparent;
 }
 
 #user-profile-modal .dictation-settings-star-counting-toggle:focus-visible {
   outline: none;
-  border-color: var(--color-button-text-pink, #e75480);
-  box-shadow: 0 0 0 3px rgba(231, 84, 128, 0.18);
+  border-color: var(--color-border-light, rgba(0, 0, 0, 0.12));
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.12);
 }
 
 #user-profile-modal .dictation-settings-star-counting-toggle i[data-lucide],
@@ -1369,12 +1369,6 @@
   width: 22px;
   height: 22px;
   flex: 0 0 auto;
-  color: #f5b301;
-}
-
-#user-profile-modal .dictation-settings-star-counting-toggle.is-half i[data-lucide],
-#user-profile-modal .dictation-settings-star-counting-toggle.is-half .lucide {
-  color: #f5b301;
 }
 
 #user-profile-modal .dictation-settings-card {
