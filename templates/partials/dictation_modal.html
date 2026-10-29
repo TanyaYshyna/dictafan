@@ -438,14 +438,18 @@
               <div class="dictation-settings-card dictation-settings-card-star-counting">
                 <div class="dictation-settings-title">{{ t('profile.star_counting.label') }}</div>
                 <div class="dictation-settings-star-counting-modes">
-                  <label class="dictation-settings-star-counting-mode">
-                    <input type="radio" name="modal-starCountingMode" id="modal-starCountingStar" value="star" />
-                    <span class="dictation-settings-inline"><i data-lucide="star"></i><span>{{ t('profile.star_counting.star') }}</span></span>
-                  </label>
-                  <label class="dictation-settings-star-counting-mode">
-                    <input type="radio" name="modal-starCountingMode" id="modal-starCountingHalf" value="half" />
-                    <span class="dictation-settings-inline"><i data-lucide="star-half"></i><span>{{ t('profile.star_counting.half') }}</span></span>
-                  </label>
+                  <button
+                    type="button"
+                    id="modal-starCountingToggle"
+                    class="dictation-settings-star-counting-toggle"
+                    data-value="star"
+                    role="switch"
+                    aria-checked="true"
+                    aria-label="{{ t('profile.star_counting.label') }}"
+                    title="{{ t('profile.star_counting.label') }}">
+                    <i data-lucide="star"></i>
+                    <span class="dictation-settings-star-counting-text">{{ t('profile.star_counting.star') }}</span>
+                  </button>
                 </div>
               </div>
             </div>

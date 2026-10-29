@@ -898,6 +898,48 @@ align-items: center;
 gap: 10px;
 }
 
+#audioSettingsModal .dictation-settings-star-counting-toggle {
+display: inline-flex;
+align-items: center;
+justify-content: flex-start;
+gap: 10px;
+width: 100%;
+padding: 10px 14px;
+border: 1px solid var(--color-border-light, rgba(0, 0, 0, 0.12));
+border-radius: 10px;
+background: #ffffff;
+color: var(--color-text, #1f2933);
+font-size: 15px;
+font-weight: 600;
+cursor: pointer;
+text-align: left;
+transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#audioSettingsModal .dictation-settings-star-counting-toggle:hover {
+border-color: var(--color-button-text-pink, #e75480);
+background: #fdf2f7;
+}
+
+#audioSettingsModal .dictation-settings-star-counting-toggle:focus-visible {
+outline: none;
+border-color: var(--color-button-text-pink, #e75480);
+box-shadow: 0 0 0 3px rgba(231, 84, 128, 0.18);
+}
+
+#audioSettingsModal .dictation-settings-star-counting-toggle i[data-lucide],
+#audioSettingsModal .dictation-settings-star-counting-toggle .lucide {
+width: 22px;
+height: 22px;
+flex: 0 0 auto;
+color: #f5b301;
+}
+
+#audioSettingsModal .dictation-settings-star-counting-toggle.is-half i[data-lucide],
+#audioSettingsModal .dictation-settings-star-counting-toggle.is-half .lucide {
+color: #f5b301;
+}
+
 #audioSettingsModal .dictation-settings-card {
   border: 1px solid var(--color-border-light, rgba(0,0,0,0.12));
   border-radius: 12px;
@@ -989,41 +1031,6 @@ gap: 10px;
 }
 
 #audioSettingsModal input[type="radio"][name="modal-audioExerciseMode"]:focus-visible {
-  outline: 3px solid rgba(245, 158, 11, 0.35);
-  outline-offset: 2px;
-}
-
-#audioSettingsModal input[type="radio"][name="modal-starCountingMode"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  border: 2px solid rgba(17, 24, 39, 0.55);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  background: #fff;
-  flex: 0 0 auto;
-  cursor: pointer;
-}
-
-#audioSettingsModal input[type="radio"][name="modal-starCountingMode"]::after {
-  content: '';
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(17, 24, 39, 0.85);
-  transform: scale(0);
-  transition: transform 120ms ease;
-}
-
-#audioSettingsModal input[type="radio"][name="modal-starCountingMode"]:checked::after {
-  transform: scale(1);
-}
-
-#audioSettingsModal input[type="radio"][name="modal-starCountingMode"]:focus-visible {
   outline: 3px solid rgba(245, 158, 11, 0.35);
   outline-offset: 2px;
 }

@@ -1719,15 +1719,45 @@ function initializeLanguageModelsSelector() {
 
 let audioSettingsPanel = null;
 
+function updateStarCountingToggleUI(value) {
+    const toggle = document.getElementById('starCountingModeToggle');
+    if (!toggle) return;
+    const isHalf = value === 'half';
+    toggle.dataset.value = isHalf ? 'half' : 'star';
+    toggle.setAttribute('aria-checked', isHalf ? 'true' : 'false');
+    toggle.classList.toggle('is-half', isHalf);
+    const icon = toggle.querySelector('[data-lucide]');
+    if (icon) {
+        icon.setAttribute('data-lucide', isHalf ? 'star-half' : 'star');
+        try {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({ root: toggle });
+            }
+        } catch (e) { }
+    }
+    const text = toggle.querySelector('.dictation-settings-star-counting-text');
+    if (text) {
+        text.textContent = profileT(isHalf ? 'profile.star_counting.half' : 'profile.star_counting.star', null,
+            isHalf ? 'і так зійде (легкий режим)' : 'для перфекціоніста (максимальне навантаження)');
+    }
+}
+
+function toggleStarCountingValue(toggle) {
+    const current = (toggle && toggle.dataset && toggle.dataset.value === 'half') ? 'half' : 'star';
+    updateStarCountingToggleUI(current === 'half' ? 'star' : 'half');
+}
+
 function getAudioSettingsFromDom() {
     const startEl = document.getElementById('playSequenceStart');
     const start = startEl ? String(startEl.value || '') : '';
     const modeRadios = document.querySelectorAll('input[name="audioExerciseMode"]');
     let exercise_mode = 'record';
     modeRadios.forEach(r => { if (r.checked) exercise_mode = r.value; });
-    const starCountingRadios = document.querySelectorAll('input[name="starCountingMode"]');
     let star_counting = 'star';
-    starCountingRadios.forEach(r => { if (r.checked) star_counting = r.value; });
+    const starCountingToggle = document.getElementById('starCountingModeToggle');
+    if (starCountingToggle && starCountingToggle.dataset && starCountingToggle.dataset.value) {
+        star_counting = starCountingToggle.dataset.value === 'half' ? 'half' : 'star';
+    }
     return {
         start,
         exercise_mode,
@@ -1798,12 +1828,7 @@ async function initializeAudioSettings() {
         } catch (e) { }
 
         try {
-            const setStarChecked = (id, v) => {
-                const el = document.getElementById(id);
-                if (el) el.checked = (starCounting === v);
-            };
-            setStarChecked('starCountingModeStar', 'star');
-            setStarChecked('starCountingModeHalf', 'half');
+            updateStarCountingToggleUI(starCounting);
         } catch (e) { }
 
         try {
@@ -1814,11 +1839,19 @@ async function initializeAudioSettings() {
                 el.addEventListener('change', () => checkForChanges());
             };
             bindInput('playSequenceStart');
-            ['audioExerciseModeRecord', 'audioExerciseModeNoRecord', 'audioExerciseModeOnlyNoHint', 'audioExerciseModeOnlyHint', 'starCountingModeStar', 'starCountingModeHalf'].forEach((id) => {
+            ['audioExerciseModeRecord', 'audioExerciseModeNoRecord', 'audioExerciseModeOnlyNoHint', 'audioExerciseModeOnlyHint'].forEach((id) => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.addEventListener('change', () => checkForChanges());
             });
+            const starCountingToggle = document.getElementById('starCountingModeToggle');
+            if (starCountingToggle && !starCountingToggle.dataset.boundStarToggle) {
+                starCountingToggle.dataset.boundStarToggle = '1';
+                starCountingToggle.addEventListener('click', () => {
+                    toggleStarCountingValue(starCountingToggle);
+                    checkForChanges();
+                });
+            }
         } catch (e) { }
 
         try {
