@@ -983,6 +983,46 @@ flex: 0 0 auto;
   color: var(--color-text, #1f2933);
 }
 
+#audioSettingsModal .play-sequence-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#audioSettingsModal .play-sequence-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#audioSettingsModal .play-sequence-clear-btn:hover {
+  border-color: var(--color-border-light, rgba(0, 0, 0, 0.12));
+  background: #f8f9fa;
+}
+
+#audioSettingsModal .play-sequence-clear-btn:focus-visible {
+  outline: none;
+  border-color: var(--color-border-light, rgba(0, 0, 0, 0.12));
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.12);
+}
+
+#audioSettingsModal .play-sequence-clear-btn i[data-lucide],
+#audioSettingsModal .play-sequence-clear-btn .lucide {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
 #audioSettingsModal #modal-playSequenceStart::placeholder {
   color: var(--color-text-placeholder, #9ca3af);
   opacity: 1;
@@ -1144,6 +1184,42 @@ flex: 0 0 auto;
   display: inline-block;
   width: 14px;
   text-align: center;
+}
+
+#audioSettingsModal .dictation-settings-legend-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text, #1f2933);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#audioSettingsModal .dictation-settings-legend-btn:hover {
+  border-color: var(--color-border-light, rgba(0, 0, 0, 0.12));
+  background: transparent;
+}
+
+#audioSettingsModal .dictation-settings-legend-btn:focus-visible {
+  outline: none;
+  border-color: var(--color-border-light, rgba(0, 0, 0, 0.12));
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.12);
+}
+
+#audioSettingsModal .dictation-settings-legend-btn strong {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  flex: 0 0 auto;
 }
 
 @media (max-width: 780px) {
@@ -2726,7 +2802,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   display: none;
   align-items: center;
   justify-content: center;
-  background: rgba(17, 24, 39, 0.38);
+  background: rgba(17, 24, 39, 0.66);
   pointer-events: none;
 }
 
@@ -2734,9 +2810,9 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   font-size: min(28vw, 240px);
   line-height: 1;
   font-weight: 800;
-  /* Корпоративный розовый; тёмная тень создаёт объём на тёмном фоне оверлея */
-  color: var(--color-button-pink, #f5c0ca);
-  text-shadow: 0 8px 32px rgba(128, 44, 53, 0.55);
+  /* Корпоративный жёлтый; тёмная тень создаёт объём на тёмном фоне оверлея */
+  color: var(--color-button-yellow, rgb(252, 235, 163));
+  text-shadow: 0 8px 32px rgba(120, 90, 0, 0.6);
   user-select: none;
   will-change: transform;
   transform-origin: center;

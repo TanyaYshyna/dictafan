@@ -7493,6 +7493,55 @@
       } catch (e) {
       }
 
+      // Вставка токена 'o'/'t' в позицию текстового курсора (или в конец поля).
+      const insertSeqToken = (token) => {
+        if (!startInput) return;
+        try {
+          startInput.focus();
+          const startPos = typeof startInput.selectionStart === 'number' ? startInput.selectionStart : (startInput.value ? startInput.value.length : 0);
+          const endPos = typeof startInput.selectionEnd === 'number' ? startInput.selectionEnd : startPos;
+          const value = startInput.value || '';
+          const next = value.slice(0, startPos) + token + value.slice(endPos);
+          const maxLen = parseInt(startInput.maxLength, 10) || 5;
+          const filtered = filterSeq(next).slice(0, maxLen);
+          const newCursor = Math.min(startPos + token.length, filtered.length);
+          startInput.value = filtered;
+          try {
+            startInput.setSelectionRange(newCursor, newCursor);
+          } catch (eSel) {
+          }
+          onAnyChange();
+        } catch (e) {
+        }
+      };
+
+      try {
+        ['o', 't'].forEach((token) => {
+          const btn = document.getElementById('modal-playSequenceAdd' + token.toUpperCase());
+          if (!btn) return;
+          btn.addEventListener('click', () => insertSeqToken(token));
+        });
+      } catch (e) {
+      }
+
+      try {
+        const clearBtn = document.getElementById('modal-playSequenceClear');
+        if (clearBtn && !clearBtn.dataset.boundDictafanClearSeq) {
+          clearBtn.dataset.boundDictafanClearSeq = '1';
+          clearBtn.addEventListener('click', () => {
+            if (startInput) {
+              startInput.value = '';
+              try {
+                startInput.focus();
+              } catch (eFocus) {
+              }
+            }
+            onAnyChange();
+          });
+        }
+      } catch (e) {
+      }
+
       try {
         [rbRecord, rbNoRecord, rbOnly].forEach((rb) => {
           if (!rb) return;

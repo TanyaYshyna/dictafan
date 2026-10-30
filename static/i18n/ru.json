@@ -88,7 +88,8 @@
         "on_start": "при старте:",
         "on_typo": "при ошибке:",
         "on_success": "при успехе:",
-        "sequence_title": "Используйте только буквы 't' (translation) и 'o' (original)"
+        "sequence_title": "Используйте только буквы 't' (translation) и 'o' (original)",
+        "clear": "очистить"
       },
       "repeats": {
         "label": "Повторы аудио:",

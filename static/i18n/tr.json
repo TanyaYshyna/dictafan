@@ -88,7 +88,8 @@
         "on_start": "başlangıçta:",
         "on_typo": "hatada:",
         "on_success": "başarılı olduğunda:",
-        "sequence_title": "Yalnızca 't' (çeviri) ve 'o' (orijinal) harflerini kullanın"
+        "sequence_title": "Yalnızca 't' (çeviri) ve 'o' (orijinal) harflerini kullanın",
+        "clear": "temizle"
       },
       "repeats": {
         "label": "Ses tekrarları:",

@@ -88,7 +88,8 @@
         "on_start": "на старті:",
         "on_typo": "при помилці:",
         "on_success": "при успіху:",
-        "sequence_title": "Використовуйте лише літери 't' (translation) та 'o' (original)"
+        "sequence_title": "Використовуйте лише літери 't' (translation) та 'o' (original)",
+        "clear": "очистити"
       },
       "repeats": {
         "label": "Повтори аудіо:",

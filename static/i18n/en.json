@@ -88,7 +88,8 @@
         "on_start": "on start:",
         "on_typo": "on mistake:",
         "on_success": "on success:",
-        "sequence_title": "Use only letters 't' (translation) and 'o' (original)"
+        "sequence_title": "Use only letters 't' (translation) and 'o' (original)",
+        "clear": "clear"
       },
       "repeats": {
         "label": "Audio repeats:",

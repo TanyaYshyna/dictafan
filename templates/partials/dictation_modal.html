@@ -387,17 +387,25 @@
                 <div class="dictation-settings-title">{{ t('profile.audio.play_audio.order_title') }}</div>
                 <table class="dictation-settings-table">
                   <tr>
-                    <td class="dictation-settings-td-label"><label for="modal-playSequenceStart">{{ t('profile.audio.play_audio.on_start') }}</label></td>
                     <td class="dictation-settings-td-input">
-                      <input type="text" id="modal-playSequenceStart" class="play-sequence-input" maxlength="5" placeholder="oto" pattern="[to]*" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+                      <div class="play-sequence-input-row">
+                        <input type="text" id="modal-playSequenceStart" class="play-sequence-input" maxlength="5" placeholder="oto" pattern="[to]*" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+                        <button type="button" id="modal-playSequenceClear" class="play-sequence-clear-btn" title="{{ t('profile.audio.play_audio.clear') }}" aria-label="{{ t('profile.audio.play_audio.clear') }}">
+                          <i data-lucide="x"></i>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 </table>
 
                 <div class="dictation-settings-title">{{ t('profile.audio.explanations.label') }}</div>
                 <div class="dictation-settings-legend">
-                  <div class="dictation-settings-legend-row"><strong>o</strong> - {{ t('profile.audio.explanations.o') }} ({{ t('profile.audio.explanations.listen') }} <b>ctrl + 1</b>)</div>
-                  <div class="dictation-settings-legend-row"><strong>t</strong> - {{ t('profile.audio.explanations.t') }} ({{ t('profile.audio.explanations.listen') }} <b>ctrl + 2</b>)</div>
+                  <button type="button" id="modal-playSequenceAddO" class="dictation-settings-legend-btn" data-seq="o">
+                    <strong>o</strong><span> - {{ t('profile.audio.explanations.o') }} ({{ t('profile.audio.explanations.listen') }} <b>ctrl + 1</b>)</span>
+                  </button>
+                  <button type="button" id="modal-playSequenceAddT" class="dictation-settings-legend-btn" data-seq="t">
+                    <strong>t</strong><span> - {{ t('profile.audio.explanations.t') }} ({{ t('profile.audio.explanations.listen') }} <b>ctrl + 2</b>)</span>
+                  </button>
                 </div>
               </div>
 
