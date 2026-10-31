@@ -128,8 +128,10 @@
     },
     "star_counting": {
       "label": "Metin kontrol seviyesi",
-      "star": "mükemmeliyetçiler için (maksimum yük)",
-      "half": "böyle de olur (kolay mod)"
+      "star": "mükemmeliyetçiler için",
+      "half": "böyle de olur",
+      "star_hint": "mükemmeliyetçiler için (maksimum yük)",
+      "half_hint": "böyle de olur (kolay mod)"
     },
     "assignment_history": {
       "retention": {

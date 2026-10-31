@@ -128,8 +128,10 @@
     },
     "star_counting": {
       "label": "Text check level",
-      "star": "for perfectionists (maximum load)",
-      "half": "good enough (easy mode)"
+      "star": "for perfectionists",
+      "half": "good enough",
+      "star_hint": "for perfectionists (maximum load)",
+      "half_hint": "good enough (easy mode)"
     },
     "assignment_history": {
       "retention": {

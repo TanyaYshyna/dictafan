@@ -7198,9 +7198,25 @@
           } catch (e) {
           }
           if (!label) {
-            label = isHalf ? 'і так зійде (легкий режим)' : 'для перфекціоніста (максимальне навантаження)';
+            // Без хардкода: ссылаемся только на ключ локализации.
+            label = key;
           }
           text.textContent = label;
+          // Подсказка (title/aria-label) — расширенный текст с пояснением
+          // «(легкий режим)» / «(максимальное навантаження)».
+          const hintKey = 'profile.star_counting.' + (isHalf ? 'half_hint' : 'star_hint');
+          let hint = '';
+          try {
+            if (window.I18n && typeof window.I18n.t === 'function') {
+              const translated = window.I18n.t(hintKey);
+              if (translated && translated !== hintKey) hint = translated;
+            }
+          } catch (e) {
+          }
+          if (hint) {
+            toggle.setAttribute('title', hint);
+            toggle.setAttribute('aria-label', hint);
+          }
         }
       };
 

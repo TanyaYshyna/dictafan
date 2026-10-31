@@ -1737,8 +1737,12 @@ function updateStarCountingToggleUI(value) {
     }
     const text = toggle.querySelector('.dictation-settings-star-counting-text');
     if (text) {
-        text.textContent = profileT(isHalf ? 'profile.star_counting.half' : 'profile.star_counting.star', null,
-            isHalf ? 'і так зійде (легкий режим)' : 'для перфекціоніста (максимальне навантаження)');
+        text.textContent = profileT(isHalf ? 'profile.star_counting.half' : 'profile.star_counting.star', null, null);
+    }
+    const hint = profileT(isHalf ? 'profile.star_counting.half_hint' : 'profile.star_counting.star_hint', null, null);
+    if (hint) {
+        toggle.setAttribute('title', hint);
+        toggle.setAttribute('aria-label', hint);
     }
 }
 
