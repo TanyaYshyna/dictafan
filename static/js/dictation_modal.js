@@ -7197,26 +7197,27 @@
             }
           } catch (e) {
           }
-          if (!label) {
-            // Без хардкода: ссылаемся только на ключ локализации.
-            label = key;
+          // Без хардкода: не перезаписываем текст сырым ключом локализации.
+          // Если словарь ещё не загружен — оставляем текущее значение
+          // (оно уже переведено на сервере через Jinja t()).
+          if (label) {
+            text.textContent = label;
           }
-          text.textContent = label;
-          // Подсказка (title/aria-label) — расширенный текст с пояснением
-          // «(легкий режим)» / «(максимальное навантаження)».
-          const hintKey = 'profile.star_counting.' + (isHalf ? 'half_hint' : 'star_hint');
-          let hint = '';
-          try {
-            if (window.I18n && typeof window.I18n.t === 'function') {
-              const translated = window.I18n.t(hintKey);
-              if (translated && translated !== hintKey) hint = translated;
-            }
-          } catch (e) {
+        }
+        // Подсказка (title/aria-label) — расширенный текст с пояснением
+        // «(легкий режим)» / «(максимальное навантаження)».
+        const hintKey = 'profile.star_counting.' + (isHalf ? 'half_hint' : 'star_hint');
+        let hint = '';
+        try {
+          if (window.I18n && typeof window.I18n.t === 'function') {
+            const translated = window.I18n.t(hintKey);
+            if (translated && translated !== hintKey) hint = translated;
           }
-          if (hint) {
-            toggle.setAttribute('title', hint);
-            toggle.setAttribute('aria-label', hint);
-          }
+        } catch (e) {
+        }
+        if (hint) {
+          toggle.setAttribute('title', hint);
+          toggle.setAttribute('aria-label', hint);
         }
       };
 

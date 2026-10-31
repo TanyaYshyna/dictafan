@@ -1737,9 +1737,12 @@ function updateStarCountingToggleUI(value) {
     }
     const text = toggle.querySelector('.dictation-settings-star-counting-text');
     if (text) {
-        text.textContent = profileT(isHalf ? 'profile.star_counting.half' : 'profile.star_counting.star', null, null);
+        // Пустой fallback: если словарь ещё не загружен, не затираем серверный
+        // (уже переведённый через Jinja) текст сырым ключом локализации.
+        const label = profileT(isHalf ? 'profile.star_counting.half' : 'profile.star_counting.star', null, '');
+        if (label) text.textContent = label;
     }
-    const hint = profileT(isHalf ? 'profile.star_counting.half_hint' : 'profile.star_counting.star_hint', null, null);
+    const hint = profileT(isHalf ? 'profile.star_counting.half_hint' : 'profile.star_counting.star_hint', null, '');
     if (hint) {
         toggle.setAttribute('title', hint);
         toggle.setAttribute('aria-label', hint);
