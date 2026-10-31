@@ -7116,7 +7116,7 @@
     return _dictationSpeechRecModeSelector || null;
   }
 
-  function initAudioSettingsModal() {
+  async function initAudioSettingsModal() {
     try {
       const m = document.getElementById('audioSettingsModal');
       if (!m) return;
@@ -7125,6 +7125,15 @@
         return;
       }
       m.dataset.dictafanInitAudioSettingsModal = '1';
+
+      // Гарантируем, что словарь локализации загружен до первого applyToUI,
+      // иначе window.I18n.t() вернёт сырой ключ и подпись не обновится.
+      try {
+        if (window.I18n && typeof window.I18n.ensureLoaded === 'function') {
+          await window.I18n.ensureLoaded();
+        }
+      } catch (e) {
+      }
 
       const startInput = document.getElementById('modal-playSequenceStart');
       const rbRecord = document.getElementById('modal-audioExerciseModeRecord');
@@ -7650,7 +7659,7 @@
   } catch (e) {
   }
 
-  function openAudioSettingsModal(sourceLabel = 'unknown') {
+  async function openAudioSettingsModal(sourceLabel = 'unknown') {
     try {
       bindAudioSettingsModalControls();
     } catch (e) {
@@ -7658,7 +7667,7 @@
 
     try {
       if (typeof window.initAudioSettingsModal === 'function') {
-        window.initAudioSettingsModal();
+        await window.initAudioSettingsModal();
       }
     } catch (e) {
     }
