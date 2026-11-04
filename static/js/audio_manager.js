@@ -6,6 +6,7 @@ class AudioManagerClass {
         this.audioPlayerVisual = null;
         this.playheadAnimation = null;
         this._autoPlayEnabled = true;
+        this._volume = 1;
         this._playToken = 0;
         this._desiredStartTime = null;
         this._lastPlayRequest = null;
@@ -295,6 +296,14 @@ class AudioManagerClass {
             const currentAudio = this.audio;
             const currentButton = this.currentButton;
 
+            // Повторно применяем громкость страницы при возобновлении того же аудио
+            try {
+                if (currentAudio) {
+                    currentAudio.volume = this.getVolume();
+                }
+            } catch (e) {
+            }
+
             if (this.currentButton) {
                 const originalState = this.currentButton.dataset.state || this.currentButton.dataset.originalState || 'ready';
                 const newState = (originalState === 'ready-shared' || originalState === 'playing-shared') ? 'playing-shared' : 'playing';
@@ -395,6 +404,12 @@ class AudioManagerClass {
             : null;
         this.audio = prewarmed || new Audio(audioUrl);
         this.currentButton = button || null;
+
+        // Применяем текущую громкость страницы к вновь созданному/переиспользуемому аудио
+        try {
+            this.audio.volume = this.getVolume();
+        } catch (e) {
+        }
 
         if (isDraftAudioUrl && this.audio) {
             try {
@@ -789,6 +804,23 @@ class AudioManagerClass {
                 this.audioPlayerVisual.setPlaybackRate(rate);
             }
         }
+    }
+
+    setVolume(volume) {
+        const parsed = parseFloat(volume);
+        const clamped = (isFinite(parsed) ? parsed : 1);
+        this._volume = Math.max(0, Math.min(1, clamped));
+        if (this.audio) {
+            try {
+                this.audio.volume = this._volume;
+            } catch (e) {
+            }
+        }
+    }
+
+    getVolume() {
+        const v = parseFloat(this._volume);
+        return (isFinite(v) ? v : 1);
     }
 
     pause() {

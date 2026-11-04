@@ -9207,6 +9207,65 @@
     }, true);
   }
 
+  function bindDictationVolumeControl() {
+    try {
+      const btn = document.getElementById('dictationVolumeBtn');
+      const slider = document.getElementById('dictationVolumeSlider');
+      const dropdown = document.getElementById('dictationVolumeDropdown');
+      const valueLabel = document.getElementById('dictationVolumeValue');
+      if (!btn || !slider || !dropdown) return;
+
+      if (btn.dataset.boundDictationModal !== '1') {
+        btn.dataset.boundDictationModal = '1';
+        btn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          const isOpen = dropdown.style.display !== 'none';
+          dropdown.style.display = isOpen ? 'none' : 'flex';
+        });
+
+        // Закрытие по клику вне контрола громкости
+        document.addEventListener('click', (e) => {
+          try {
+            if (!btn || !dropdown) return;
+            if (dropdown.style.display === 'none') return;
+            if (btn.contains(e.target) || dropdown.contains(e.target)) return;
+            dropdown.style.display = 'none';
+          } catch (e0) {
+          }
+        });
+      }
+
+      if (slider.dataset.boundDictationModal !== '1') {
+        slider.dataset.boundDictationModal = '1';
+        // Инициализируем слайдер текущей громкостью AudioManager
+        try {
+          const current = window.AudioManager && typeof window.AudioManager.getVolume === 'function'
+            ? window.AudioManager.getVolume()
+            : 1;
+          slider.value = String(Math.round(current * 100));
+          if (valueLabel) valueLabel.textContent = slider.value + '%';
+        } catch (e0) {
+        }
+
+        slider.addEventListener('input', () => {
+          try {
+            const vol = parseInt(slider.value, 10) / 100;
+            if (window.AudioManager && typeof window.AudioManager.setVolume === 'function') {
+              window.AudioManager.setVolume(vol);
+            }
+            if (valueLabel) valueLabel.textContent = slider.value + '%';
+          } catch (e0) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+  }
+
   function init() {
     patchDictationCardOpenHandler();
     preloadUiSounds();
@@ -9221,6 +9280,7 @@
     bindCheckButtonAsRepeat();
     bindNextButton();
     bindUserAudioButtons();
+    bindDictationVolumeControl();
     updateUserAudioButtonsFromState();
   }
 

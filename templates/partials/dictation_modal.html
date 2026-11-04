@@ -71,8 +71,19 @@
               <span id="dictationIdDisplay" class="dictation-id"></span>
             </div>
             <div class="dictation-top-progress-wrap">
-              <!-- Контейнер для рендера прогресс-панели (страница) -->
-              <div id="progressPanelContainer" class="progress-panel-modal-r"></div>
+              <div class="dictation-clock-volume-row">
+                <!-- Контейнер для рендера прогресс-панели (страница) -->
+                <div id="progressPanelContainer" class="progress-panel-modal-r"></div>
+                <div class="dictation-volume-control">
+                  <button id="dictationVolumeBtn" class="button-32-32" type="button" title="Громкость">
+                    <i data-lucide="volume-2"></i>
+                  </button>
+                  <div class="dictation-volume-dropdown" id="dictationVolumeDropdown" style="display:none;">
+                    <input type="range" id="dictationVolumeSlider" min="0" max="100" step="1" value="100" aria-label="Громкость аудио">
+                    <span class="dictation-volume-value" id="dictationVolumeValue">100%</span>
+                  </div>
+                </div>
+              </div>
               <div id="dictationTaskProgress" class="dictation-task-progress" aria-hidden="true">
                 <div class="dictation-task-progress-bar">
                   <div id="dictationTaskProgressFill" class="dictation-task-progress-fill"></div>

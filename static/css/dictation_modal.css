@@ -101,6 +101,74 @@
   min-width: 0;
 }
 
+/* Строка «часы + кнопка громкости», прижатая вправо */
+#dictationModal .panel-tablo .dictation-clock-volume-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+#dictationModal .dictation-volume-control {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+#dictationModal .dictation-volume-control .button-32-32 {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-button-text-gray);
+  cursor: pointer;
+}
+
+#dictationModal .dictation-volume-control .button-32-32:hover {
+  border-color: var(--color-hover);
+}
+
+#dictationModal .dictation-volume-control .button-32-32 svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Выпадающий бегунок громкости */
+#dictationModal .dictation-volume-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid var(--color-border, #e2e2e2);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+}
+
+#dictationModal .dictation-volume-dropdown input[type="range"] {
+  width: 120px;
+  accent-color: var(--color-button-yellow, #f2b705);
+  cursor: pointer;
+}
+
+#dictationModal .dictation-volume-dropdown .dictation-volume-value {
+  min-width: 42px;
+  font-size: 13px;
+  color: var(--color-button-text-gray, #555);
+  text-align: right;
+}
+
 /* На узких экранах панель результатов должна оставаться в той же строке,
    что и навигатор "<- 1/24 ->", а не перепрыгивать на отдельную строку.
    Поэтому НЕ включаем flex-wrap и не растягиваем прогресс на всю ширину. */
