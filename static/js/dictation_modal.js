@@ -2420,6 +2420,14 @@
   }
 
   function stopAllAudios() {
+    // Сбрасываем отложенный запуск цепочки аудио (playAudioSequence через setTimeout).
+    // Иначе при открытии модалки (например, списка предложений) таймер может сработать
+    // уже после stop() и снова запустить комбинацию файлов.
+    try {
+      clearTimeout(dictationModalState._startSequenceTimer);
+      dictationModalState._startSequenceTimer = null;
+    } catch (eTimer) {
+    }
     try {
       const am = window.AudioManager;
       if (am && typeof am.stop === 'function') {
@@ -6647,6 +6655,13 @@
       startModal.style.display = 'flex';
       console.log('[DM:showStartModal] display установлен в flex');
       renderLucide(startModal);
+
+      // Останавливаем плеер (в т.ч. цепочку из нескольких файлов), если он что-то играет
+      try {
+        stopAllAudios();
+      } catch (eStopAudio) {
+        console.warn('[DM:showStartModal] не удалось остановить аудио:', eStopAudio);
+      }
 
       try {
         const prefs = window.__dictationStartModalColumnPrefs;
