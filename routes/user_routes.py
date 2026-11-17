@@ -939,7 +939,10 @@ def api_telegram_test_send():
             send_telegram_message(int(chat_id), text)
             sent_count += 1
         except Exception as e:
-            errors.append(f"self: {e}")
+            # Технические детали пишем только в серверный лог,
+            # наружу их не отдаём (там может быть токен бота).
+            print(f"❌ [TELEGRAM][TEST_SEND] self send failed: {e}")
+            errors.append('self')
 
     # Отправляем учителям
     try:
@@ -954,12 +957,18 @@ def api_telegram_test_send():
                     send_telegram_message(int(t_chat_id), text)
                     sent_count += 1
                 except Exception as e:
-                    errors.append(f"teacher {t_chat_id}: {e}")
+                    print(f"❌ [TELEGRAM][TEST_SEND] teacher send failed chat_id={t_chat_id}: {e}")
+                    errors.append('teacher')
     except Exception as e:
-        errors.append(f"list_teachers: {e}")
+        print(f"❌ [TELEGRAM][TEST_SEND] list_teachers failed: {e}")
+        errors.append('list_teachers')
 
     if sent_count == 0 and errors:
-        return jsonify({'success': False, 'error': '; '.join(errors)}), 500
+        return jsonify({
+            'success': False,
+            'error': 'telegram_send_failed',
+            'message': 'Не удалось отправить сообщение в Telegram. Попробуйте позже.',
+        }), 500
 
     return jsonify({'success': True, 'sent_count': sent_count})
 

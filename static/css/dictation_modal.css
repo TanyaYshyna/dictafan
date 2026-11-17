@@ -101,15 +101,9 @@
   min-width: 0;
 }
 
-/* Строка «часы + кнопка громкости», прижатая вправо */
-#dictationModal .panel-tablo .dictation-clock-volume-row {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-#dictationModal .dictation-volume-control {
+/* Кнопка громкости — отдельный flex-элемент строки, прижатый вправо */
+#dictationModal .panel-tablo .dictation-volume-control {
+  flex: 0 0 auto;
   position: relative;
   display: inline-flex;
   align-items: center;

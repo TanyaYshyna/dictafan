@@ -168,7 +168,8 @@
         "get_code_first": "Önce bir kod alın"
       },
       "errors": {
-        "profile_refresh_failed": "Profil yenilenemedi"
+        "profile_refresh_failed": "Profil yenilenemedi",
+        "send_failed": "Telegram'a mesaj gönderilemedi. Lütfen daha sonra tekrar deneyin."
       },
       "help": {
         "prefix": "Telegram'ı bağlamak için:",

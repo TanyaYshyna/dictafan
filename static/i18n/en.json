@@ -168,7 +168,8 @@
         "get_code_first": "Get a code first"
       },
       "errors": {
-        "profile_refresh_failed": "Failed to refresh profile"
+        "profile_refresh_failed": "Failed to refresh profile",
+        "send_failed": "Failed to send the message to Telegram. Please try again later."
       },
       "help": {
         "prefix": "To link Telegram:",

@@ -168,7 +168,8 @@
         "get_code_first": "Спочатку отримай код"
       },
       "errors": {
-        "profile_refresh_failed": "Не вдалося оновити профіль"
+        "profile_refresh_failed": "Не вдалося оновити профіль",
+        "send_failed": "Не вдалося надіслати повідомлення в Telegram. Спробуйте пізніше."
       },
       "help": {
         "prefix": "Щоб прив’язати Telegram:",

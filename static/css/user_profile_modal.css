@@ -1567,6 +1567,19 @@
   color: var(--color-button-text-lightgreen);
 }
 
+#user-profile-modal .toast-notice.error {
+  background: var(--color-button-red, #ff4d4f);
+  color: var(--color-button-text-red, #ffffff);
+  max-width: min(90vw, 420px);
+}
+
+#user-profile-modal .toast-notice.toast-with-icon .toast-message {
+  max-width: min(78vw, 340px);
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
 #user-profile-modal .toast-notice.info {
   background: var(--color-button-yellow);
   color: var(--color-button-text-yellow);

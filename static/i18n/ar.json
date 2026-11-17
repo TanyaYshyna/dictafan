@@ -163,7 +163,8 @@
         "get_code_first": "احصل على الرمز أولاً"
       },
       "errors": {
-        "profile_refresh_failed": "تعذر تحديث الملف الشخصي"
+        "profile_refresh_failed": "تعذر تحديث الملف الشخصي",
+        "send_failed": "تعذر إرسال الرسالة إلى Telegram. حاول مرة أخرى لاحقًا."
       },
       "help": {
         "prefix": "لربط Telegram:",

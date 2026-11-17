@@ -1475,7 +1475,10 @@ function renderTelegramSection() {
                     body: JSON.stringify({ text }),
                 });
                 if (!data || !data.success) {
-                    throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
+                    // Дружелюбное сообщение вместо сырого текста ошибки сервера
+                    const friendly = (data && data.message) ? String(data.message)
+                        : profileT('profile.telegram.errors.send_failed', null, 'Не удалось отправить сообщение в Telegram. Попробуйте позже.');
+                    throw new Error(friendly);
                 }
                 const sentCount = data.sent_count || 0;
                 showSuccess(profileT('profile.telegram.test_sent', { count: sentCount }, `Тестовое сообщение отправлено (${sentCount} получателей)`));

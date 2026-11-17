@@ -168,7 +168,8 @@
         "get_code_first": "Сначала получи код"
       },
       "errors": {
-        "profile_refresh_failed": "Не удалось обновить профиль"
+        "profile_refresh_failed": "Не удалось обновить профиль",
+        "send_failed": "Не удалось отправить сообщение в Telegram. Попробуйте позже."
       },
       "help": {
         "prefix": "Чтобы привязать Telegram:",
