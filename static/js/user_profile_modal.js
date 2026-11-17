@@ -2853,6 +2853,42 @@ function bindProfileTestRecording() {
     };
 }
 
+function bindEmailTestSend() {
+    const btn = document.getElementById('emailTestSendBtn');
+    const emailInput = document.getElementById('email');
+    if (!btn || !emailInput) return;
+
+    btn.addEventListener('click', async () => {
+        const email = String(emailInput.value || '').trim();
+        if (!email) {
+            showInfo(profileT('profile.email.test_missing', null, 'Укажите почту'));
+            return;
+        }
+
+        btn.disabled = true;
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            try { if (UM && UM.token) headers['Authorization'] = `Bearer ${UM.token}`; } catch (e) { }
+            const res = await fetch('/user/api/email/test_send', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({}),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data || !data.success) {
+                const msg = data && (data.message || data.error) ? String(data.message || data.error)
+                    : profileT('profile.email.test_failed', null, 'Не удалось отправить тестовое письмо. Проверьте настройки почты на сервере.');
+                throw new Error(msg);
+            }
+            showSuccess(profileT('profile.email.test_sent', { email: email }, `Тестовое письмо отправлено на ${email}. Проверь папку «Входящие» или «Спам».`));
+        } catch (e) {
+            showError(e && e.message ? e.message : profileT('profile.email.test_failed', null, 'Не удалось отправить тестовое письмо. Проверьте настройки почты на сервере.'));
+        } finally {
+            btn.disabled = false;
+        }
+    });
+}
+
 // ==================== INIT ====================
 
 // ==================== ПЛАН АКТИВНОСТИ: КНОПКИ +/- ====================
@@ -2951,6 +2987,7 @@ async function initUserProfilePageOrModal() {
         initializeTopbarControls();
         setupPasswordToggles();
         bindProfileTestRecording();
+        bindEmailTestSend();
 
         try { installProfileSaveHotkey(); } catch (e) { }
 

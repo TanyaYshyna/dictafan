@@ -48,7 +48,12 @@
                                 </div>
                                 <div class="form-row">
                                     <label for="email">{{ t('profile.email.label') }}</label>
-                                    <input type="email" id="email" name="email" readonly>
+                                    <div class="email-test-block">
+                                        <input type="email" id="email" name="email" readonly>
+                                        <button type="button" id="emailTestSendBtn" class="email-test-send-btn" title="{{ t('profile.email.test_title') }}">
+                                            <i data-lucide="mail"></i>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="form-row">
                                     <label for="password">{{ t('profile.password.label') }}</label>

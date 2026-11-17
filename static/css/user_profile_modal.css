@@ -1258,6 +1258,48 @@
   color: var(--color-text, #1f2933);
 }
 
+#user-profile-modal .email-test-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+#user-profile-modal .email-test-block input {
+  flex: 1;
+  min-width: 0;
+}
+
+#user-profile-modal .email-test-send-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid #ced4da;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-text, #1f2933);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#user-profile-modal .email-test-send-btn:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+#user-profile-modal .email-test-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#user-profile-modal .email-test-send-btn i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
 #user-profile-modal .password-input-wrapper {
   position: relative;
   display: flex;

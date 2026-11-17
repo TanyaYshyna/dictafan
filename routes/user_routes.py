@@ -973,6 +973,42 @@ def api_telegram_test_send():
     return jsonify({'success': True, 'sent_count': sent_count})
 
 
+@user_bp.route('/api/email/test_send', methods=['POST'])
+@jwt_required()
+def api_email_test_send():
+    """Отправить тестовое письмо на почту текущего пользователя для проверки работы почты."""
+    try:
+        current_email = get_jwt_identity()
+        user_db = get_user_by_email(current_email)
+        if not user_db:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+
+        email = (user_db.get('email') or current_email or '').strip().lower()
+        if not email:
+            return jsonify({'success': False, 'error': 'Email is required'}), 400
+
+        subject = 'Dictafan: тестовое письмо'
+        text_body = (
+            'Это тестовое письмо от Dictafan.\n\n'
+            'Если вы его получили — отправка почты работает корректно.\n'
+            'Проверьте также папку «Спам», если письма нет во «Входящих».'
+        )
+        try:
+            send_email(email, subject, text_body)
+        except Exception as e:
+            print(f"❌ Ошибка отправки email test_send: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'email_send_failed',
+                'message': 'Не удалось отправить тестовое письмо. Проверьте настройки почты на сервере.',
+            }), 500
+
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Ошибка email/test_send: {e}")
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+
 @user_bp.route('/api/avatar', methods=['POST'])
 @jwt_required()
 def api_upload_avatar():

@@ -40,7 +40,11 @@
       "label": "Ad"
     },
     "email": {
-      "label": "E-posta"
+      "label": "E-posta",
+      "test_title": "Test e-postası gönder",
+      "test_missing": "E-postanızı girin",
+      "test_sent": "{email} adresine test e-postası gönderildi. Gelen Kutusu veya Spam klasörünü kontrol edin.",
+      "test_failed": "Test e-postası gönderilemedi. Sunucudaki e-posta ayarlarını kontrol edin."
     },
     "password": {
       "label": "Şifre",

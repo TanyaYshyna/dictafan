@@ -40,7 +40,11 @@
       "label": "Name"
     },
     "email": {
-      "label": "Email"
+      "label": "Email",
+      "test_title": "Send test email",
+      "test_missing": "Enter your email",
+      "test_sent": "Test email sent to {email}. Check your Inbox or Spam folder.",
+      "test_failed": "Failed to send test email. Check the server email settings."
     },
     "password": {
       "label": "Password",
