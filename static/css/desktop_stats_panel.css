@@ -112,10 +112,10 @@
 /* ---- Время под кружком ---- */
 .desktop-stats-time-row {
     font-size: 12px;
-    font-weight: 800;
+    font-weight: 500;
     line-height: 1;
     /* Часы и подпись — тёмно-жёлтые (та же дуга, что и внешнее кольцо) */
-    color: var(--color-button-text-yellow, #fcc613);
+    color: var(--color-text-secondary, #9aa0a6);;
     white-space: nowrap;
     display: flex;
     align-items: center;
@@ -129,7 +129,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-button-text-yellow, #fcc613);
+    color: var(--color-text-secondary, #9aa0a6);;
     flex-shrink: 0;
 }
 

@@ -599,11 +599,21 @@ html[dir="rtl"] .topbar-save-group {
     opacity: 0;
     background: var(--color-button-yellow);
     color: var(--color-button-text-yellow);
-    padding: 10px 18px;
+    /* Увеличенная высота плашки (~7 мм выше) и вертикальное центрирование текста,
+       чтобы текст не прижимался к нижнему краю при многострочных сообщениях. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    /* +7 мм к прежней высоте плашки (~37px → ~64px) */
+    min-height: 64px;
+    padding: 12px 18px;
     border-radius: 10px;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
     font-size: 14px;
     font-weight: 600;
+    line-height: 1.35;
+    text-align: center;
     z-index: 200500;
     transition: opacity 0.2s ease, transform 0.2s ease;
 }

@@ -2776,6 +2776,13 @@
       // Тихо останавливаем таймер (часы становятся серыми), без модального окна.
       _pauseDictationTimer();
 
+      // Останавливаем проигрывание диктанта (схема аудио и т.п.) при нажатии
+      // «стоп» на часах. Возобновлять не нужно — пользователь сам запустит повторно.
+      try {
+        stopAllAudios();
+      } catch (eStopAudio) {
+      }
+
       if (isInactivityPause) {
         try {
           const inactivityTime = Number(dictationModalState._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
@@ -9050,6 +9057,13 @@
       clearDictationCountdownTimer();
       hideDictationCountdown();
     } catch (eCd) {
+    }
+
+    // Останавливаем проигрывание аудио диктанта при закрытии модалки,
+    // чтобы незакрытое до конца предложение не продолжало звучать в фоне.
+    try {
+      stopAllAudios();
+    } catch (eStopAudio) {
     }
 
     // Если диктант завершён (session.completed === true), всегда очищаем сессию
