@@ -9136,6 +9136,11 @@
 
     document.addEventListener('click', (e) => {
       try {
+        // Не перехватываем клики по виджету рейтинга диктанта (звезда + попап).
+        if (e.target && e.target.closest && e.target.closest('.card-rating-badge, .card-rating-popup')) {
+          return;
+        }
+
         const thumb = e.target && e.target.closest ? e.target.closest('.short-thumb[data-href]') : null;
         if (!thumb) return;
 
@@ -9181,6 +9186,8 @@
       try {
         const el = document.activeElement;
         if (!el) return;
+        // Не перехватываем клавиатурные события от кнопок виджета рейтинга.
+        if (el.closest && el.closest('.card-rating-badge, .card-rating-popup')) return;
         if (e && (e.key === 'Enter' || e.key === ' ')) {
           const thumb = el.closest ? el.closest('.short-thumb[data-href]') : null;
           if (!thumb) return;
