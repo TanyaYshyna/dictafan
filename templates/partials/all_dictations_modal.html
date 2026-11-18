@@ -1,0 +1,55 @@
+<!-- all-dictations-modal: все диктанты по языку (общий список) -->
+<div id="all-dictations-modal" class="modal" style="display: none;">
+    <div class="modal-content all-dictations-modal-content">
+        <div class="modal-header">
+            <div class="library-modal-header-left">
+                <i data-lucide="globe" class="library-modal-icon all-dictations-modal-icon"></i>
+            </div>
+            <h3 data-i18n="desktop.all_dictations.title">Все диктанты</h3>
+            <div class="all-dictations-header-actions">
+                <div class="all-dictations-sort">
+                    <label class="all-dictations-sort-label" for="all-dictations-sort-select" data-i18n="desktop.all_dictations.sort_label">Сортировка</label>
+                    <select id="all-dictations-sort-select" class="all-dictations-sort-select">
+                        <option value="rating" data-i18n="desktop.all_dictations.sort_rating">По рейтингу</option>
+                        <option value="alphabet" data-i18n="desktop.all_dictations.sort_alphabet">По алфавиту</option>
+                        <option value="newest" data-i18n="desktop.all_dictations.sort_newest">Новые впереди</option>
+                        <option value="oldest" data-i18n="desktop.all_dictations.sort_oldest">Старые впереди</option>
+                    </select>
+                </div>
+                <button class="modal-close" id="all-dictations-close" type="button" aria-label="" title="">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="modal-body all-dictations-modal-body">
+            <div class="all-dictations-content">
+                <div class="all-dictations-list" id="allDictationsList"></div>
+                <div class="all-dictations-footer">
+                    <button type="button" class="all-dictations-more-btn" id="all-dictations-more">
+                        <span data-i18n="desktop.all_dictations.next">Далее</span>
+                        <i data-lucide="chevron-down"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- all-dictations-text-modal: просмотр текста и перевода диктанта -->
+<div id="all-dictations-text-modal" class="modal" style="display: none;">
+    <div class="modal-content all-dictations-text-modal-content">
+        <div class="modal-header">
+            <h3 id="all-dictations-text-title">Текст диктанта</h3>
+            <button class="modal-close" id="all-dictations-text-close" type="button" aria-label="" title="">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body all-dictations-text-modal-body">
+            <div class="all-dictations-text-loading" id="all-dictations-text-loading" style="display:none;">
+                <i data-lucide="loader-2" class="spin"></i>
+            </div>
+            <div class="all-dictations-text-columns" id="all-dictations-text-columns"></div>
+        </div>
+    </div>
+</div>

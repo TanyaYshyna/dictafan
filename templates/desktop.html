@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/static/css/book_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/private_library_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/global_library_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/all_dictations_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/tasks_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/desktop_confirm_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/plan_tasks_modal.css?v={{ app_cache_revision }}">
@@ -112,6 +113,9 @@
                     <i data-lucide="home"></i>
                 </button>
                 <button class="tool-palette-btn" type="button" data-action="desktop-public" title="">
+                    <i data-lucide="library-big"></i>
+                </button>
+                <button class="tool-palette-btn" type="button" data-action="desktop-all-dictations" title="">
                     <i data-lucide="globe"></i>
                 </button>
                 <button class="tool-palette-btn" type="button" data-action="desktop-plan" title="">
@@ -146,6 +150,7 @@
 
     {% include 'partials/private_library_modal.html' %}
     {% include 'partials/global_library_modal.html' %}
+    {% include 'partials/all_dictations_modal.html' %}
 
     {% include 'partials/user_profile_modal.html' %}
 
@@ -173,6 +178,7 @@
     <script defer src="/static/js/book_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/private_library_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/global_library_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/all_dictations_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/speech_recognition_mode_selector.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/dictation_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>

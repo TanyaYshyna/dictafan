@@ -1068,6 +1068,7 @@ window.Desktop = window.Desktop || {
       'desktop-new': ['desktop.tooltips.new', 'Новый диктант'],
       'desktop-home': ['desktop.tooltips.home', 'Моя библиотека'],
       'desktop-public': ['desktop.tooltips.public', 'Глобальная библиотека'],
+      'desktop-all-dictations': ['desktop.tooltips.all_dictations', 'Все диктанты'],
       'desktop-plan': ['desktop.tooltips.plan', 'План'],
       'desktop-zoom-in': ['desktop.tooltips.zoom_in', 'Увеличить'],
       'desktop-zoom-out': ['desktop.tooltips.zoom_out', 'Уменьшить'],
@@ -1123,6 +1124,16 @@ window.Desktop = window.Desktop || {
           try {
             if (window.GlobalLibraryModal && typeof window.GlobalLibraryModal.open === 'function') {
               window.GlobalLibraryModal.open();
+              return;
+            }
+          } catch (e2) {
+          }
+        }
+
+        if (action === 'desktop-all-dictations') {
+          try {
+            if (window.AllDictationsModal && typeof window.AllDictationsModal.open === 'function') {
+              window.AllDictationsModal.open();
               return;
             }
           } catch (e2) {

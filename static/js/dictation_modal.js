@@ -815,11 +815,15 @@
   }
 
   /**
-   * Показывает короткое уведомление через общий toast-элемент диктанта.
+   * Показывает короткое уведомление через стандартный тост — жёлтая плашка
+   * внизу экрана (класс .toast-notice из style.css). Это обычный плавающий
+   * элемент без модального оверлея: он НЕ блокирует ввод и дальнейшую работу,
+   * просто сам исчезает по таймеру.
    */
   function showDictationToast(message, durationMs) {
     const dur = Number.isFinite(Number(durationMs)) ? Number(durationMs) : 3000;
     try {
+      // Устаревший тост диктанта (#toastMessage), если он вдруг есть в разметке.
       const toast = document.getElementById('toastMessage');
       if (toast) {
         toast.textContent = String(message || '');
@@ -830,6 +834,28 @@
         }, dur);
         return;
       }
+    } catch (e) {
+    }
+    try {
+      // Единый стандартный тост на жёлтом фоне внизу экрана.
+      let el = document.getElementById('dictation-toast-notice');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'dictation-toast-notice';
+        el.className = 'toast-notice';
+        // Чтобы плашка гарантированно не перехватывала клики.
+        el.style.pointerEvents = 'none';
+        document.body.appendChild(el);
+      }
+      el.textContent = String(message || '');
+      clearTimeout(showDictationToast._timer);
+      el.classList.remove('visible');
+      void el.offsetWidth; // перезапуск CSS-перехода, чтобы тост показался заново
+      el.classList.add('visible');
+      showDictationToast._timer = setTimeout(() => {
+        try { el.classList.remove('visible'); } catch (e) { }
+      }, dur);
+      return;
     } catch (e) {
     }
     try {
@@ -1948,15 +1974,12 @@
         });
 
         try {
-          const notice = document.getElementById('userInputNotice');
-          if (notice) {
-            if (res && res.okToCheck === false && res.noticeMessage) {
-              notice.textContent = String(res.noticeMessage);
-              notice.style.display = 'block';
-            } else {
-              notice.textContent = '';
-              notice.style.display = 'none';
-            }
+          // Сообщение об ошибке ввода показываем стандартным тостом (жёлтая плашка
+          // внизу экрана на 5 секунд), как и прочие всплывающие уведомления.
+          // Лейбл #userInputNotice под полем ввода не трогаем — он используется
+          // для других целей.
+          if (res && res.okToCheck === false && res.noticeMessage) {
+            showDictationToast(String(res.noticeMessage), 5000);
           }
         } catch (e5) {
         }
@@ -2563,11 +2586,8 @@
       } catch (e0) {
       }
       try {
-        const notice = document.getElementById('userInputNotice');
-        if (!notice) return;
         const hint = script === 'cyrillic' ? 'RU/UK' : (script === 'arabic' ? 'AR' : 'EN');
-        notice.textContent = `Для этого диктанта включи раскладку ${hint}`;
-        notice.style.display = 'block';
+        showDictationToast(`Для этого диктанта включи раскладку ${hint}`, 5000);
       } catch (e1) {
       }
     };
@@ -3757,6 +3777,18 @@
     updateSentenceTabloFromSession(session, curKey);
     updateTaskProgressFromSession(session);
     updateNextButtonVisibilityFromSession(session);
+
+    // После обмена предложение может стать полностью выполненным (звезда + микрофон),
+    // но, в отличие от checkText() и onRecognitionComplete(), здесь таймер не
+    // останавливался. Останавливаем его, чтобы время не продолжало тикать,
+    // когда работа с текущим предложением уже закончена.
+    try {
+      const completion = computeSentenceCompletionState(st);
+      if (completion.textOk && completion.audioOk) {
+        _pauseDictationTimer();
+      }
+    } catch (eCompExchange) {
+    }
 
     try {
       if (mode === 'audio') {

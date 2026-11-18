@@ -789,11 +789,31 @@
       "new": "Yeni dikte",
       "home": "Kütüphanem",
       "public": "Genel kütüphane",
+      "all_dictations": "Tüm dikteler",
       "plan": "Plan",
       "zoom_in": "Yakınlaştır",
       "zoom_out": "Uzaklaştır",
       "layout_free": "Serbest masa: kartlar sürüklenebilir",
       "layout_grid": "Normal masa: kartlar sıralı (sürüklenemez)"
+    },
+    "all_dictations": {
+      "title": "Tüm dikteler",
+      "sort_label": "Sıralama",
+      "sort_rating": "Puana göre",
+      "sort_alphabet": "Alfabetik",
+      "sort_newest": "Önce en yeniler",
+      "sort_oldest": "Önce en eskiler",
+      "next": "Sonraki",
+      "view_text": "Metni ve çeviriyi görüntüle",
+      "on_desk": "Zaten masada",
+      "add_to_desk": "Masaya ekle",
+      "rate": "Puanla",
+      "sentences_count": "Cümle sayısı",
+      "empty": "Dikte bulunamadı",
+      "loading": "Yükleniyor...",
+      "error": "Yükleme hatası",
+      "desk_limit": "Masa kartı limitine ulaşıldı",
+      "original": "orijinal"
     }
   },
   "support": {

@@ -1,0 +1,612 @@
+/* ==========================================================================
+   Модальное окно «Все диктанты» (общий список диктантов по языку)
+   ========================================================================== */
+
+#all-dictations-modal {
+  position: fixed !important;
+  top: calc(var(--topbar-height, 56px) + 5mm) !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: calc(100% - var(--topbar-height, 56px) - 5mm) !important;
+  z-index: 100150 !important;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.all-dictations-modal-content {
+  max-width: 95vw;
+  width: 95vw;
+  max-height: 90vh;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-hover, #f8f9fa);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.all-dictations-modal-content .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--color-border-light, #dee2e6);
+  background: var(--color-hover, #f8f9fa);
+  border-radius: 12px 12px 0 0;
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.all-dictations-modal-content .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.all-dictations-modal-content .library-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.all-dictations-modal-icon {
+  width: 28px;
+  height: 28px;
+  color: #d6d2c4;
+  flex-shrink: 0;
+}
+
+.all-dictations-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.all-dictations-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.all-dictations-sort-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted, #6b7280);
+  white-space: nowrap;
+}
+
+.all-dictations-sort-select {
+  min-width: 160px;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--color-panel-bg, #fff);
+  color: var(--color-text, #1f2933);
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+}
+
+.all-dictations-sort-select:focus {
+  border-color: var(--color-focus-border, #f9c609);
+}
+
+.all-dictations-modal-content .modal-close {
+  background: none;
+  border: none;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+  font-size: 24px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.all-dictations-modal-content .modal-close:hover {
+  background: var(--color-panel-bg, #fff);
+}
+
+.all-dictations-modal-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.all-dictations-content {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.all-dictations-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  gap: 12px;
+  padding: 16px 24px;
+  scroll-behavior: smooth;
+}
+
+.all-dictations-empty {
+  width: 100%;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 15px;
+}
+
+.all-dictations-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 12px 24px 16px;
+  border-top: 1px solid var(--color-border-light, #dee2e6);
+  background: var(--color-hover, #f8f9fa);
+}
+
+.all-dictations-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 22px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--color-panel-bg, #fff);
+  color: var(--color-text, #1f2933);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.all-dictations-more-btn:hover:not(:disabled) {
+  border-color: var(--color-button-text-yellow, #f9c609);
+  background: var(--color-hover, #f8f9fa);
+}
+
+.all-dictations-more-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.all-dictations-more-btn i {
+  width: 16px;
+  height: 16px;
+}
+
+/* ==========================================================================
+   Карточка диктанта (похожа на карточку рабочего стола)
+   ========================================================================== */
+
+.all-dictations-card {
+  display: block;
+  border-radius: 16px;
+  padding: 12px;
+  background: var(--color-panel-bg, #fff);
+  border: 2px solid var(--color-border, #e2e8f0);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: visible;
+  box-sizing: border-box;
+  width: 180px;
+  min-width: 180px;
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.all-dictations-card:hover {
+  border-color: var(--color-button-text-yellow, #f9c609);
+}
+
+.all-dictations-card--on-desk {
+  border-color: rgba(34, 197, 94, 0.55);
+}
+
+.all-dictations-card .short-thumb {
+  position: relative;
+  width: calc(100% + 24px);
+  margin: -12px -12px 0 -12px;
+  border-radius: 14px 14px 0 0;
+  overflow: hidden;
+  aspect-ratio: 5 / 3;
+}
+
+.all-dictations-card .short-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.all-dictations-card .short-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: block;
+  margin: 10px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+}
+
+.all-dictations-card .short-meta.short-meta--row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: nowrap;
+  margin-top: 8px;
+}
+
+.all-dictations-card .short-meta-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.all-dictations-card .short-meta-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.all-dictations-card .short-lang-flags {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #6b7280);
+  white-space: nowrap;
+}
+
+.all-dictations-card .short-level {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted, #6b7280);
+  white-space: nowrap;
+}
+
+.all-dictations-card .short-sentences-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.all-dictations-card .short-sentences-count i {
+  width: 14px;
+  height: 14px;
+}
+
+.all-dictations-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.all-dictations-card-footer .short-action-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.all-dictations-card-footer .short-action-btn:hover:not(:disabled) {
+  background: var(--color-hover, #f8f9fa);
+  color: var(--color-button-text-yellow, #f9c609);
+}
+
+.all-dictations-card-footer .short-action-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.all-dictations-card-footer .short-action-btn i {
+  width: 18px;
+  height: 18px;
+}
+
+.all-dictations-card-footer .all-dictations-add-btn:disabled {
+  color: rgba(34, 197, 94, 0.8);
+}
+
+.all-dictations-card .short-dikt-number {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted, #6b7280);
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Рейтинг диктанта (звезда + балл) и попап выбора оценки
+   ========================================================================== */
+
+.all-dictations-card .card-rating-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--color-star, #f9c609);
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  border: none;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+
+.all-dictations-card .card-rating-badge i {
+  width: 13px;
+  height: 13px;
+}
+
+.all-dictations-card .card-rating-badge--voted {
+  color: var(--color-gold, #f59e0b);
+}
+
+.all-dictations-card .card-rating-popup {
+  position: absolute;
+  top: 30px;
+  right: 6px;
+  z-index: 4;
+  display: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 4px 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+}
+
+.all-dictations-card .card-rating-popup__stars {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+}
+
+.all-dictations-card .card-rating-star {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 13px;
+  line-height: 1;
+  padding: 1px;
+  cursor: pointer;
+  transition: color 0.12s ease, transform 0.12s ease;
+  user-select: none;
+}
+
+.all-dictations-card .card-rating-star:hover {
+  transform: scale(1.2);
+}
+
+.all-dictations-card .card-rating-star--filled {
+  color: var(--color-star, #f9c609);
+}
+
+.all-dictations-card .card-rating-popup__hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  min-height: 12px;
+  line-height: 1;
+}
+
+/* ==========================================================================
+   Модалка просмотра текста и перевода диктанта
+   ========================================================================== */
+
+#all-dictations-text-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 100300 !important;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.all-dictations-text-modal-content {
+  max-width: 90vw;
+  width: 90vw;
+  max-height: 86vh;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-hover, #f8f9fa);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.all-dictations-text-modal-content .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--color-border-light, #dee2e6);
+  background: var(--color-hover, #f8f9fa);
+  border-radius: 12px 12px 0 0;
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.all-dictations-text-modal-content .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.all-dictations-text-modal-content .modal-close {
+  background: none;
+  border: none;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+  font-size: 24px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.all-dictations-text-modal-content .modal-close:hover {
+  background: var(--color-panel-bg, #fff);
+}
+
+.all-dictations-text-modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 24px;
+}
+
+.all-dictations-text-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.all-dictations-text-loading i {
+  width: 28px;
+  height: 28px;
+}
+
+.all-dictations-text-columns {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.all-dictations-text-col {
+  flex: 1 1 320px;
+  min-width: 280px;
+  max-width: 100%;
+  background: var(--color-panel-bg, #fff);
+  border: 1px solid var(--color-border-light, #dee2e6);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.all-dictations-text-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--color-hover, #f8f9fa);
+  border-bottom: 1px solid var(--color-border-light, #dee2e6);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text, #1f2933);
+}
+
+.all-dictations-text-original-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-button-text-yellow, #b8860b);
+  background: rgba(249, 198, 9, 0.18);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.all-dictations-text-row {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border-light, #dee2e6);
+}
+
+.all-dictations-text-row:last-child {
+  border-bottom: none;
+}
+
+.all-dictations-text-sentence {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text, #1f2933);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.all-dictations-text-explanation {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-muted, #6b7280);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.all-dictations-text-empty {
+  width: 100%;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 15px;
+}

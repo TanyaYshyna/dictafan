@@ -5,6 +5,8 @@ import tempfile
 from werkzeug.utils import secure_filename
 from helpers.language_data import load_language_data
 from helpers.user_helpers import get_current_user, login_required, get_safe_email
+from helpers.db import get_db_cursor
+from helpers.db_users import get_user_by_email
 from helpers.db_dictations import (
     get_dictation_by_id,
     get_dictation_sentences,
@@ -511,6 +513,248 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
     except Exception as e:
         current_app.logger.error(f"Ошибка при загрузке предложений диктанта {dictation_id}: {e}", exc_info=True)
         return jsonify({'error': f'Ошибка загрузки предложений: {str(e)}'}), 500
+
+
+DICTATION_SORT_COLUMNS = {
+    "rating": "rating_value",
+    "alphabet": "title",
+    "newest": "created_at",
+    "oldest": "created_at",
+}
+
+
+@dictation_bp.route('/api/dictations', methods=['GET'])
+def api_list_dictations():
+    """
+    Возвращает список диктантов из ПУБЛИЧНЫХ книг (books.visibility = 'public')
+    с фильтром по языку оригинала, сортировкой и пагинацией (по 10 на страницу).
+    Диктанты из приватных книг или не привязанные к публичной книге не попадают.
+
+    Query-параметры:
+      - language: код языка оригинала (например, 'en'). Если не задан — все языки.
+      - sort: rating | alphabet | newest | oldest (по умолчанию rating)
+      - page: номер страницы, начиная с 1 (по умолчанию 1)
+      - page_size: размер страницы (по умолчанию 10, максимум 100)
+
+    Сортировка:
+      - rating: по среднему рейтингу (points*10/points_max) по убыванию,
+                затем по количеству голосов, затем по id.
+      - alphabet: по title (без учета регистра) по возрастанию.
+      - newest: по дате создания по убыванию (новые впереди).
+      - oldest: по дате создания по возрастанию (старые впереди).
+    """
+    try:
+        sort = str(request.args.get("sort", "rating")).strip().lower() or "rating"
+        if sort not in DICTATION_SORT_COLUMNS:
+            sort = "rating"
+
+        language = str(request.args.get("language", "")).strip().lower() or None
+
+        try:
+            page = int(request.args.get("page", 1))
+        except (TypeError, ValueError):
+            page = 1
+        if page < 1:
+            page = 1
+
+        try:
+            page_size = int(request.args.get("page_size", 10))
+        except (TypeError, ValueError):
+            page_size = 10
+        if page_size < 1:
+            page_size = 10
+        if page_size > 100:
+            page_size = 100
+
+        # Динамически определяем, какие колонки есть в таблице dictations,
+        # чтобы запрос не падал с 500, если миграция рейтинга не применена.
+        conn, cur = get_db_cursor()
+        try:
+            tr_langs = ["en", "uk", "sv", "be", "ru", "de", "fr", "es", "it", "tr", "ar", "pl", "nl", "no"]
+
+            # Ищем все интересующие нас колонки одним запросом: рейтинг, счётчик
+            # предложений, порядок аудио, ссылку на материалы и tr_* флаги переводов.
+            column_candidates = [
+                'points', 'points_max', 'sentences_count', 'audio_order',
+                'author_materials_url', 'is_first_load',
+            ] + [f"tr_{lang}" for lang in tr_langs]
+
+            cur.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'dictations'
+                  AND column_name = ANY(%s)
+                """,
+                (column_candidates,),
+            )
+            dictation_cols = set()
+            for row in (cur.fetchall() or []):
+                dictation_cols.add(row["column_name"])
+
+            points_sql = (
+                "COALESCE(d.points, 0) AS points"
+                if "points" in dictation_cols
+                else "0 AS points"
+            )
+            points_max_sql = (
+                "COALESCE(d.points_max, 0) AS points_max"
+                if "points_max" in dictation_cols
+                else "0 AS points_max"
+            )
+            sentences_count_sql = (
+                "COALESCE(d.sentences_count, 0) AS sentences_count"
+                if "sentences_count" in dictation_cols
+                else "0 AS sentences_count"
+            )
+            audio_order_sql = (
+                "COALESCE(d.audio_order, '') AS audio_order"
+                if "audio_order" in dictation_cols
+                else "'' AS audio_order"
+            )
+            author_materials_url_sql = (
+                "d.author_materials_url AS author_materials_url"
+                if "author_materials_url" in dictation_cols
+                else "NULL AS author_materials_url"
+            )
+            is_first_load_sql = (
+                "d.is_first_load AS is_first_load"
+                if "is_first_load" in dictation_cols
+                else "FALSE AS is_first_load"
+            )
+
+            # Динамически определяем tr_* флаги переводов.
+            tr_cols_sql = []
+            for lang in tr_langs:
+                col = f"tr_{lang}"
+                if col in dictation_cols:
+                    tr_cols_sql.append(f"COALESCE(d.{col}, FALSE) AS {col}")
+                else:
+                    tr_cols_sql.append(f"FALSE AS {col}")
+
+            # Основной отбор: только диктанты, входящие хотя бы в одну ПУБЛИЧНУЮ книгу
+            # (books.visibility = 'public'). Остальные диктанты (приватные, без книги)
+            # в общий список не попадают.
+            where_clause = (
+                "WHERE EXISTS ("
+                "SELECT 1 FROM book_dictations bd "
+                "JOIN books b ON b.id = bd.book_id "
+                "WHERE bd.dictation_id = d.id AND b.visibility = 'public'"
+                ")"
+            )
+            params = []
+            if language:
+                where_clause += " AND LOWER(d.language_code) = %s"
+                params.append(language)
+
+            # Сортировка рейтинга: rating_value = points*10.0 / NULLIF(points_max, 0).
+            # NULL ставим в конец (последними).
+            if sort == "rating":
+                order_clause = (
+                    "ORDER BY (CASE WHEN points_max > 0 THEN (points * 10.0 / points_max) END) DESC NULLS LAST, "
+                    "COALESCE(points_max, 0) DESC, d.id ASC"
+                )
+            elif sort == "alphabet":
+                order_clause = "ORDER BY LOWER(d.title) ASC, d.id ASC"
+            elif sort == "newest":
+                order_clause = "ORDER BY d.created_at DESC, d.id DESC"
+            else:  # oldest
+                order_clause = "ORDER BY d.created_at ASC, d.id ASC"
+
+            # Общее количество для пагинации.
+            count_query = f"""
+                SELECT COUNT(*)::int AS total
+                FROM dictations d
+                {where_clause}
+            """
+            cur.execute(count_query, params)
+            total = int((cur.fetchone() or {}).get("total") or 0)
+
+            offset = (page - 1) * page_size
+            params_page = list(params) + [page_size, offset]
+
+            list_query = f"""
+                SELECT
+                    d.id,
+                    d.title,
+                    d.language_code,
+                    d.owner_id,
+                    d.level,
+                    d.created_at,
+                    d.updated_at,
+                    {points_sql},
+                    {points_max_sql},
+                    {', '.join(tr_cols_sql)},
+                    {sentences_count_sql},
+                    {audio_order_sql},
+                    {author_materials_url_sql},
+                    {is_first_load_sql},
+                    (SELECT DISTINCT ds.language_code
+                     FROM dictation_sentences ds
+                     WHERE ds.dictation_id = d.id AND ds.language_code != d.language_code
+                     LIMIT 1) AS language_translation
+                FROM dictations d
+                {where_clause}
+                {order_clause}
+                LIMIT %s OFFSET %s
+            """
+            cur.execute(list_query, params_page)
+            rows = cur.fetchall()
+        finally:
+            cur.close()
+            conn.close()
+
+        items = []
+        for row in rows:
+            dictation_id_str = f"dict_{row['id']}"
+            try:
+                cover_url = get_cover_url_for_id(dictation_id_str, row["language_code"])
+            except Exception:
+                cover_url = f"/static/data/covers/cover_{row['language_code'] or 'en'}.webp"
+
+            translation_languages = sorted(
+                [
+                    lang
+                    for lang in tr_langs
+                    if row.get(f"tr_{lang}")
+                ]
+            )
+
+            items.append(
+                {
+                    "id": row["id"],
+                    "dictation_id": row["id"],
+                    "title": row["title"],
+                    "language_code": row["language_code"],
+                    "language_translation": row.get("language_translation") or row["language_code"],
+                    "translation_languages": translation_languages,
+                    "owner_id": row.get("owner_id"),
+                    "level": row["level"],
+                    "sentences_count": row.get("sentences_count") or 0,
+                    "audio_order": row.get("audio_order") or '',
+                    "author_materials_url": row.get("author_materials_url") or '',
+                    "is_first_load": bool(row.get("is_first_load")),
+                    "points": int(row.get("points") or 0),
+                    "points_max": int(row.get("points_max") or 0),
+                    "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
+                    "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
+                    "cover_url": cover_url,
+                }
+            )
+
+        return jsonify(
+            {
+                "success": True,
+                "items": items,
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "has_more": (page * page_size) < total,
+            }
+        )
+    except Exception as e:
+        current_app.logger.error(f"Ошибка при получении списка диктантов: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f'Ошибка получения списка: {str(e)}'}), 500
 
 
 @dictation_bp.route('/api/dictation/<int:dictation_id>', methods=['GET'])

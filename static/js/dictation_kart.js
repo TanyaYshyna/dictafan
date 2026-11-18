@@ -1477,7 +1477,18 @@ window.DictationKart = window.DictationKart || {
   _formatRating(points, pointsMax) {
     const p = Number(points) || 0;
     const m = Number(pointsMax) || 0;
-    return m > 0 ? (p * 10 / m).toFixed(1) : '–';
+    return m > 0 ? this._formatRatingValue(p * 10 / m) : '–';
+  },
+
+  /**
+   * Форматирует значение рейтинга: целые числа без дробной части (10),
+   * дробные — с одним знаком после запятой (8.8).
+   * @param {number} value
+   * @returns {string}
+   */
+  _formatRatingValue(value) {
+    const v = Number(value) || 0;
+    return Number.isInteger(v) ? String(v) : v.toFixed(1);
   },
 
   /**
@@ -1492,7 +1503,7 @@ window.DictationKart = window.DictationKart || {
       ? Number(data.user_points)
       : null;
     const scoreEl = badge.querySelector('.card-rating-score');
-    if (scoreEl) scoreEl.textContent = rating > 0 ? rating.toFixed(1) : '–';
+    if (scoreEl) scoreEl.textContent = rating > 0 ? this._formatRatingValue(rating) : '–';
     badge.style.display = 'inline-flex';
     if (userPoints && userPoints > 0) {
       badge.classList.add('card-rating-badge--voted');
@@ -1842,7 +1853,7 @@ window.DictationKart = window.DictationKart || {
 
     const points = Number(item.points) || 0;
     const pointsMax = Number(item.points_max) || 0;
-    const ratingScoreText = pointsMax > 0 ? (points * 10 / pointsMax).toFixed(1) : '–';
+    const ratingScoreText = pointsMax > 0 ? this._formatRatingValue(points * 10 / pointsMax) : '–';
 
     const menu = this.renderMenuHtml({
       context: 'desk',
@@ -2090,7 +2101,7 @@ window.DictationKart = window.DictationKart || {
       ratingBadge.setAttribute('data-points', String(points));
       ratingBadge.setAttribute('data-points-max', String(pointsMax));
       const scoreEl = ratingBadge.querySelector('.card-rating-score');
-      if (scoreEl) scoreEl.textContent = pointsMax > 0 ? (points * 10 / pointsMax).toFixed(1) : '–';
+      if (scoreEl) scoreEl.textContent = pointsMax > 0 ? this._formatRatingValue(points * 10 / pointsMax) : '–';
       ratingBadge.style.display = 'inline-flex';
     }
     const ratingPopup = node.querySelector('.card-rating-popup');
