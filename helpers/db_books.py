@@ -18,19 +18,37 @@ DESK_MAX_CARDS = 25
 class DeskLimitError(Exception):
     """Превышен лимит количества карточек на рабочем столе пользователя."""
 
-    def __init__(self, limit: int = DESK_MAX_CARDS):
+    def __init__(self, limit: int = DESK_MAX_CARDS, language_code: Optional[str] = None):
         self.limit = limit
-        super().__init__(f"Desk card limit reached: {limit}")
+        self.language_code = language_code
+        detail = f"Desk card limit reached: {limit}"
+        if language_code:
+            detail += f" for language {language_code}"
+        super().__init__(detail)
 
 
-def _count_desk_items(user_id: int) -> int:
-    """Возвращает текущее количество карточек на столе пользователя."""
+def _count_desk_items(user_id: int, language_code: Optional[str] = None) -> int:
+    """Возвращает текущее количество карточек на столе пользователя.
+
+    Если указан language_code — считаются только карточки диктантов этого языка.
+    """
     conn, cur = get_db_cursor()
     try:
-        cur.execute(
-            "SELECT COUNT(*)::int AS cnt FROM desk_items WHERE user_id = %s",
-            (user_id,),
-        )
+        if language_code:
+            cur.execute(
+                """
+                SELECT COUNT(*)::int AS cnt
+                FROM desk_items di
+                JOIN dictations d ON d.id = di.dictation_id
+                WHERE di.user_id = %s AND d.language_code = %s
+                """,
+                (user_id, language_code),
+            )
+        else:
+            cur.execute(
+                "SELECT COUNT(*)::int AS cnt FROM desk_items WHERE user_id = %s",
+                (user_id,),
+            )
         row = cur.fetchone() or {}
         return int(row.get("cnt") or 0)
     finally:
@@ -587,8 +605,8 @@ def add_dictation_to_desk(
     Добавляет диктант на «Стол» пользователя (desk_items).
     planned_date может быть строкой в формате YYYY-MM-DD или None.
 
-    Если диктант ещё не на столе и количество карточек достигло
-    DESK_MAX_CARDS — бросает DeskLimitError (лимит рабочего стола).
+    Если диктант ещё не на столе и количество карточек указанного языка
+    достигло DESK_MAX_CARDS — бросает DeskLimitError (лимит рабочего стола).
 
     Returns:
         int | None: id записи desk_items (новой или уже существующей),
@@ -606,14 +624,27 @@ def add_dictation_to_desk(
         if existing:
             return existing["id"]
 
-        # Лимит: считаем только при фактическом добавлении новой карточки.
+        # Определяем язык добавляемого диктанта.
         cur.execute(
-            "SELECT COUNT(*)::int AS cnt FROM desk_items WHERE user_id = %s",
-            (user_id,),
+            "SELECT language_code FROM dictations WHERE id = %s",
+            (dictation_id,),
+        )
+        dictation_row = cur.fetchone()
+        language_code = dictation_row["language_code"] if dictation_row else None
+
+        # Лимит: считаем только карточки этого языка при добавлении новой карточки.
+        cur.execute(
+            """
+            SELECT COUNT(*)::int AS cnt
+            FROM desk_items di
+            JOIN dictations d ON d.id = di.dictation_id
+            WHERE di.user_id = %s AND d.language_code = %s
+            """,
+            (user_id, language_code),
         )
         cnt = int((cur.fetchone() or {}).get("cnt") or 0)
         if cnt >= DESK_MAX_CARDS:
-            raise DeskLimitError(DESK_MAX_CARDS)
+            raise DeskLimitError(DESK_MAX_CARDS, language_code)
 
         query = """
             INSERT INTO desk_items (user_id, dictation_id, planned_date)

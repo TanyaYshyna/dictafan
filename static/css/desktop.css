@@ -94,6 +94,29 @@
   align-items: center;
 }
 
+/* Группа «флаги оригинала → перевода + счётчик диктантов» */
+.desktop-lang-group {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  line-height: 1;
+  gap: 1px;
+}
+
+.desktop-lang-group .desktop-lang-selector {
+  /* Селектор продолжает позиционировать свой dropdown сам */
+}
+
+/* Вторая строка: число диктантов на рабочем столе для языка оригинала */
+.desktop-lang-counter {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-text-secondary, #9aa0a6);
+  padding-left: 10px;
+  white-space: nowrap;
+}
+
 .desktop-lang-selector .language-selector-group {
   margin: 0;
   padding: 0;

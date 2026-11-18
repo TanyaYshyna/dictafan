@@ -36,7 +36,10 @@
             <img src="/static/icons/logo.svg" class="logo logo--full">
             <img src="/static/icons/logo_min.svg" class="logo logo--min">
         </a>
-        <div class="desktop-lang-selector" id="desktopLangSelector"></div>
+        <div class="desktop-lang-group">
+            <div class="desktop-lang-selector" id="desktopLangSelector"></div>
+            <div class="desktop-lang-counter" id="desktopLangCounter">0/25</div>
+        </div>
         {% include 'partials/desktop_stats_panel.html' %}
         <div class="user-section" id="user-section">
             <div class="auth-buttons" style="display: none;"></div>

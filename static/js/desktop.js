@@ -822,6 +822,7 @@ window.Desktop = window.Desktop || {
           return function (data) {
             if (data && data.currentLearning) {
               self._activeLanguage = data.currentLearning;
+              self.updateLangCounter();
 
               // Оповещаем остальные части приложения (например, открытые модалки
               // библиотек), что язык оригинала в шапке изменился — чтобы они
@@ -987,6 +988,8 @@ window.Desktop = window.Desktop || {
         } else {
           this.loadDeskItems().catch(function () {});
         }
+      } else {
+        this.updateLangCounter();
       }
     } catch (e) {
     }
@@ -1147,9 +1150,37 @@ window.Desktop = window.Desktop || {
     });
   },
 
+  /**
+   * Обновляет счётчик «N/25» под флагами оригинала/перевода в шапке.
+   * Считает диктанты на рабочем столе для текущего активного языка оригинала.
+   */
+  updateLangCounter() {
+    try {
+      const el = document.getElementById('desktopLangCounter');
+      if (!el) return;
+      const activeLang = this._activeLanguage;
+      const items = Array.isArray(this._allDeskItems) ? this._allDeskItems : [];
+      let count = 0;
+      if (activeLang) {
+        items.forEach(function (item) {
+          try {
+            if (item && item.language_code && String(item.language_code).toLowerCase() === String(activeLang).toLowerCase()) {
+              count += 1;
+            }
+          } catch (e) {
+          }
+        });
+      }
+      el.textContent = count + '/25';
+    } catch (e) {
+    }
+  },
+
   renderDeskCards(items) {
     const container = document.getElementById('deskCardsContainer');
     if (!container) return;
+
+    this.updateLangCounter();
 
     if (!Array.isArray(items) || items.length === 0) {
       container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
@@ -1258,6 +1289,8 @@ window.Desktop = window.Desktop || {
     } catch (e) {
     }
 
+    this.updateLangCounter();
+
     // Убираем плейсхолдер «Рабочий стол пуст» / «Немає диктантів…».
     try {
       if (container.firstElementChild && !container.firstElementChild.classList.contains('shorts-grid')) {
@@ -1351,6 +1384,8 @@ window.Desktop = window.Desktop || {
       }
     } catch (e) {
     }
+
+    this.updateLangCounter();
 
     // Если отрисованных карточек не осталось — возвращаем плейсхолдер,
     // повторяя логику renderDeskCards (пустой стол vs. фильтр по языку).

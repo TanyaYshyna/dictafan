@@ -272,10 +272,23 @@ def api_add_desk_item():
         if existing:
             return jsonify({"success": True, "message": "Already on desk", "id": existing["id"]})
 
-        # Лимит рабочего стола: проверяем количество уже добавленных карточек.
+        # Определяем язык добавляемого диктанта.
         cur.execute(
-            "SELECT COUNT(*)::int AS cnt FROM desk_items WHERE user_id = %s",
-            (user["id"],),
+            "SELECT language_code FROM dictations WHERE id = %s",
+            (dictation_id,),
+        )
+        dictation_row = cur.fetchone()
+        language_code = dictation_row["language_code"] if dictation_row else None
+
+        # Лимит рабочего стола: проверяем количество карточек указанного языка.
+        cur.execute(
+            """
+            SELECT COUNT(*)::int AS cnt
+            FROM desk_items di
+            JOIN dictations d ON d.id = di.dictation_id
+            WHERE di.user_id = %s AND d.language_code = %s
+            """,
+            (user["id"], language_code),
         )
         cnt = int((cur.fetchone() or {}).get("cnt") or 0)
         if cnt >= DESK_MAX_CARDS:
@@ -284,8 +297,10 @@ def api_add_desk_item():
                     "success": False,
                     "error": "desk_limit_reached",
                     "limit": DESK_MAX_CARDS,
+                    "language_code": language_code,
                     "message": (
-                        f"На рабочем столе уже {DESK_MAX_CARDS} диктантов. "
+                        f"На рабочем столе уже {DESK_MAX_CARDS} диктантов "
+                        f"на языке {language_code or '?'}. "
                         "Уберите лишние, которыми не пользуетесь, и попробуйте снова."
                     ),
                 }

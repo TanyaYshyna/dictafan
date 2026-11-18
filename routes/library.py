@@ -418,13 +418,15 @@ def api_add_dictation_to_desk(dictation_id: int):
                 )
         return jsonify({"success": True, "added": desk_item_id is not None, "item": item})
     except DeskLimitError as exc:
+        language_text = f" на языке {exc.language_code}" if exc.language_code else ""
         return jsonify(
             {
                 "success": False,
                 "error": "desk_limit_reached",
                 "limit": exc.limit,
+                "language_code": exc.language_code,
                 "message": (
-                    f"На рабочем столе уже {exc.limit} диктантов. "
+                    f"На рабочем столе уже {exc.limit} диктантов{language_text}. "
                     "Уберите лишние, которыми не пользуетесь, и попробуйте снова."
                 ),
             }
