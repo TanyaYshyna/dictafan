@@ -50,6 +50,68 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 | money_dt_count | integer | YES | 0 | Заработано монет |
 
 Уникальный ключ: `(user_id, teacher_id, dictation_id, positions, date_plan, date_fact)`
+
+## Рейтинг диктантов (голосование от 1 до 10)
+
+Миграция: [`migrations/add_dictation_rating.sql`](migrations/add_dictation_rating.sql). Идемпотентна, запускается как обычная SQL-миграция.
+
+### Модель хранения
+
+В таблице `dictations` два денормализованных поля-кэша:
+
+| Колонка | Тип | DEFAULT | Описание |
+|---------|-----|---------|----------|
+| `points` | integer | 0 | Сумма выставленных пользователями оценок (например, 88) |
+| `points_max` | integer | 0 | Сумма максимумов = количество голосов × 10 (например, 10 голосов → 100) |
+
+Средний балл (один знак после запятой) вычисляется как:
+
+```
+rating = points * 10.0 / points_max   (если points_max = 0, то 0)
+```
+
+Пример: `88 * 10 / 100 = 8.8` → в UI показываем `★ 8.8`.
+
+### Таблица голосов `dictation_votes`
+
+Одна строка = один голос пользователя. Это минимальная нормализованная запись.
+
+| Колонка | Тип | Описание |
+|---------|-----|----------|
+| `id` | SERIAL PK | Первичный ключ |
+| `dictation_id` | integer FK → dictations ON DELETE CASCADE | Диктант |
+| `user_id` | integer FK → users ON DELETE CASCADE | Кто проголосовал |
+| `points` | integer CHECK (1..10) | Оценка пользователя |
+| `created_at` | timestamp | Первый голос |
+| `updated_at` | timestamp | Последнее переголосование |
+
+Уникальный ключ: `UNIQUE (user_id, dictation_id)`.
+
+Он решает **обе** задачи одновременно и без лишних структур:
+
+- **«Голосовал ли пользователь X по диктанту Y»** — мгновенный точечный lookup по уникальному индексу:
+  ```sql
+  SELECT points FROM dictation_votes WHERE user_id = %s AND dictation_id = %s;
+  ```
+- **Защита от дублей** на уровне БД (повторный INSERT нельзя).
+
+### Правила
+
+- **Переголосование разрешено.** Новая оценка или изменение своей оценки — один UPSERT:
+  ```sql
+  INSERT INTO dictation_votes (dictation_id, user_id, points)
+  VALUES (%s, %s, %s)
+  ON CONFLICT (user_id, dictation_id)
+  DO UPDATE SET points = EXCLUDED.points, updated_at = NOW();
+  ```
+- **Кэш `points`/`points_max` не трогаем руками** — его поддерживает триггер `dictation_votes_recalc` (`AFTER INSERT OR UPDATE OR DELETE ON dictation_votes`). Он при первом голосе добавляет оценку и +10 к `points_max`, при переголосовании — только разницу оценок, при удалении — вычитает.
+- Кэш нужен, чтобы карточка диктанта **не** делала `COUNT/SUM` по голосам при каждой отрисовке списка — агрегат уже лежит в самой строке `dictations`.
+
+### Анти-паттерны (не использовать)
+
+- Не хранить массив `user_id` проголосовавших в JSONB внутри `dictations`: теряется уникальность на уровне БД, дорого обновлять, не масштабируется и не позволяет хранить саму оценку.
+- Не округлять средний балл до целого: теряется информация (8.1 и 8.9 оба превратятся в 9). Показывать один знак после запятой.
+
 ## Принципы разделения ответственности
 
 - **HTML = структура**

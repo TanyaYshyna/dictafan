@@ -5,7 +5,12 @@ import tempfile
 from werkzeug.utils import secure_filename
 from helpers.language_data import load_language_data
 from helpers.user_helpers import get_current_user, login_required, get_safe_email
-from helpers.db_dictations import get_dictation_by_id, get_dictation_sentences
+from helpers.db_dictations import (
+    get_dictation_by_id,
+    get_dictation_sentences,
+    get_dictation_rating,
+    set_dictation_vote,
+)
 from routes.index import get_cover_url_for_id
 
 dictation_bp = Blueprint('dictation', __name__)
@@ -626,6 +631,57 @@ def api_get_dictation_meta(dictation_id):
     except Exception as e:
         current_app.logger.error(f"Ошибка при получении метаданных диктанта {dictation_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': f'Ошибка получения метаданных: {str(e)}'}), 500
+
+
+# ==============================================================
+# API рейтинга/голосования за диктант (1..10)
+# ==============================================================
+@dictation_bp.route('/api/dictation/<int:dictation_id>/rating', methods=['GET'])
+def api_get_dictation_rating(dictation_id):
+    """Возвращает агрегированный рейтинг диктанта и голос текущего пользователя.
+
+    Не требует авторизации: user_points заполняется только если пользователь
+    передал валидный токен (Authorization: Bearer или cookie).
+    """
+    try:
+        user = get_current_user()
+        user_id = user.get('id') if user else None
+        result = get_dictation_rating(dictation_id, user_id=user_id)
+        if not result.get('success', False):
+            return jsonify(result), 404
+        return jsonify(result)
+    except Exception as e:
+        current_app.logger.error(f"Ошибка при получении рейтинга диктанта {dictation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f'Ошибка получения рейтинга: {str(e)}'}), 500
+
+
+@dictation_bp.route('/api/dictation/<int:dictation_id>/rating', methods=['POST'])
+def api_set_dictation_rating(dictation_id):
+    """Сохраняет (или обновляет) оценку текущего пользователя за диктант.
+
+    Тело запроса: {"points": 1..10}. Переголосование разрешено.
+    """
+    try:
+        user = get_current_user()
+        if not user or not user.get('id'):
+            return jsonify({'success': False, 'error': 'Требуется аутентификация'}), 401
+
+        data = request.get_json(silent=True) or {}
+        try:
+            points = int(data.get('points'))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'points должен быть числом от 1 до 10'}), 400
+
+        if points < 1 or points > 10:
+            return jsonify({'success': False, 'error': 'points должен быть числом от 1 до 10'}), 400
+
+        result = set_dictation_vote(dictation_id, user['id'], points)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Ошибка при сохранении оценки диктанта {dictation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f'Ошибка сохранения оценки: {str(e)}'}), 500
 
 
 # ==============================================================

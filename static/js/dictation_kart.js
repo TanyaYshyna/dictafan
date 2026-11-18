@@ -1463,6 +1463,225 @@ window.DictationKart = window.DictationKart || {
       });
     });
 
+    // Виджет рейтинга диктанта (звезда + 10 звёзд в попапе)
+    this._bindRatingHandlers(cardEl);
+
+  },
+
+  /**
+   * Форматирует средний балл диктанта из кэша points/points_max.
+   * @param {number} points - сумма оценок
+   * @param {number} pointsMax - сумма максимумов (голосов * 10)
+   * @returns {string} строка с одним знаком после запятой (или '–')
+   */
+  _formatRating(points, pointsMax) {
+    const p = Number(points) || 0;
+    const m = Number(pointsMax) || 0;
+    return m > 0 ? (p * 10 / m).toFixed(1) : '–';
+  },
+
+  /**
+   * Обновляет бейдж рейтинга на карточке из ответа сервера.
+   * @param {HTMLElement} badge - элемент .card-rating-badge
+   * @param {object} data - {rating, user_points, points, points_max}
+   */
+  _updateRatingBadge(badge, data) {
+    if (!badge) return;
+    const rating = Number(data && data.rating) || 0;
+    const userPoints = (data && data.user_points !== null && data.user_points !== undefined)
+      ? Number(data.user_points)
+      : null;
+    const scoreEl = badge.querySelector('.card-rating-score');
+    if (scoreEl) scoreEl.textContent = rating > 0 ? rating.toFixed(1) : '–';
+    badge.style.display = 'inline-flex';
+    if (userPoints && userPoints > 0) {
+      badge.classList.add('card-rating-badge--voted');
+      badge.setAttribute('title', 'Ваша оценка: ' + userPoints);
+    } else {
+      badge.classList.remove('card-rating-badge--voted');
+      badge.setAttribute('title', 'Оценить');
+    }
+  },
+
+  /**
+   * Заполняет звёзды в попапе: выбранная и все слева — закрашенные.
+   * @param {HTMLElement} popup - элемент .card-rating-popup
+   * @param {number} value - выбранное значение (0 = сброс)
+   */
+  _fillRatingStars(popup, value) {
+    if (!popup) return;
+    const stars = popup.querySelectorAll('.card-rating-star');
+    stars.forEach((star) => {
+      const v = Number(star.getAttribute('data-rating-value')) || 0;
+      const active = value > 0 && v <= value;
+      star.classList.toggle('card-rating-star--filled', active);
+      star.textContent = active ? '★' : '☆';
+    });
+    const hint = popup.querySelector('.card-rating-popup__hint');
+    if (hint) hint.textContent = value > 0 ? String(value) + ' / 10' : '';
+  },
+
+  /**
+   * Закрывает все открытые попапы рейтинга.
+   * @param {HTMLElement} [exceptPopup] - попап, который не нужно закрывать
+   */
+  _closeAllRatingPopups(exceptPopup) {
+    document.querySelectorAll('.card-rating-popup').forEach((p) => {
+      if (p !== exceptPopup && p.style.display !== 'none') {
+        p.style.display = 'none';
+      }
+    });
+  },
+
+  /**
+   * Собирает обработчики виджета рейтинга на карточке.
+   * Вызывается из _bindHandlers.
+   * @param {HTMLElement} cardEl - корневой элемент карточки
+   */
+  _bindRatingHandlers(cardEl) {
+    if (!cardEl || cardEl.__ratingBound) return;
+    const badge = cardEl.querySelector('.card-rating-badge');
+    const popup = cardEl.querySelector('.card-rating-popup');
+    if (!badge || !popup) return;
+    cardEl.__ratingBound = true;
+
+    const dictationId = Number(cardEl.getAttribute('data-dictation-id')) || Number(badge.getAttribute('data-dictation-id')) || 0;
+
+    badge.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isOpen = popup.style.display !== 'none';
+      this._closeAllRatingPopups(popup);
+      if (isOpen) {
+        popup.style.display = 'none';
+        return;
+      }
+      this._openRatingPopup(cardEl, popup, dictationId);
+    });
+
+    // Hover — временно подсвечиваем звёзды слева.
+    popup.addEventListener('mouseover', (e) => {
+      const star = e.target.closest ? e.target.closest('.card-rating-star') : null;
+      if (star) {
+        const v = Number(star.getAttribute('data-rating-value')) || 0;
+        this._fillRatingStars(popup, v);
+      }
+    });
+    popup.addEventListener('mouseleave', () => {
+      const current = Number(popup.getAttribute('data-current-value')) || 0;
+      this._fillRatingStars(popup, current);
+    });
+
+    // Клик по звезде — отправляем голос.
+    popup.addEventListener('click', (e) => {
+      const star = e.target.closest ? e.target.closest('.card-rating-star') : null;
+      if (!star) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const value = Number(star.getAttribute('data-rating-value')) || 0;
+      this._submitRating(cardEl, badge, popup, dictationId, value);
+    });
+  },
+
+  /**
+   * Открывает попап рейтинга и подтягивает актуальный рейтинг с сервера.
+   * @param {HTMLElement} cardEl
+   * @param {HTMLElement} popup
+   * @param {number} dictationId
+   */
+  async _openRatingPopup(cardEl, popup, dictationId) {
+    if (!popup || !Number.isFinite(dictationId) || dictationId <= 0) return;
+
+    // Предварительно показываем текущее значение из data-атрибутов бейджа.
+    const badge = cardEl.querySelector('.card-rating-badge');
+    const current = badge ? (Number(badge.getAttribute('data-user-points')) || 0) : 0;
+    this._fillRatingStars(popup, current);
+
+    const token = (() => { try { return localStorage.getItem('jwt_token'); } catch (e) { return null; } })();
+    if (!token) {
+      popup.style.display = 'flex';
+      const hint = popup.querySelector('.card-rating-popup__hint');
+      if (hint) hint.textContent = 'Войдите, чтобы оценить';
+      return;
+    }
+
+    try {
+      const resp = await fetch('/api/dictation/' + dictationId + '/rating', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.success) {
+          popup.setAttribute('data-current-value', String(data.user_points || 0));
+          this._fillRatingStars(popup, Number(data.user_points) || 0);
+          if (badge) {
+            badge.setAttribute('data-user-points', String(data.user_points || 0));
+            this._updateRatingBadge(badge, data);
+          }
+        }
+      }
+    } catch (e) {
+      // Офлайн — остаёмся на локальном состоянии.
+    }
+    popup.style.display = 'flex';
+  },
+
+  /**
+   * Отправляет голос на сервер и обновляет бейдж/звёзды.
+   * @param {HTMLElement} cardEl
+   * @param {HTMLElement} badge
+   * @param {HTMLElement} popup
+   * @param {number} dictationId
+   * @param {number} value
+   */
+  async _submitRating(cardEl, badge, popup, dictationId, value) {
+    if (!Number.isFinite(value) || value < 1 || value > 10) return;
+    const token = (() => { try { return localStorage.getItem('jwt_token'); } catch (e) { return null; } })();
+    if (!token) {
+      this._showToast('Войдите, чтобы оценить', { durationMs: 3000 });
+      return;
+    }
+
+    // Оптимистичное обновление UI.
+    popup.setAttribute('data-current-value', String(value));
+    this._fillRatingStars(popup, value);
+
+    try {
+      const resp = await fetch('/api/dictation/' + dictationId + '/rating', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ points: value }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.success) {
+          if (badge) {
+            badge.setAttribute('data-user-points', String(data.user_points || 0));
+            badge.setAttribute('data-points', String(data.points || 0));
+            badge.setAttribute('data-points-max', String(data.points_max || 0));
+            this._updateRatingBadge(badge, data);
+          }
+          popup.setAttribute('data-current-value', String(data.user_points || 0));
+          this._fillRatingStars(popup, Number(data.user_points) || 0);
+          this._showToast('Спасибо за оценку!', { durationMs: 2000 });
+        } else {
+          this._showToast((data && data.error) || 'Ошибка сохранения оценки', { durationMs: 3000 });
+        }
+      } else {
+        let msg = 'Ошибка сохранения оценки';
+        try {
+          const errData = await resp.json();
+          if (errData && errData.error) msg = errData.error;
+        } catch (e) {}
+        this._showToast(msg, { durationMs: 3000 });
+      }
+    } catch (e) {
+      this._showToast('Ошибка соединения', { durationMs: 3000 });
+    }
   },
 
   /**
@@ -1621,6 +1840,10 @@ window.DictationKart = window.DictationKart || {
     const coverSrc = coverUrl || '/static/data/covers/cover_en.webp';
     const coverLoading = 'lazy';
 
+    const points = Number(item.points) || 0;
+    const pointsMax = Number(item.points_max) || 0;
+    const ratingScoreText = pointsMax > 0 ? (points * 10 / pointsMax).toFixed(1) : '–';
+
     const menu = this.renderMenuHtml({
       context: 'desk',
       dictationId,
@@ -1649,6 +1872,25 @@ window.DictationKart = window.DictationKart || {
               <i data-lucide="medal" style="width:14px;height:14px;"></i>
               <span class="card-medal-count">0</span>
             </span>
+          </div>
+          <button type="button" class="card-rating-badge" data-action="rating-toggle" data-dictation-id="${dictationId}" data-points="${points}" data-points-max="${pointsMax}" title="Оценить" aria-label="Оценить">
+            <i data-lucide="star" style="width:13px;height:13px;"></i>
+            <span class="card-rating-score">${ratingScoreText}</span>
+          </button>
+          <div class="card-rating-popup" data-dictation-id="${dictationId}" style="display:none;">
+            <div class="card-rating-popup__stars">
+              <button type="button" class="card-rating-star" data-rating-value="1" title="1">☆</button>
+              <button type="button" class="card-rating-star" data-rating-value="2" title="2">☆</button>
+              <button type="button" class="card-rating-star" data-rating-value="3" title="3">☆</button>
+              <button type="button" class="card-rating-star" data-rating-value="4" title="4">☆</button>
+              <button type="button" class="card-rating-star" data-rating-value="5" title="5">☆</button>
+              <button type="button" class="card-rating-star" data-rating-value="6" title="6">☆</button>
+              <button type="button" class="card-rating-star" data-rating-value="7" title="7">☆</button>
+              <button type="button" class="card-rating-star" data-rating-value="8" title="8">☆</button>
+              <button type="button" class="card-rating-star" data-rating-value="9" title="9">☆</button>
+              <button type="button" class="card-rating-star" data-rating-value="10" title="10">☆</button>
+            </div>
+            <div class="card-rating-popup__hint"></div>
           </div>
         </div>
         <h3 class="short-title" title="${window.escapeHtml(item.title || 'Без названия')}">${item.title || 'Без названия'}</h3>
@@ -1837,6 +2079,23 @@ window.DictationKart = window.DictationKart || {
     const medalBadge = node.querySelector('.card-medal-badge');
     if (medalBadge) {
       medalBadge.setAttribute('data-dictation-id', String(dictationId || ''));
+    }
+
+    // Рейтинг диктанта (звезда + балл) в правом верхнем углу карточки
+    const ratingBadge = node.querySelector('.card-rating-badge');
+    if (ratingBadge) {
+      ratingBadge.setAttribute('data-dictation-id', String(dictationId || ''));
+      const points = Number(item.points) || 0;
+      const pointsMax = Number(item.points_max) || 0;
+      ratingBadge.setAttribute('data-points', String(points));
+      ratingBadge.setAttribute('data-points-max', String(pointsMax));
+      const scoreEl = ratingBadge.querySelector('.card-rating-score');
+      if (scoreEl) scoreEl.textContent = pointsMax > 0 ? (points * 10 / pointsMax).toFixed(1) : '–';
+      ratingBadge.style.display = 'inline-flex';
+    }
+    const ratingPopup = node.querySelector('.card-rating-popup');
+    if (ratingPopup) {
+      ratingPopup.setAttribute('data-dictation-id', String(dictationId || ''));
     }
 
     const menuSlot = node.querySelector('[data-slot="menu"]');

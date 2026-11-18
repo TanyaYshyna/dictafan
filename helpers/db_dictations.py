@@ -1288,3 +1288,137 @@ def delete_dictation(dictation_id):
     finally:
         conn.close()
 
+
+def _dictation_rating_columns_exist(cur) -> bool:
+    """Проверяет, применена ли миграция add_dictation_rating.sql.
+
+    Нужно, чтобы endpoint не падал с 500, если миграция ещё не запущена.
+    """
+    try:
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = 'dictations' AND column_name = 'points'
+            """
+        )
+        return cur.fetchone() is not None
+    except Exception:
+        return False
+
+
+def set_dictation_vote(dictation_id: int, user_id: int, points: int) -> dict:
+    """Сохраняет (или обновляет) оценку пользователя за диктант.
+
+    Использует UPSERT: если пользователь уже голосовал, оценка обновляется
+    (переголосование разрешено). Триггер dictation_votes_recalc поддерживает
+    кэш dictations.points/points_max в консистентном состоянии.
+
+    Returns:
+        dict с полями:
+            points      — итоговая сумма оценок (кэш)
+            points_max  — итоговая сумма максимумов = голосов * 10
+            votes_count — число голосов
+            rating      — средний балл (0.0, если голосов нет)
+            user_points — оценка текущего пользователя
+    """
+    if not dictation_id or not user_id:
+        raise ValueError("dictation_id and user_id are required")
+    points = int(points)
+    if points < 1 or points > 10:
+        raise ValueError("points must be between 1 and 10")
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO dictation_votes (dictation_id, user_id, points)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_id, dictation_id)
+                DO UPDATE SET points = EXCLUDED.points, updated_at = NOW()
+                """,
+                (dictation_id, user_id, points),
+            )
+            conn.commit()
+
+            return _read_dictation_rating(cur, dictation_id, user_id)
+    except Exception as e:
+        conn.rollback()
+        raise Exception(f"Failed to set dictation vote: {e}")
+    finally:
+        conn.close()
+
+
+def get_dictation_rating(dictation_id: int, user_id: int | None = None) -> dict:
+    """Возвращает агрегированный рейтинг диктанта и, опционально, голос пользователя.
+
+    Если миграция рейтинга ещё не применена, возвращает нулевой рейтинг,
+    чтобы фронтенд просто не показывал звёзды.
+    """
+    if not dictation_id:
+        return {
+            "success": True,
+            "points": 0,
+            "points_max": 0,
+            "votes_count": 0,
+            "rating": 0.0,
+            "user_points": None,
+        }
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            if not _dictation_rating_columns_exist(cur):
+                return {
+                    "success": True,
+                    "points": 0,
+                    "points_max": 0,
+                    "votes_count": 0,
+                    "rating": 0.0,
+                    "user_points": None,
+                }
+            return _read_dictation_rating(cur, dictation_id, user_id)
+    except Exception as e:
+        raise Exception(f"Failed to get dictation rating: {e}")
+    finally:
+        conn.close()
+
+
+def _read_dictation_rating(cur, dictation_id: int, user_id: int | None) -> dict:
+    """Читает кэш points/points_max из dictations и голос пользователя из dictation_votes."""
+    cur.execute(
+        "SELECT COALESCE(points, 0), COALESCE(points_max, 0) FROM dictations WHERE id = %s",
+        (dictation_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        return {
+            "success": False,
+            "error": "Dictation not found",
+        }
+
+    points = int(row[0] or 0)
+    points_max = int(row[1] or 0)
+    votes_count = points_max // 10 if points_max > 0 else 0
+    rating = round(points * 10.0 / points_max, 1) if points_max > 0 else 0.0
+
+    user_points = None
+    if user_id:
+        cur.execute(
+            "SELECT points FROM dictation_votes WHERE dictation_id = %s AND user_id = %s",
+            (dictation_id, user_id),
+        )
+        urow = cur.fetchone()
+        if urow:
+            user_points = int(urow[0])
+
+    return {
+        "success": True,
+        "points": points,
+        "points_max": points_max,
+        "votes_count": votes_count,
+        "rating": rating,
+        "user_points": user_points,
+    }
+

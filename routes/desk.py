@@ -90,7 +90,8 @@ def api_desk_items():
             WHERE (table_name = 'dictations'
               AND column_name IN ('tr_en','tr_uk','tr_sv','tr_be','tr_ru',
                                   'tr_de','tr_fr','tr_es','tr_it','tr_tr',
-                                  'tr_ar','tr_pl','tr_nl','tr_no','sentences_count','audio_order','author_materials_url'))
+                                  'tr_ar','tr_pl','tr_nl','tr_no','sentences_count','audio_order','author_materials_url',
+                                  'points','points_max'))
               OR (table_name = 'desk_items'
               AND column_name IN ('planned_date'))
             """
@@ -130,6 +131,16 @@ def api_desk_items():
             if "author_materials_url" in dictation_cols
             else "NULL AS author_materials_url"
         )
+        points_sql = (
+            "COALESCE(d.points, 0) AS points"
+            if "points" in dictation_cols
+            else "0 AS points"
+        )
+        points_max_sql = (
+            "COALESCE(d.points_max, 0) AS points_max"
+            if "points_max" in dictation_cols
+            else "0 AS points_max"
+        )
         planned_date_sql = (
             "di.planned_date"
             if "planned_date" in desk_items_cols
@@ -150,6 +161,8 @@ def api_desk_items():
                 {sentences_count_sql},
                 {audio_order_sql},
                 {author_materials_url_sql},
+                {points_sql},
+                {points_max_sql},
                 (SELECT DISTINCT language_code
                  FROM dictation_sentences
                  WHERE dictation_id = d.id AND language_code != d.language_code
@@ -212,6 +225,8 @@ def api_desk_items():
                     "sentences_count": row["sentences_count"] or 0,
                     "audio_order": row.get("audio_order") or '',
                     "author_materials_url": row.get("author_materials_url") or '',
+                    "points": int(row.get("points") or 0),
+                    "points_max": int(row.get("points_max") or 0),
                     "cover_url": cover_url,
                     "tr_en": bool(row.get("tr_en")),
                     "tr_uk": bool(row.get("tr_uk")),
