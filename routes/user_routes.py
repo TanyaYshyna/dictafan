@@ -917,7 +917,7 @@ def api_telegram_send_audio():
 @user_bp.route('/api/telegram/test_send', methods=['POST'])
 @jwt_required()
 def api_telegram_test_send():
-    """Отправить тестовое сообщение в Telegram: себе (если включено) и всем учителям."""
+    """Отправить тестовое сообщение в Telegram: себе и всем учителям."""
     current_email = get_jwt_identity()
     user_db = get_user_by_email(current_email)
     if not user_db:
@@ -931,10 +931,10 @@ def api_telegram_test_send():
     sent_count = 0
     errors = []
 
-    # Отправляем себе, если включены self_reports
-    self_reports = bool(user_db.get('telegram_self_reports_enabled'))
+    # Тестовое сообщение всегда отправляем себе, если Telegram привязан.
+    # Это проверка именно привязки, поэтому флаг self_reports не важен.
     chat_id = user_db.get('telegram_chat_id')
-    if self_reports and chat_id:
+    if chat_id:
         try:
             send_telegram_message(int(chat_id), text)
             sent_count += 1

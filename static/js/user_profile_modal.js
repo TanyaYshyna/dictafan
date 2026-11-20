@@ -1259,6 +1259,23 @@ function avatarUrlForUser(userId) {
     return `/user/api/avatar?user_id=${encodeURIComponent(String(userId))}&size=small`;
 }
 
+function openTelegramUrl(url) {
+    // ВАЖНО: не используем window.open. В dictation_editor_modal.js на верхнем
+    // уровне объявлена функция open(config), которая перекрывает нативный
+    // window.open. Поэтому открываем ссылку через временный <a target="_blank">.
+    if (!url) return;
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    try {
+        a.click();
+    } finally {
+        document.body.removeChild(a);
+    }
+}
+
 function renderTelegramSection() {
     const statusEl = document.getElementById('telegramStatusText');
     const codeLabel = document.getElementById('telegramLinkCodeLabel');
@@ -1366,7 +1383,7 @@ function renderTelegramSection() {
                 openBotBtn.disabled = true;
                 if (linked) {
                     const url = `https://t.me/${encodeURIComponent(botUsername)}`;
-                    window.open(url, '_blank', 'noopener,noreferrer');
+                    openTelegramUrl(url);
                     return;
                 }
 
@@ -1391,7 +1408,7 @@ function renderTelegramSection() {
                 }
 
                 const url = `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(code)}`;
-                window.open(url, '_blank', 'noopener,noreferrer');
+                openTelegramUrl(url);
             } catch (e) {
                 showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
             } finally {

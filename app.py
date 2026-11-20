@@ -234,6 +234,40 @@ app.register_blueprint(admin_bp)
 from routes.license import license_bp
 app.register_blueprint(license_bp)
 
+# Настраиваем Telegram webhook при старте приложения (если задан токен бота).
+# Без этого Telegram не будет доставлять /start <code> на /api/telegram/webhook,
+# и привязка Telegram «молча» не сработает.
+def _setup_telegram_webhook() -> None:
+    try:
+        from helpers.telegram import is_telegram_enabled, set_telegram_webhook
+
+        if not is_telegram_enabled():
+            print("[app] Telegram webhook: токен не задан, пропускаю.", file=sys.stderr)
+            return
+
+        # Railway всегда даёт публичный URL. При локальной разработке без
+        # PUBLIC_URL webhook настроить нельзя — просто предупреждаем.
+        public_url = (os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("PUBLIC_URL") or "").strip()
+        if not public_url:
+            print(
+                "[app] Telegram webhook: PUBLIC_URL/RAILWAY_PUBLIC_DOMAIN не задан, "
+                "пропускаю настройку webhook.",
+                file=sys.stderr,
+            )
+            return
+
+        if not public_url.startswith("http"):
+            public_url = "https://" + public_url
+
+        webhook_url = public_url.rstrip("/") + "/api/telegram/webhook"
+        ok = set_telegram_webhook(webhook_url)
+        print(f"[app] Telegram webhook -> {webhook_url} ok={ok}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[app] Ошибка настройки Telegram webhook: {exc}", file=sys.stderr)
+
+
+_setup_telegram_webhook()
+
 # Предзаполняем справочники ролей и разрешений при старте
 try:
     from helpers.db_license import seed_roles_and_permissions

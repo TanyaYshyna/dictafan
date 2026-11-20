@@ -11,6 +11,14 @@ def is_telegram_enabled() -> bool:
     return bool(token)
 
 
+def get_bot_token() -> str:
+    """Возвращает токен бота или бросает ошибку, если он не задан."""
+    token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+    if not token:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN is not set")
+    return token
+
+
 def _allowed_gai_family_ipv4() -> socket.AddressFamily:
     """Force IPv4-only resolution for outbound Telegram connections.
 
@@ -53,9 +61,7 @@ def _get_session() -> requests.Session:
 
 
 def send_telegram_message(chat_id: int, text: str) -> None:
-    token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
-    if not token:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN is not set")
+    token = get_bot_token()
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     resp = _get_session().post(
@@ -70,6 +76,27 @@ def send_telegram_message(chat_id: int, text: str) -> None:
     )
     if resp.status_code != 200:
         raise RuntimeError(f"Telegram sendMessage failed: {resp.status_code} {resp.text}")
+
+
+def set_telegram_webhook(webhook_url: str) -> bool:
+    """Устанавливает webhook бота на указанный URL.
+
+    Вызывается при старте приложения (только когда токен задан).
+    """
+    token = get_bot_token()
+    url = f"https://api.telegram.org/bot{token}/setWebhook"
+    resp = _get_session().post(
+        url,
+        json={"url": webhook_url, "allowed_updates": ["message", "edited_message"]},
+        timeout=15,
+    )
+    if resp.status_code != 200:
+        raise RuntimeError(f"Telegram setWebhook failed: {resp.status_code} {resp.text}")
+    try:
+        body = resp.json()
+        return bool(body.get("ok"))
+    except Exception:
+        return False
 
 
 def send_telegram_voice(chat_id: int, audio_bytes: bytes, filename: str = "audio.ogg") -> None:
