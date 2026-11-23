@@ -92,6 +92,12 @@ def generate_simple_user_id():
 @user_bp.route('/api/register', methods=['POST'])
 def api_register():
     """Регистрация через API"""
+    import time as _time
+    _t_start = _time.perf_counter()
+
+    def _lap(label):
+        print(f"[api_register] {label}: {_time.perf_counter() - _t_start:.3f}s", flush=True)
+
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -106,6 +112,7 @@ def api_register():
     existing_user = get_user_by_email(email)
     if existing_user:
         return jsonify({'error': 'User already exists'}), 400
+    _lap('get_user_by_email')
 
     language_data = load_language_data()
     available_languages = set(language_data.keys())
@@ -142,11 +149,13 @@ def api_register():
         return jsonify({'error': 'User already exists'}), 400
     except Exception as exc:
         return jsonify({'error': f'Failed to create user: {exc}'}), 500
+    _lap('create_user')
 
     try:
         ensure_personal_group_for_user(int(user_response.get('id')), str(user_response.get('username') or ''))
     except Exception:
         pass
+    _lap('ensure_personal_group_for_user')
 
     # Выдаём бесплатную лицензию при регистрации
     try:
@@ -154,6 +163,7 @@ def api_register():
         license_manager.assign_free_license(int(user_response.get('id')))
     except Exception:
         pass
+    _lap('assign_free_license')
 
     # Создаем токен (identity = email, как и раньше)
     access_token = create_access_token(identity=email)

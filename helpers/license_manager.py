@@ -134,7 +134,17 @@ class LicenseManager:
            - Одинаковый приоритет → побеждает более поздняя запись.
            - days=0 означает вечную лицензию (до 2099-12-31).
         4. Записать результаты в user_access_calendar.
+
+        Оптимизация: раньше каждый день вставлялся отдельным INSERT —
+        для вечной лицензии это ~26700 одиночных запросов к БД, что при
+        удалённой БД (Neon/Railway) занимало десятки секунд и приводило к
+        WORKER TIMEOUT / 502 при регистрации. Теперь соседние дни с одинаковой
+        победившей лицензией объединяются в сегменты и вставляются одним
+        INSERT ... SELECT generate_series(...) на сегмент.
         """
+        import time as _time
+        _t0 = _time.perf_counter()
+
         conn, cur = get_db_cursor()
         try:
             # 1. Получить все операции пользователя
@@ -169,25 +179,34 @@ class LicenseManager:
                 if op_end > max_date:
                     max_date = op_end
 
-            # 3. Для каждого дня определить победившую лицензию
-            calendar_entries = []
+            # 3. Разбить диапазон на сегменты с одинаковой победившей лицензией.
+            #    Сегмент = (начало, конец, победившая операция).
+            segments = []  # [(start, end, winner)]
             current = min_date
+            prev_key = None
+            prev_winner = None
+            seg_start = None
             while current <= max_date:
                 winner = self._resolve_day(operations, current)
+                key = None
                 if winner is not None:
-                    role_code = LICENSE_TO_ROLE.get(winner["license_type"], "guest")
-                    calendar_entries.append({
-                        "user_id": user_id,
-                        "date": current,
-                        "license_type": winner["license_type"],
-                        "role_code": role_code,
-                        "source_document_type": winner["document_type"],
-                        "source_document_id": str(winner["id"]),
-                    })
+                    key = (
+                        winner["license_type"],
+                        winner["document_type"],
+                        str(winner["id"]),
+                    )
+                if key != prev_key:
+                    if prev_key is not None:
+                        segments.append((seg_start, current - timedelta(days=1), prev_winner))
+                    seg_start = current
+                    prev_key = key
+                    prev_winner = winner
                 current += timedelta(days=1)
+            if prev_key is not None:
+                segments.append((seg_start, max_date, prev_winner))
 
-            # 4. Записать в базу (удалить старые записи, вставить новые)
-            if calendar_entries:
+            # 4. Записать в базу (удалить старые записи, вставить новые сегменты)
+            if segments:
                 # Удаляем записи в затронутом диапазоне
                 cur.execute(
                     """
@@ -197,17 +216,18 @@ class LicenseManager:
                     (user_id, min_date, max_date),
                 )
 
-                for entry in calendar_entries:
+                for seg_start, seg_end, winner in segments:
+                    role_code = LICENSE_TO_ROLE.get(winner["license_type"], "guest")
                     cur.execute(
                         """
                         INSERT INTO user_access_calendar
                             (user_id, date, role_id,
                              source_document_type, source_document_id)
-                        VALUES (
-                            %s, %s,
+                        SELECT
+                            %s, d::date,
                             (SELECT id FROM roles WHERE code = %s),
                             %s, %s
-                        )
+                        FROM generate_series(%s::date, %s::date, '1 day'::interval) AS d
                         ON CONFLICT (user_id, date)
                         DO UPDATE SET
                             role_id = EXCLUDED.role_id,
@@ -215,15 +235,19 @@ class LicenseManager:
                             source_document_id = EXCLUDED.source_document_id
                         """,
                         (
-                            entry["user_id"],
-                            entry["date"],
-                            entry["role_code"],
-                            entry["source_document_type"],
-                            entry["source_document_id"],
+                            user_id,
+                            role_code,
+                            winner["document_type"],
+                            str(winner["id"]),
+                            seg_start,
+                            seg_end,
                         ),
                     )
 
             conn.commit()
+            print(f"[LicenseManager] rebuild_calendar_for_user user={user_id} "
+                  f"segments={len(segments)} days={(max_date - min_date).days + 1} "
+                  f"took {_time.perf_counter() - _t0:.3f}s")
         except Exception as e:
             conn.rollback()
             print(f"[LicenseManager] Ошибка при перестроении календаря: {e}")
