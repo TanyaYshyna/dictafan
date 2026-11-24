@@ -1167,10 +1167,23 @@ def save_dictation_final():
                 os.makedirs(os.path.dirname(cover_dst), exist_ok=True)
                 shutil.copy2(cover_src, cover_dst)
                 logger.info(f"✅ Ковер скопирован: {cover_src} -> {cover_dst}")
-                
+
+                numeric_id = str(dictation_id).split('_', 1)[1] if str(dictation_id).startswith('dict_') else str(dictation_id)
+
+                # Обновляем серверный локальный кеш /api/dictations_covers/<id>.webp.
+                # Без этого api_get_dictation_cover_webp будет отдавать СТАРЫЙ ковер:
+                # он сначала проверяет локальный файл и НЕ смотрит в B2.
+                try:
+                    covers_cache_dir = os.path.join('static', 'data', 'dictations_covers')
+                    os.makedirs(covers_cache_dir, exist_ok=True)
+                    local_cover_cache = os.path.join(covers_cache_dir, f"{numeric_id}.webp")
+                    shutil.copy2(cover_dst, local_cover_cache)
+                    logger.info(f"✅ Ковер обновлён в локальном кеше: {local_cover_cache}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Не удалось обновить локальный кеш ковера: {e}")
+
                 # Загружаем обложку в B2
                 if b2_storage.enabled:
-                    numeric_id = str(dictation_id).split('_', 1)[1] if str(dictation_id).startswith('dict_') else str(dictation_id)
                     remote_path = f"dictations_covers/{numeric_id}.webp"
                     b2_storage.upload_file(cover_dst, remote_path)
                     logger.info(f"✅ Ковер загружен в B2: {remote_path}")

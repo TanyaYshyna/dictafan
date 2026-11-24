@@ -230,6 +230,61 @@ async function _refreshDictationCacheAfterSave(sentencesPayload) {
   }
 }
 
+/**
+ * После сохранения нового ковера вычищаем старый ковер из Service Worker
+ * (MEDIA_CACHE_PERSIST). SW отдаёт /api/dictations_covers/<id>.webp cache-first
+ * и игнорирует ?v=, поэтому без purge ковер на рабочем столе останется старым.
+ */
+async function _purgeDictationCoverFromSwCache(dictationId) {
+  var rawId = String(dictationId == null ? '' : dictationId).trim();
+  if (!rawId) return;
+  var numericId = rawId.replace(/^dict_/, '');
+  var dictKey = rawId.startsWith('dict_') ? rawId : ('dict_' + rawId);
+
+  try {
+    // 1) Через DictationKart._swRequest (если доступен).
+    if (window.DictationKart && typeof window.DictationKart._swRequest === 'function') {
+      try {
+        await window.DictationKart._swRequest('purgeDictation', { dictationId: dictKey });
+        console.log('[dictationEditorModal] SW-кеш ковера очищен через DictationKart:', dictKey);
+        return;
+      } catch (e) {
+        console.warn('[dictationEditorModal] _swRequest purgeDictation не удался, пробуем прямой postMessage:', e);
+      }
+    }
+
+    // 2) Прямой postMessage контроллеру SW.
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      await new Promise(function (resolve) {
+        var channel = new MessageChannel();
+        var done = false;
+        var finish = function () {
+          if (done) return;
+          done = true;
+          resolve();
+        };
+        var timer = setTimeout(finish, 3000);
+        channel.port1.onmessage = function () {
+          clearTimeout(timer);
+          finish();
+        };
+        try {
+          navigator.serviceWorker.controller.postMessage(
+            { action: 'purgeDictation', dictationId: dictKey, requestId: 'cover_purge_' + numericId },
+            [channel.port2]
+          );
+        } catch (e) {
+          clearTimeout(timer);
+          finish();
+        }
+      });
+      console.log('[dictationEditorModal] SW-кеш ковера очищен (postMessage):', dictKey);
+    }
+  } catch (e) {
+    console.warn('[dictationEditorModal] Не удалось очистить SW-кеш ковера:', e);
+  }
+}
+
 /* ===== AUDIO MANAGER ===== */
 
 function _ensureAudioManager() {
@@ -4216,6 +4271,9 @@ async function _handleSave() {
   try {
     var flags = _getDirtyFlags();
     var hasChanges = _hasUnsavedChanges();
+    // Снапшот: был ли ковер грязным ДО _setDirtyFlags() (которая мутирует state.dirtyFlags).
+    // Нужен, чтобы после сохранения почистить SW-кеш ковера и перерисовать рабочий стол.
+    var coverWasDirty = !!flags.cover;
 
     window.__SAVE_FLOW = (window.__SAVE_FLOW || 0) + 1;
     var flowNum = window.__SAVE_FLOW;
@@ -4518,6 +4576,12 @@ async function _handleSave() {
 
             // Обновляем десктоп
             try {
+              // Если меняли ковер — чистим SW-кеш /api/dictations_covers/<id>.webp.
+              // SW отдаёт коверы cache-first и игнорирует ?v=, поэтому без purge
+              // loadDeskItems() перерисует карточку со СТАРЫМ ковером.
+              if (coverWasDirty) {
+                await _purgeDictationCoverFromSwCache(state.config ? state.config.dictationId : normalizedId);
+              }
               if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
                 await window.Desktop.loadDeskItems();
               }
@@ -4696,6 +4760,11 @@ async function _handleSave() {
 
           // Обновляем десктоп, если он есть (перезагружаем карточки)
           try {
+            // Если меняли ковер — чистим SW-кеш ковера перед перерисовкой карточек.
+            // Используем актуальный ID из state.config (после сохранения он мог обновиться).
+            if (coverWasDirty) {
+              await _purgeDictationCoverFromSwCache(state.config ? state.config.dictationId : normalizedId);
+            }
             if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
               await window.Desktop.loadDeskItems();
             }
