@@ -977,6 +977,53 @@
   flex-direction: column;
 }
 
+#crop-modal .modal-header,
+#crop-url-modal .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border-light, #dee2e6);
+}
+
+#crop-modal .modal-header h3,
+#crop-url-modal .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.3;
+  color: var(--color-text, #1f2933);
+}
+
+#crop-modal .modal-close,
+#crop-url-modal .modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+}
+
+#crop-modal .modal-close:hover,
+#crop-url-modal .modal-close:hover {
+  background: var(--color-hover, #f8f9fa);
+}
+
+#crop-modal .modal-close i[data-lucide],
+#crop-modal .modal-close svg,
+#crop-url-modal .modal-close i[data-lucide],
+#crop-url-modal .modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+
 .crop-modal-body {
   padding: 24px;
   display: flex;

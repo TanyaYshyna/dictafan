@@ -226,6 +226,22 @@
     };
   }
 
+  function getCurrentPreviewSrc(cfg) {
+    const ids = normIdList(cfg && cfg.previewImgId);
+    for (const id of ids) {
+      const el = getElById(id);
+      if (!el) continue;
+      let raw = null;
+      try { raw = el.getAttribute('src'); } catch (e) { raw = null; }
+      if (!raw || String(raw).trim() === '') continue;
+      let src = null;
+      try { src = el.currentSrc || el.src; } catch (e) { src = null; }
+      if (!src || String(src).trim() === '') src = String(raw).trim();
+      return String(src).trim();
+    }
+    return '';
+  }
+
   function getSourceEls() {
     return {
       wrapper: getElById('crop-source-wrapper'),
@@ -494,6 +510,38 @@
     }
   }
 
+  function urlFromDataTransfer(dt) {
+    if (!dt) return '';
+    const candidates = [];
+
+    // При перетаскивании картинки из другого браузера (например, из поиска
+    // Google) в dataTransfer обычно лежит не сам файл, а URL/HTML-сниппет.
+    try {
+      const uri = dt.getData('text/uri-list') || dt.getData('text/x-moz-url');
+      if (uri) candidates.push(uri);
+    } catch (e) {
+    }
+    try {
+      const plain = dt.getData('text/plain');
+      if (plain) candidates.push(plain);
+    } catch (e) {
+    }
+    try {
+      const html = dt.getData('text/html');
+      if (html) candidates.push(html);
+    } catch (e) {
+    }
+
+    for (const raw of candidates) {
+      const text = String(raw || '').trim();
+      if (!text) continue;
+      const m = text.match(/https?:\/\/[^\s"'<>]+/i);
+      if (m && m[0]) return m[0];
+    }
+
+    return '';
+  }
+
   function bindDropZone(el, cfg) {
     if (!el) return;
     if (el.getAttribute && el.getAttribute('data-cover-drop-bound') === '1') return;
@@ -516,7 +564,17 @@
       try { el.classList.remove('drag-over'); } catch (e2) {}
       const files = filesFromDataTransfer(e.dataTransfer);
       const file = files[0];
-      if (file) processFile(file, cfg);
+      if (file) {
+        processFile(file, cfg);
+        return;
+      }
+      // Если файла нет, но в dataTransfer есть URL (картинку перетащили
+      // из другого браузера) — загружаем изображение по этому адресу.
+      const url = urlFromDataTransfer(e.dataTransfer);
+      if (url) {
+        try { openCropModal('', cfg || activeConfig); } catch (e3) {}
+        loadImageFromUrl(url, cfg || currentCropConfig || activeConfig);
+      }
     });
   }
 
@@ -653,10 +711,18 @@
 
     destroyCropper();
 
-    const hasImage = imageSrc && String(imageSrc).length > 0;
+    let src = imageSrc && String(imageSrc).length > 0 ? String(imageSrc) : '';
+
+    // Если файл ещё не выбран, показываем актуальное изображение (то, что
+    // сейчас отображается у кавера/аватара), а не пустое состояние.
+    if (!src) {
+      src = getCurrentPreviewSrc(conf);
+    }
+
+    const hasImage = src.length > 0;
 
     if (hasImage) {
-      image.src = imageSrc;
+      image.src = src;
       try {
         const cropContainer = modal.querySelector('.crop-container');
         if (cropContainer) cropContainer.classList.add('crop-has-image');
