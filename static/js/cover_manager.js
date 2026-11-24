@@ -619,7 +619,7 @@
     return '';
   }
 
-  function bindDropZone(el, cfg) {
+  function bindDropZone(el, cfg, preferCurrent) {
     if (!el) return;
     if (el.getAttribute && el.getAttribute('data-cover-drop-bound') === '1') return;
     if (el.setAttribute) el.setAttribute('data-cover-drop-bound', '1');
@@ -639,10 +639,17 @@
       try { e.preventDefault(); } catch (e2) {}
       try { e.stopPropagation(); } catch (e2) {}
       try { el.classList.remove('drag-over'); } catch (e2) {}
+      // Для общей зоны обрезки (#crop-dropzone внутри #crop-modal) отдаём
+      // приоритет текущей открытой модалке (currentCropConfig), а не первому
+      // забиндившему её компоненту. Для зон конкретного компонента (превью,
+      // кликабельная область) используем переданную конфигурацию cfg.
+      const dropConf = preferCurrent
+        ? (currentCropConfig || cfg)
+        : (cfg || currentCropConfig || activeConfig);
       const files = filesFromDataTransfer(e.dataTransfer);
       const file = files[0];
       if (file) {
-        processFile(file, cfg);
+        processFile(file, dropConf);
         return;
       }
       // Если файла нет, но в dataTransfer есть URL (картинку перетащили
@@ -651,7 +658,7 @@
       // успешной загрузке, а при неудаче текущее изображение останется как есть.
       const url = urlFromDataTransfer(e.dataTransfer);
       if (url) {
-        loadImageFromUrl(url, cfg || currentCropConfig || activeConfig);
+        loadImageFromUrl(url, dropConf);
       }
     });
   }
@@ -1076,31 +1083,35 @@
 
   function bind(config) {
     activeConfig = config || {};
+    // Захватываем конфигурацию в локальную переменную: activeConfig — общий и
+    // перезаписывается каждым вызовом bind(), поэтому в замыканиях он мог бы
+    // «утекать» на конфиг другого компонента (книга/диктант/аватар).
+    const conf = activeConfig;
 
     // Регистрируем конфигурацию по уникальному ключу, чтобы при выборе файла
     // в конкретном input восстанавливать правильные параметры обрезки.
     try {
-      const key = getConfigKey(activeConfig);
-      configsById[key] = activeConfig;
+      const key = getConfigKey(conf);
+      configsById[key] = conf;
     } catch (e) {
     }
 
-    const fileInput = getElById(activeConfig.fileInputId);
-    const uploadBtn = getElById(activeConfig.uploadBtnId);
-    const clickable = getElById(activeConfig.clickableId);
-    const dropZone = getElById(activeConfig.dropZoneId || null);
+    const fileInput = getElById(conf.fileInputId);
+    const uploadBtn = getElById(conf.uploadBtnId);
+    const clickable = getElById(conf.clickableId);
+    const dropZone = getElById(conf.dropZoneId || null);
 
     // Новый порядок: сначала открываем модалку обрезки, а файл выбираем уже в ней.
     if (uploadBtn) {
       if (!uploadBtn.getAttribute('data-cover-click-bound')) {
         uploadBtn.setAttribute('data-cover-click-bound', '1');
-        uploadBtn.addEventListener('click', () => openCropModal('', activeConfig));
+        uploadBtn.addEventListener('click', () => openCropModal('', conf));
       }
     }
     if (clickable) {
       if (!clickable.getAttribute('data-cover-click-bound')) {
         clickable.setAttribute('data-cover-click-bound', '1');
-        clickable.addEventListener('click', () => openCropModal('', activeConfig));
+        clickable.addEventListener('click', () => openCropModal('', conf));
       }
     }
     if (fileInput) {
@@ -1111,14 +1122,14 @@
     }
 
     // Drag & drop: кликабельная область, превью, явная drop-зона и сам кроп-модал
-    try { bindDropZone(clickable, activeConfig); } catch (e) {}
-    try { bindDropZone(dropZone, activeConfig); } catch (e) {}
-    const previewIds = normIdList(activeConfig && activeConfig.previewImgId);
+    try { bindDropZone(clickable, conf); } catch (e) {}
+    try { bindDropZone(dropZone, conf); } catch (e) {}
+    const previewIds = normIdList(conf && conf.previewImgId);
     for (const id of previewIds) {
-      try { bindDropZone(getElById(id), activeConfig); } catch (e) {}
+      try { bindDropZone(getElById(id), conf); } catch (e) {}
     }
 
-    const els = getModalEls(activeConfig);
+    const els = getModalEls(conf);
     if (els.closeBtn && !els.closeBtn.getAttribute('data-crop-btn-bound')) {
       els.closeBtn.setAttribute('data-crop-btn-bound', '1');
       els.closeBtn.addEventListener('click', () => closeCropModal(true));
@@ -1134,7 +1145,9 @@
 
     try {
       const cropContainer = els.modal ? els.modal.querySelector('.crop-container') : null;
-      bindDropZone(cropContainer, activeConfig);
+      // preferCurrent=true: при дропе в общую зону обрезки используем конфигурацию
+      // текущей открытой модалки (currentCropConfig), а не первого забиндившего.
+      bindDropZone(cropContainer, conf, true);
     } catch (e) {}
 
     try { bindSourceControls(); } catch (e) {}
