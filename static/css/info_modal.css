@@ -124,12 +124,12 @@
   background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
 }
 
-#info-modal .info-modal-link-icon--ratatype {
-  background: #6c5ce7;
-}
-
-#info-modal .info-modal-link-icon--dictations {
-  background: #0ea5e9;
+#info-modal .info-modal-link-logo {
+  display: block;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 #info-modal .info-modal-link-label {
