@@ -803,12 +803,22 @@ def api_proxy_image():
 
     max_bytes = 10 * 1024 * 1024  # 10 MB
 
+    # Некоторые CDN отдают картинки только с Referer того же домена.
+    extra_headers = {'User-Agent': 'Mozilla/5.0 (DictaFan cover loader)'}
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        if parsed.scheme and parsed.netloc:
+            extra_headers['Referer'] = parsed.scheme + '://' + parsed.netloc + '/'
+    except Exception:
+        pass
+
     try:
         resp = requests.get(
             url,
             timeout=15,
             stream=True,
-            headers={'User-Agent': 'Mozilla/5.0 (DictaFan cover loader)'},
+            headers=extra_headers,
         )
     except Exception as e:
         logger.error("api_proxy_image request error: %s", e, exc_info=True)
@@ -818,8 +828,6 @@ def api_proxy_image():
         return jsonify({'error': 'Remote returned non-200'}), 502
 
     content_type = (resp.headers.get('Content-Type') or '').split(';')[0].strip().lower()
-    if not content_type.startswith('image/'):
-        return jsonify({'error': 'Remote content is not an image'}), 415
 
     chunks = []
     total = 0
@@ -839,9 +847,30 @@ def api_proxy_image():
     if not body:
         return jsonify({'error': 'Empty image'}), 502
 
+    # Некоторые источники отдают неверный Content-Type (text/html вместо image/*).
+    # Определяем реальный тип по сигнатуре байтов и используем его как fallback.
+    detected = None
+    try:
+        if body[:3] == b'\xff\xd8\xff':
+            detected = 'image/jpeg'
+        elif body[:8] == b'\x89PNG\r\n\x1a\n':
+            detected = 'image/png'
+        elif body[:6] in (b'GIF87a', b'GIF89a'):
+            detected = 'image/gif'
+        elif body[:4] == b'RIFF' and body[8:12] == b'WEBP':
+            detected = 'image/webp'
+        elif body.lstrip()[:5].lower() == b'<?xml' or body.lstrip()[:4].lower() == b'<svg':
+            detected = 'image/svg+xml'
+    except Exception as e:
+        logger.error("api_proxy_image sniff error: %s", e, exc_info=True)
+
+    if not content_type.startswith('image/') and not detected:
+        logger.warning("api_proxy_image: non-image content from %s (content-type=%s)", url, content_type)
+        return jsonify({'error': 'Remote content is not an image'}), 415
+
     return send_file(
         io.BytesIO(body),
-        mimetype=content_type or 'application/octet-stream',
+        mimetype=content_type if content_type.startswith('image/') else detected or 'application/octet-stream',
         max_age=0,
     )
 

@@ -358,6 +358,11 @@
       if (typeof window.showToast === 'function') window.showToast('Не удалось загрузить изображение по адресу');
     } catch (e) {
     }
+    try {
+      console.warn('[CoverManager] Не удалось загрузить изображение по URL:', rawUrl);
+    } catch (e) {
+    }
+    // При неудаче оставляем текущее изображение как есть (не сбрасываем на пустое).
   }
 
   async function handleClipboardPaste(cfg) {
@@ -510,12 +515,88 @@
     }
   }
 
+  function extractUrlsFromText(text) {
+    const out = [];
+    if (!text) return out;
+    const re = /https?:\/\/[^\s"'<>]+/gi;
+    let m;
+    while ((m = re.exec(String(text))) !== null) {
+      try {
+        // Отрезаем хвост из спецсимволов (запятые, скобки и т.п.).
+        const u = m[0].replace(/[),;!]+$/g, '');
+        if (u) out.push(u);
+      } catch (e) {
+      }
+    }
+    return out;
+  }
+
+  function extractImageUrlFromHtml(html) {
+    try {
+      const div = document.createElement('div');
+      div.innerHTML = String(html || '');
+      const img = div.querySelector('img[src]');
+      if (img) {
+        // img.src уже декодирован браузером и приведён к абсолютному адресу.
+        const src = img.getAttribute('src') || img.src || '';
+        if (src) return src;
+      }
+      const a = div.querySelector('a[href]');
+      if (a) {
+        const href = a.getAttribute('href') || a.href || '';
+        if (href) return href;
+      }
+    } catch (e) {
+    }
+    return '';
+  }
+
+  function normalizeExtractedUrl(raw) {
+    let u = String(raw || '').trim();
+    if (!u) return '';
+    if (!/^https?:\/\//i.test(u)) {
+      // Пытаемся раскодировать URL, закодированный целиком.
+      try {
+        const dec = decodeURIComponent(u);
+        if (/^https?:\/\//i.test(dec)) u = dec;
+      } catch (e) {
+      }
+    }
+
+    // Google Images при перетаскивании отдаёт ссылку вида
+    // https://www.google.com/imgres?imgurl=<настоящая картинка>&...
+    // Сервер-прокси умеет только http/https image, поэтому достаём imgurl.
+    const lm = u.toLowerCase();
+    if (lm.indexOf('imgres') !== -1 || (lm.indexOf('google.') !== -1 && lm.indexOf('?') !== -1)) {
+      try {
+        const q = u.indexOf('?');
+        if (q !== -1) {
+          const params = new URLSearchParams(u.slice(q + 1));
+          const img = params.get('imgurl') || params.get('img') || params.get('media') || params.get('u');
+          if (img && /^https?:\/\//i.test(img)) return img;
+        }
+      } catch (e) {
+      }
+    }
+
+    return u;
+  }
+
   function urlFromDataTransfer(dt) {
     if (!dt) return '';
-    const candidates = [];
 
-    // При перетаскивании картинки из другого браузера (например, из поиска
-    // Google) в dataTransfer обычно лежит не сам файл, а URL/HTML-сниппет.
+    // 1) HTML-сниппет: достаём <img src> или <a href> — самый надёжный
+    //    источник, когда картинку перетащили из другого браузера.
+    let html = '';
+    try { html = dt.getData('text/html'); } catch (e) { }
+    if (html) {
+      const fromHtml = extractImageUrlFromHtml(html);
+      const normalized = normalizeExtractedUrl(fromHtml);
+      if (/^https?:\/\//i.test(normalized)) return normalized;
+    }
+
+    // 2) URI-списки и plain text.
+    const candidates = [];
     try {
       const uri = dt.getData('text/uri-list') || dt.getData('text/x-moz-url');
       if (uri) candidates.push(uri);
@@ -526,17 +607,13 @@
       if (plain) candidates.push(plain);
     } catch (e) {
     }
-    try {
-      const html = dt.getData('text/html');
-      if (html) candidates.push(html);
-    } catch (e) {
-    }
 
     for (const raw of candidates) {
-      const text = String(raw || '').trim();
-      if (!text) continue;
-      const m = text.match(/https?:\/\/[^\s"'<>]+/i);
-      if (m && m[0]) return m[0];
+      const urls = extractUrlsFromText(raw);
+      for (const url of urls) {
+        const normalized = normalizeExtractedUrl(url);
+        if (/^https?:\/\//i.test(normalized)) return normalized;
+      }
     }
 
     return '';
@@ -570,9 +647,10 @@
       }
       // Если файла нет, но в dataTransfer есть URL (картинку перетащили
       // из другого браузера) — загружаем изображение по этому адресу.
+      // Модалку заранее не трогаем: loadImageFromUrl откроет её только при
+      // успешной загрузке, а при неудаче текущее изображение останется как есть.
       const url = urlFromDataTransfer(e.dataTransfer);
       if (url) {
-        try { openCropModal('', cfg || activeConfig); } catch (e3) {}
         loadImageFromUrl(url, cfg || currentCropConfig || activeConfig);
       }
     });
