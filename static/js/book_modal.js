@@ -204,6 +204,8 @@
       activeBookId: null,
       activeBookIsWorkbook: false,
       bookViewActiveBookId: null,
+      /** Язык оригинала открытой книги — используется при создании нового диктанта из книги/раздела. */
+      activeBookOriginalLanguage: null,
       selectedDictationCard: null,
       /** Запоминаем, что редактор нового диктанта открыт из этой книги/раздела,
        *  чтобы после сохранения сразу обновить список в уже открытой модалке книги. */
@@ -859,7 +861,27 @@
           isNewDictation: true,
           dictationId: reservedId,
           dbId: reservedDbId,
-          originalLanguage: '',
+          // Язык оригинала нового диктанта — язык книги, из которой создаём диктант.
+          // Фолбэк — актуальный язык в шапке рабочего стола.
+          originalLanguage: (function () {
+            try {
+              var bookLang = state.activeBookOriginalLanguage
+                ? String(state.activeBookOriginalLanguage).trim().toLowerCase()
+                : '';
+              if (bookLang) return bookLang;
+            } catch (e) {}
+            try {
+              if (window.Desktop && window.Desktop._activeLanguage) {
+                var v = String(window.Desktop._activeLanguage).trim().toLowerCase();
+                if (v) return v;
+              }
+            } catch (e) {}
+            try {
+              var ud = window.UM && window.UM.userData ? window.UM.userData : null;
+              if (ud && ud.current_learning) return String(ud.current_learning).trim().toLowerCase();
+            } catch (e) {}
+            return '';
+          })(),
           translationLanguage: '',
           title: '',
           level: '',
@@ -880,14 +902,32 @@
     }
 
     function getDefaultOriginalLanguageForNewBook() {
+      // Язык оригинала новой книги по умолчанию — актуальный язык в шапке рабочего стола
+      // (window.Desktop._activeLanguage). Если его нет — изучаемый язык пользователя,
+      // затем родной язык, и только в самом конце 'en'.
+      try {
+        if (window.Desktop && window.Desktop._activeLanguage) {
+          const v = String(window.Desktop._activeLanguage).trim().toLowerCase();
+          if (v) return v;
+        }
+      } catch (e) {}
+      try {
+        if (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.currentLearning) {
+          const v = String(window.USER_LANGUAGE_DATA.currentLearning).toLowerCase();
+          if (v) return v;
+        }
+      } catch (e) {}
+      try {
+        const ud = window.UM && window.UM.userData ? window.UM.userData : null;
+        if (ud && ud.current_learning) return String(ud.current_learning).toLowerCase();
+      } catch (e) {}
       try {
         const v = window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage
           ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
           : '';
-        return v || 'en';
-      } catch (e) {
-        return 'en';
-      }
+        if (v) return v;
+      } catch (e) {}
+      return 'en';
     }
 
     function getBookCroppedCoverBlob() {
@@ -1103,7 +1143,9 @@
         modal.style.display = 'flex';
         modal.classList.add('show');
 
-        const defaultLang = book ? book.original_language : getDefaultOriginalLanguageForNewBook();
+        // Для новой книги (book.__isNewReserved с original_language: null) берём дефолт
+        // из активного языка в шапке стола, а не из профильного значения.
+        const defaultLang = (book && book.original_language) ? book.original_language : getDefaultOriginalLanguageForNewBook();
         initBookLanguageSelector(defaultLang);
 
         try {
@@ -1820,6 +1862,11 @@
         try {
           const titleEl = document.getElementById('book-view-title');
           if (titleEl) titleEl.textContent = cached.book.title || 'Книга';
+          try {
+            if (cached.book.original_language) {
+              state.activeBookOriginalLanguage = cached.book.original_language;
+            }
+          } catch (e) {}
           renderActiveBookCard(cached.book, card, { onClose: closeBookViewModal });
           renderBookContentTo(structure, cached.sections || [], cached.dictations || [], wbFlag);
           renderedFromCache = true;
@@ -1849,6 +1896,11 @@
         }
 
         const fresh = { book: freshBook, sections, dictations };
+        try {
+          if (freshBook && freshBook.original_language) {
+            state.activeBookOriginalLanguage = freshBook.original_language;
+          }
+        } catch (e) {}
         const cachedStr = cached
           ? JSON.stringify({ book: cached.book, sections: cached.sections || [], dictations: cached.dictations || [] })
           : '';

@@ -728,7 +728,20 @@ window.Desktop = window.Desktop || {
                 isNewDictation: true,
                 dictationId: reservedId,
                 dbId: reservedDbId,
-                originalLanguage: '',
+                // Язык оригинала для нового диктанта со стола — актуальный язык в шапке стола
+                originalLanguage: (function () {
+                  try {
+                    var activeLang = window.Desktop && window.Desktop._activeLanguage
+                      ? String(window.Desktop._activeLanguage).trim().toLowerCase()
+                      : '';
+                    if (activeLang) return activeLang;
+                  } catch (e) {}
+                  try {
+                    var ud = window.UM && window.UM.userData ? window.UM.userData : null;
+                    if (ud && ud.current_learning) return String(ud.current_learning).trim().toLowerCase();
+                  } catch (e) {}
+                  return '';
+                })(),
                 translationLanguage: '',
                 title: '',
                 level: '',
