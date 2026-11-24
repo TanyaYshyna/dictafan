@@ -462,7 +462,16 @@
       "dictation_report": "تقرير الإملاء",
       "coffee": "ادعمني بقهوة",
       "admin_panel": "لوحة الإدارة",
+      "info": "معلومات",
       "switch_user": "تبديل المستخدم"
+    },
+    "info_modal": {
+      "title": "معلومات",
+      "close": "إغلاق",
+      "my_resources": "مواردي",
+      "friends": "الأصدقاء",
+      "ratatype": "راتاتايب",
+      "dictations": "الإملاءات"
     },
     "delete_modal": {
       "title": "حذف الإملاء",

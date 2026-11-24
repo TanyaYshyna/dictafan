@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="/static/css/dictation_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/dictation_editor_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/dictation_launch_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/info_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/dictation_language_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/model_selector.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/language_selector.css?v={{ app_cache_revision }}">
@@ -89,6 +90,10 @@
                                 <i data-lucide="shield-check"></i>
                                 <span>{{ t('private_library.user_menu.admin_panel') }}</span>
                             </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-info" role="menuitem">
+                                <i data-lucide="info"></i>
+                                <span>{{ t('private_library.user_menu.info') }}</span>
+                            </button>
                             <div class="dropdown-menu-separator"></div>
                             <button type="button" class="dropdown-menu-item" data-action="desktop-menu-logout" role="menuitem" id="desktopLogoutMenuItem">
                                 <i data-lucide="log-out"></i>
@@ -153,6 +158,7 @@
     {% include 'partials/all_dictations_modal.html' %}
 
     {% include 'partials/user_profile_modal.html' %}
+    {% include 'partials/info_modal.html' %}
 
     {% include 'partials/dictation_modal.html' %}
     {% include 'partials/dictation_editor_modal.html' %}
@@ -206,6 +212,7 @@
     <script defer src="{{ url_for('static', filename='js/speech_recognition_unified.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="{{ url_for('static', filename='js/audio_settings_panel.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="{{ url_for('static', filename='js/user_profile_modal.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/info_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop_stats_panel.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/user_activity_history.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/report_filter_panel.js?v={{ app_cache_revision }}"></script>

@@ -1,0 +1,146 @@
+/* ============================================
+   Модальное окно «Информация» (полезные ссылки)
+   ============================================ */
+
+#info-modal.modal {
+  z-index: 100500;
+}
+
+#info-modal .info-modal-content {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  margin: auto;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+#info-modal .info-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--color-border-light, #e9ecef);
+}
+
+#info-modal .info-modal-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text, #1f2933);
+}
+
+#info-modal .info-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#info-modal .info-modal-close:hover {
+  background: var(--color-hover, #f8f9fa);
+}
+
+#info-modal .info-modal-close i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+#info-modal .info-modal-body {
+  padding: 16px 18px 18px;
+}
+
+#info-modal .info-modal-section + .info-modal-section {
+  margin-top: 18px;
+}
+
+#info-modal .info-modal-section-title {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+#info-modal .info-modal-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#info-modal .info-modal-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: var(--color-text, #1f2933);
+  background: var(--color-hover, #f8f9fa);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+#info-modal .info-modal-link:hover {
+  background: var(--color-border-light, #e9ecef);
+}
+
+#info-modal .info-modal-link-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  color: #ffffff;
+}
+
+#info-modal .info-modal-link-icon i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+#info-modal .info-modal-link-icon--youtube {
+  background: #ff0000;
+}
+
+#info-modal .info-modal-link-icon--tiktok {
+  background: #000000;
+}
+
+#info-modal .info-modal-link-icon--instagram {
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+}
+
+#info-modal .info-modal-link-icon--ratatype {
+  background: #6c5ce7;
+}
+
+#info-modal .info-modal-link-icon--dictations {
+  background: #0ea5e9;
+}
+
+#info-modal .info-modal-link-label {
+  flex: 1 1 auto;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+#info-modal .info-modal-link-ext {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--color-text-secondary, #9aa0a6);
+}

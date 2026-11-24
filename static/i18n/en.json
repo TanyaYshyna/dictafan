@@ -467,7 +467,16 @@
       "dictation_report": "Dictation report",
       "coffee": "Buy me a coffee",
       "admin_panel": "Admin panel",
+      "info": "Information",
       "switch_user": "Switch user"
+    },
+    "info_modal": {
+      "title": "Information",
+      "close": "Close",
+      "my_resources": "My resources",
+      "friends": "Friends",
+      "ratatype": "Ratatype",
+      "dictations": "Dictations"
     },
     "delete_modal": {
       "title": "Delete dictation",

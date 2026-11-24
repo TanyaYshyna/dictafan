@@ -655,6 +655,16 @@ window.Desktop = window.Desktop || {
         }
         return;
       }
+      if (name === 'desktop-menu-info') {
+        try {
+          if (window.InfoModal && typeof window.InfoModal.open === 'function') {
+            window.InfoModal.open();
+          }
+        } catch (e) {
+          console.error('[desktop] info modal error', e);
+        }
+        return;
+      }
       if (name === 'desktop-menu-admin-panel' || name === 'desktop-menu-admin-licenses' || name === 'desktop-admin-licenses') {
         // Управление лицензиями переехало на отдельную страницу администратора.
         // Открываем админ-панель в новой вкладке браузера.
@@ -1106,7 +1116,7 @@ window.Desktop = window.Desktop || {
         const action = btn.getAttribute('data-action');
 
         // Исключаем действия, которые уже обрабатываются в initUserMenu
-        if (action === 'desktop-menu-profile' || action === 'desktop-menu-license' || action === 'desktop-menu-admin-panel' || action === 'desktop-menu-logout') {
+        if (action === 'desktop-menu-profile' || action === 'desktop-menu-license' || action === 'desktop-menu-admin-panel' || action === 'desktop-menu-logout' || action === 'desktop-menu-info') {
           return;
         }
 

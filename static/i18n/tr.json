@@ -467,7 +467,16 @@
       "dictation_report": "Dikte raporu",
       "coffee": "Bana kahve ısmarla",
       "admin_panel": "Yönetici paneli",
+      "info": "Bilgi",
       "switch_user": "Kullanıcı değiştir"
+    },
+    "info_modal": {
+      "title": "Bilgi",
+      "close": "Kapat",
+      "my_resources": "Kaynaklarım",
+      "friends": "Arkadaşlar",
+      "ratatype": "Ratatype",
+      "dictations": "Dikteler"
     },
     "delete_modal": {
       "title": "Dikteyi sil",

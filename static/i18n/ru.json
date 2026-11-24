@@ -467,7 +467,16 @@
       "dictation_report": "Отчет по диктантам",
       "coffee": "На кофе",
       "admin_panel": "Админ-панель",
+      "info": "Информация",
       "switch_user": "Сменить пользователя"
+    },
+    "info_modal": {
+      "title": "Информация",
+      "close": "Закрыть",
+      "my_resources": "Мои ресурсы",
+      "friends": "Друзья",
+      "ratatype": "Рататайп",
+      "dictations": "Диктанты"
     },
     "delete_modal": {
       "title": "Удалить диктант",
