@@ -161,10 +161,6 @@
             if (rb.disabled) return;
           } catch (e1) {
           }
-          try {
-            console.debug('[DictationSpeechRecognitionPanel] record click');
-          } catch (e2) {
-          }
           this.toggleRecording().catch(() => { });
         });
       }

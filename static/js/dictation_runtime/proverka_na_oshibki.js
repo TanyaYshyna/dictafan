@@ -618,19 +618,6 @@ class ПроверкаНаОшибки {
     // (например, когда в предложении есть отдельные знаки "...").
     const displayOrig = this._alignOriginalDisplayWords(originalWords);
 
-    try {
-      console.log('[ПроверкаНаОшибки] checkWords start', {
-        original,
-        userInput,
-        langCode,
-        simplOriginal,
-        simplUser,
-        originalWords,
-        userWords,
-        displayOrig,
-      });
-    } catch (eLog) {}
-
     const userVerified = [];
     let i = 0;
     let j = 0;
@@ -758,13 +745,6 @@ class ПроверкаНаОшибки {
       }
     }
 
-    try {
-      console.log('[ПроверкаНаОшибки] checkWords result', {
-        verified: userVerified,
-        errorCount,
-      });
-    } catch (eLog) {}
-
     return { verified: userVerified, errorCount };
   }
 
@@ -864,22 +844,6 @@ class ПроверкаНаОшибки {
     }
 
     const allCorrect = allCorrectWords || spacingOnlyErrors;
-
-    try {
-      console.log('[ПроверкаНаОшибки] analyze result', {
-        originalText,
-        userText,
-        userNorm,
-        origNorm,
-        allCorrectWords,
-        spacingOnlyErrors,
-        allCorrect,
-        errorCount,
-        starOutcome,
-        nextPerfect,
-        nextCorrected,
-      });
-    } catch (eLog) {}
 
     return {
       okToCheck: true,

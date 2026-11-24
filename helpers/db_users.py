@@ -264,18 +264,13 @@ def create_user(
         # Автоматически добавляем на «Стол» пользователя диктанты по умолчанию
         # для изучаемых им языков (dictations.is_first_load IS TRUE).
         try:
-            import time as _time
-            _t = _time.perf_counter()
             from .db_books import add_default_dictations_to_desk
-            added = add_default_dictations_to_desk(
+            add_default_dictations_to_desk(
                 int(user_row["id"]),
                 normalized_langs,
             )
-            print(f"[create_user] add_default_dictations_to_desk user={user_row['id']} "
-                  f"langs={normalized_langs} added={added} took {_time.perf_counter() - _t:.3f}s",
-                  flush=True)
-        except Exception as _exc:
-            print(f"[create_user] add_default_dictations_to_desk error: {_exc}", flush=True)
+        except Exception:
+            pass
 
         result = {
             "id": user_row["id"],

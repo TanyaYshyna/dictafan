@@ -62,10 +62,7 @@
       // UserManager хранит данные в this.userData, полученные из /user/api/me (поле id)
       var uid = String(window.UM?.userData?.id || window.UM?.userId || window.UM?.user?.id || '').trim();
       if (!uid) {
-        console.log(TAG, '[0] _getUserId: UM=', typeof window.UM, window.UM ? 'exists' : 'null',
-          'userData=', window.UM?.userData,
-          'userId=', window.UM?.userId,
-          'user=', window.UM?.user);
+        
       }
       return uid;
     } catch (e) {
@@ -423,7 +420,7 @@
       const recordResult = await _checkRecordLocally(payload, key);
       if (recordResult.is_record && recordResult.record) {
         await _enqueueRecord(recordResult.record);
-        console.log(TAG, '[checkAndSaveRecord] новый рекорд!', recordResult.record);
+        
         try {
           document.dispatchEvent(new CustomEvent('dictation-record', {
             detail: {
@@ -857,7 +854,7 @@
         });
       }
 
-      console.log(TAG, '[syncAllRecordsFromServer] синхронизировано ' + data.records.length + ' рекордов');
+      
       return true;
     } catch (e) {
       console.warn(TAG, '[syncAllRecordsFromServer] ошибка:', e);

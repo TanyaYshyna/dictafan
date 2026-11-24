@@ -135,16 +135,11 @@ class LicenseManager:
            - days=0 означает вечную лицензию (до 2099-12-31).
         4. Записать результаты в user_access_calendar.
 
-        Оптимизация: раньше каждый день вставлялся отдельным INSERT —
-        для вечной лицензии это ~26700 одиночных запросов к БД, что при
-        удалённой БД (Neon/Railway) занимало десятки секунд и приводило к
-        WORKER TIMEOUT / 502 при регистрации. Теперь соседние дни с одинаковой
-        победившей лицензией объединяются в сегменты и вставляются одним
-        INSERT ... SELECT generate_series(...) на сегмент.
+        Оптимизация: соседние дни с одинаковой победившей лицензией
+        объединяются в сегменты и вставляются одним
+        INSERT ... SELECT generate_series(...) на сегмент вместо
+        одиночного INSERT на каждый день.
         """
-        import time as _time
-        _t0 = _time.perf_counter()
-
         conn, cur = get_db_cursor()
         try:
             # 1. Получить все операции пользователя
@@ -245,9 +240,6 @@ class LicenseManager:
                     )
 
             conn.commit()
-            print(f"[LicenseManager] rebuild_calendar_for_user user={user_id} "
-                  f"segments={len(segments)} days={(max_date - min_date).days + 1} "
-                  f"took {_time.perf_counter() - _t0:.3f}s")
         except Exception as e:
             conn.rollback()
             print(f"[LicenseManager] Ошибка при перестроении календаря: {e}")
