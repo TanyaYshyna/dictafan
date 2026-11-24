@@ -148,26 +148,66 @@
     </div>
 </div>
 
-<!-- crop-modal: обрезка изображения для обложки -->
+<!-- crop-modal: обрезка изображения для обложки/аватара -->
 <div id="crop-modal" class="modal" style="display: none;">
     <div class="modal-content crop-modal-content">
         <div class="modal-header">
-            <h3></h3>
+            <h3 id="crop-modal-title"></h3>
             <button class="modal-close" id="crop-close" type="button" aria-label="" title="">
                 <i data-lucide="x"></i>
             </button>
         </div>
         <div class="modal-body crop-modal-body">
+            <div class="crop-toolbar">
+                <div class="crop-source-wrapper" id="crop-source-wrapper">
+                    <button type="button" class="crop-source-btn" id="crop-source-btn" aria-haspopup="true" aria-expanded="false">
+                        <span id="crop-source-label">Выберите файл</span>
+                        <i data-lucide="chevron-down"></i>
+                    </button>
+                    <div class="crop-source-menu" id="crop-source-menu" role="menu" hidden>
+                        <button type="button" class="crop-source-item" data-source="file" role="menuitem">
+                            <i data-lucide="file-image"></i>
+                            <span>Выберите файл</span>
+                        </button>
+                        <button type="button" class="crop-source-item" data-source="url" role="menuitem">
+                            <i data-lucide="link"></i>
+                            <span>Ввести адрес</span>
+                        </button>
+                        <button type="button" class="crop-source-item" data-source="clipboard" role="menuitem">
+                            <i data-lucide="clipboard"></i>
+                            <span>Вставить из кармана</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
             <div class="crop-container" id="crop-dropzone">
                 <img id="crop-image" src="" alt="Crop">
                 <div class="crop-drop-hint" id="crop-drop-hint">
                     <i data-lucide="upload"></i>
-                    <span>Перетащите сюда картинку</span>
+                    <span>Перетащите сюда картинку или выберите источник справа</span>
                 </div>
             </div>
             <div class="crop-actions">
                 <button type="button" class="btn-secondary" id="crop-cancel"></button>
                 <button type="button" class="btn-primary" id="crop-confirm"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- crop-url-modal: ввод адреса изображения -->
+<div id="crop-url-modal" class="modal" style="display: none;">
+    <div class="modal-content crop-url-modal-content">
+        <div class="modal-header">
+            <h3 id="crop-url-title">Введите адрес</h3>
+            <button class="modal-close" id="crop-url-close" type="button" aria-label="Закрыть" title="Закрыть">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body crop-url-modal-body">
+            <input type="url" id="crop-url-input" placeholder="https://example.com/image.jpg" autocomplete="off">
+            <div class="crop-url-actions">
+                <button type="button" class="btn-primary" id="crop-url-confirm">Выбрать</button>
             </div>
         </div>
     </div>

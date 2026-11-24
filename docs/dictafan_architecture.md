@@ -706,12 +706,17 @@ const state = {
   2. Если `audio` dirty → `_uploadDraftAudioToB2()`
   3. Если `cover` dirty → cover передаётся как `cover_b64` внутри `save_dictation_final` (отдельного endpoint для cover нет)
 - **Флоу cover**:
-  1. Пользователь выбирает файл → `CoverManager.handleCoverSelect()` → открывается crop modal
-  2. После подтверждения crop → `CoverManager.handleCropConfirm()` → вызывает `onConfirm(blob)` и `onDirty()`
-  3. `onDirty()` устанавливает `dirtyFlags.cover = true`
-  4. При сохранении: `CoverManager.getCroppedBlob()` → `_blobToBase64()` → `cover_b64` в `saveData`
-  5. Сервер (`save_dictation_final`) декодирует `cover_b64` и сохраняет как `cover.webp` в temp-папку
-  6. Существующая логика копирует `cover.webp` из temp в финальную папку (`static/data/dictations/<dictation_id>/cover.webp`) и в B2 (`dictations_covers/<numeric_id>.webp`)
+  1. Пользователь нажимает кнопку загрузки/кликает по обложке → `CoverManager.openCropModal('', config)` → сразу открывается crop modal (сначала модалка, файл ещё не выбран)
+  2. В модалке пользователь выбирает источник изображения кнопкой-дропдауном справа:
+     - «Выберите файл» → открывается системный диалог выбора файла → `CoverManager.handleCoverSelect()` → файл вставляется в кроппер
+     - «Ввести адрес» → маленькое модальное окно с полем URL и кнопкой «Выбрать» → сервер скачивает картинку через `/api/proxy_image` и вставляет её в кроппер
+     - «Вставить из кармана» (или Cmd/Ctrl+V) → картинка из буфера обмена вставляется в кроппер
+  3. Drag & drop картинки в поле кроппера/превью по-прежнему работает
+  4. После подтверждения crop → `CoverManager.handleCropConfirm()` → вызывает `onConfirm(blob)` и `onDirty()`
+  5. `onDirty()` устанавливает `dirtyFlags.cover = true`
+  6. При сохранении: `CoverManager.getCroppedBlob()` → `_blobToBase64()` → `cover_b64` в `saveData`
+  7. Сервер (`save_dictation_final`) декодирует `cover_b64` и сохраняет как `cover.webp` в temp-папку
+  8. Существующая логика копирует `cover.webp` из temp в финальную папку (`static/data/dictations/<dictation_id>/cover.webp`) и в B2 (`dictations_covers/<numeric_id>.webp`)
 
 ### SaveQueueBatcher — очередь сохранения при нестабильном интернете
 
@@ -927,14 +932,23 @@ const state = {
 
 | Метод | Описание |
 |-------|----------|
-| `bind(config)` | Привязывает обработчики к элементам UI: file input, upload button, preview img, crop modal. Возвращает `{ unbind() }` |
-| `getCroppedBlob()` | Возвращает `Blob` обрезанного изображения (или `null`, если crop не выполнялся) |
-| `handleCoverSelect(event)` | Обработчик выбора файла — читает файл как data URL и открывает crop modal |
-| `openCropModal(imageSrc)` | Открывает crop modal с Cropper.js |
+| `bind(config)` | Привязывает обработчики к элементам UI: file input, upload button, preview img, crop modal. Кнопка/кликабельная область открывают crop modal сразу (без предварительного диалога выбора файла) |
+| `getCroppedBlob(key)` | Возвращает `Blob` обрезанного изображения по ключу конфигурации (или `null`) |
+| `handleCoverSelect(event)` | Обработчик выбора файла — читает файл как data URL и вставляет его в уже открытый crop modal |
+| `openCropModal(imageSrc, config)` | Открывает crop modal с Cropper.js. Если `imageSrc` пустой — модалка открывается в пустом состоянии (выбор источника внутри) |
 | `handleCropConfirm()` | Подтверждает crop — создаёт canvas, формирует blob, вызывает `onConfirm(blob)` и `onDirty()` |
 | `closeCropModal(clearBlob)` | Закрывает crop modal |
 | `getCoverUrl(dictationId, languageCode)` | Строит URL обложки: `/api/dictations_covers/<id>.webp` |
 | `prefetchUrls(urls)` | Prefetch массивов URL через `fetch()` + CacheStorage |
+
+**Источники изображения в crop modal** (общие для обложки книги, обложки диктанта и аватара):
+
+- кнопка-дропдаун `#crop-source-btn` с пунктами `#crop-source-menu`:
+  - `data-source="file"` — системный диалог выбора файла (прежний механизм)
+  - `data-source="url"` — модальное окно `#crop-url-modal` с полем `#crop-url-input` и кнопкой `#crop-url-confirm`
+  - `data-source="clipboard"` — вставка из буфера обмена (также по Cmd/Ctrl+V)
+- Drag & drop по-прежнему работает для кликабельной области, preview и контейнера кроппера.
+- Загрузка по URL идёт через серверный прокси `GET /api/proxy_image?url=...` (обход CORS), с fallback на прямой `fetch`.
 
 **Параметры `bind(config)`:**
 

@@ -3174,6 +3174,7 @@ function _initCoverUpload() {
     uploadBtn.setAttribute('data-cover-bound', '1');
 
     window.CoverManager.bind({
+      kind: 'dictation',
       fileInputId: 'dictationEditorModalCoverFile',
       uploadBtnId: 'dictationEditorModalCoverUploadBtn',
       previewImgId: 'dictationEditorModalCoverImage',
@@ -4333,7 +4334,7 @@ async function _handleSave() {
     if (flags.cover) {
       try {
         if (window.CoverManager && typeof window.CoverManager.getCroppedBlob === 'function') {
-          var coverBlob = window.CoverManager.getCroppedBlob();
+          var coverBlob = window.CoverManager.getCroppedBlob('dictation');
           if (coverBlob) {
             cover_b64 = await _blobToBase64(coverBlob);
           }
@@ -5139,7 +5140,7 @@ function open(config) {
   // диктанта не «протекла» в только что созданный диктант.
   try {
     if (window.CoverManager && typeof window.CoverManager.clearCroppedBlob === 'function') {
-      window.CoverManager.clearCroppedBlob();
+      window.CoverManager.clearCroppedBlob('dictation');
     }
   } catch (e) {}
   var _coverFileInput = document.getElementById('dictationEditorModalCoverFile');
@@ -5515,7 +5516,7 @@ function _closeEditorModal(wasSaved) {
   // чтобы при следующем открытии не осталась обложка предыдущего диктанта.
   try {
     if (window.CoverManager && typeof window.CoverManager.clearCroppedBlob === 'function') {
-      window.CoverManager.clearCroppedBlob();
+      window.CoverManager.clearCroppedBlob('dictation');
     }
   } catch (e) {}
   var coverFileInput = document.getElementById('dictationEditorModalCoverFile');

@@ -6,6 +6,7 @@ import shutil
 import hashlib
 import tempfile
 import zipfile
+import requests
 from flask import Blueprint, jsonify, render_template, request, current_app, send_file, send_from_directory, redirect
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import logging
@@ -780,6 +781,69 @@ def app_cache_revision():
         'success': True,
         'revision': get_app_cache_revision(),
     })
+
+
+@index_bp.route('/api/proxy_image', methods=['GET'])
+@jwt_required()
+def api_proxy_image():
+    """
+    Прокси для загрузки изображения по URL (обход CORS).
+
+    Фронт (модалка обрезки обложки/аватара) просит сервер скачать картинку
+    по внешнему адресу и отдаёт её обратно как image/*, чтобы можно было
+    вставить её в кроппер без ограничений CORS.
+    """
+    url = (request.args.get('url') or '').strip()
+    if not url:
+        return jsonify({'error': 'url parameter required'}), 400
+
+    # Защита от SSRF: разрешаем только http/https.
+    if not (url.lower().startswith('http://') or url.lower().startswith('https://')):
+        return jsonify({'error': 'Only http/https URLs are allowed'}), 400
+
+    max_bytes = 10 * 1024 * 1024  # 10 MB
+
+    try:
+        resp = requests.get(
+            url,
+            timeout=15,
+            stream=True,
+            headers={'User-Agent': 'Mozilla/5.0 (DictaFan cover loader)'},
+        )
+    except Exception as e:
+        logger.error("api_proxy_image request error: %s", e, exc_info=True)
+        return jsonify({'error': 'Failed to download image'}), 502
+
+    if resp.status_code != 200:
+        return jsonify({'error': 'Remote returned non-200'}), 502
+
+    content_type = (resp.headers.get('Content-Type') or '').split(';')[0].strip().lower()
+    if not content_type.startswith('image/'):
+        return jsonify({'error': 'Remote content is not an image'}), 415
+
+    chunks = []
+    total = 0
+    try:
+        for chunk in resp.iter_content(chunk_size=65536):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > max_bytes:
+                return jsonify({'error': 'Image is too large'}), 413
+            chunks.append(chunk)
+    except Exception as e:
+        logger.error("api_proxy_image stream error: %s", e, exc_info=True)
+        return jsonify({'error': 'Failed to read image'}), 502
+
+    body = b''.join(chunks)
+    if not body:
+        return jsonify({'error': 'Empty image'}), 502
+
+    return send_file(
+        io.BytesIO(body),
+        mimetype=content_type or 'application/octet-stream',
+        max_age=0,
+    )
 
 
 

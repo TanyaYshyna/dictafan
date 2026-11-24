@@ -6,7 +6,21 @@
   let cropper = null;
   let croppedImageBlob = null;
   let activeConfig = null;
+  // Конфигурация компонента, который сейчас открыл модалку обрезки.
+  // activeConfig перезаписывается при каждом bind(), поэтому для модалки
+  // храним отдельную ссылку на конфигурацию, открывшую модалку.
+  let currentCropConfig = null;
   let fileDialogActive = false;
+  // Реестр конфигураций по уникальному ключу (kind или fileInputId).
+  // Раньше activeConfig был единственным и перезаписывался при каждом bind(),
+  // из-за чего модалка обрезки открывалась с параметрами последнего
+  // привязанного компонента (например, обложка книги открывалась с
+  // широким прямоугольником редактора диктанта 200/120 вместо квадрата).
+  const configsById = {};
+  // Обрезанные обложки по ключу конфигурации, чтобы обложка книги не
+  // «протекала» в редактор диктанта и наоборот. croppedImageBlob остаётся
+  // как fallback для компонентов, которые не передают ключ (редактор диктанта).
+  const croppedBlobsById = {};
 
   function getAppBuildValue() {
     try {
@@ -160,6 +174,43 @@
     return document.getElementById(String(id));
   }
 
+  function getToken() {
+    try {
+      if (window.UM && window.UM.token) return window.UM.token;
+    } catch (e) {
+    }
+    try {
+      if (window.UM && typeof window.UM.getToken === 'function') return window.UM.getToken();
+    } catch (e) {
+    }
+    try {
+      return localStorage.getItem('jwt_token');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function getConfigKey(config) {
+    try {
+      const k = config && (config.kind || config.fileInputId)
+        ? String(config.kind || config.fileInputId)
+        : '';
+      return k || 'default';
+    } catch (e) {
+      return 'default';
+    }
+  }
+
+  function findConfigByFileInputId(inputId) {
+    if (!inputId) return null;
+    const keys = Object.keys(configsById);
+    for (let i = 0; i < keys.length; i++) {
+      const c = configsById[keys[i]];
+      if (c && String(c.fileInputId || '') === String(inputId)) return c;
+    }
+    return null;
+  }
+
   function getModalEls(cfg) {
     const modalId = (cfg && cfg.modalId) || 'crop-modal';
     const imageId = (cfg && cfg.cropImageId) || 'crop-image';
@@ -173,6 +224,245 @@
       cancelBtn: getElById(cancelId),
       confirmBtn: getElById(confirmId),
     };
+  }
+
+  function getSourceEls() {
+    return {
+      wrapper: getElById('crop-source-wrapper'),
+      btn: getElById('crop-source-btn'),
+      label: getElById('crop-source-label'),
+      menu: getElById('crop-source-menu'),
+      urlModal: getElById('crop-url-modal'),
+      urlInput: getElById('crop-url-input'),
+      urlConfirm: getElById('crop-url-confirm'),
+      urlClose: getElById('crop-url-close'),
+      title: getElById('crop-modal-title'),
+    };
+  }
+
+  function setSourceLabel(text) {
+    try {
+      const lbl = getElById('crop-source-label');
+      if (lbl) lbl.textContent = String(text || '');
+    } catch (e) {
+    }
+  }
+
+  function destroyCropper() {
+    if (cropper) {
+      try {
+        cropper.destroy();
+      } catch (e) {
+      }
+      cropper = null;
+    }
+  }
+
+  function toggleSourceMenu(force) {
+    const menu = getElById('crop-source-menu');
+    const btn = getElById('crop-source-btn');
+    if (!menu) return;
+    const willOpen = force !== undefined ? !!force : menu.hasAttribute('hidden');
+    if (willOpen) {
+      menu.removeAttribute('hidden');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+    } else {
+      menu.setAttribute('hidden', '');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function openUrlModal() {
+    const s = getSourceEls();
+    if (!s.urlModal) return;
+    s.urlModal.style.display = 'flex';
+    s.urlModal.classList.add('show');
+    try {
+      if (s.urlInput) s.urlInput.value = '';
+    } catch (e) {
+    }
+    try {
+      if (s.urlInput) s.urlInput.focus();
+    } catch (e) {
+    }
+  }
+
+  function closeUrlModal() {
+    const s = getSourceEls();
+    if (!s.urlModal) return;
+    s.urlModal.style.display = 'none';
+    s.urlModal.classList.remove('show');
+    try {
+      if (s.urlInput) s.urlInput.value = '';
+    } catch (e) {
+    }
+  }
+
+  async function loadImageFromUrl(url, cfg) {
+    const conf = cfg || currentCropConfig || activeConfig;
+    const rawUrl = String(url || '').trim();
+    if (!rawUrl) return;
+
+    try {
+      if (typeof window.showToast === 'function') window.showToast('Загружаем изображение...');
+    } catch (e) {
+    }
+
+    const token = getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+
+    // 1) Серверный прокси (обходит CORS).
+    try {
+      const resp = await fetch('/api/proxy_image?url=' + encodeURIComponent(rawUrl), { headers });
+      if (resp.ok) {
+        const blob = await resp.blob();
+        if (blob && (blob.type || '').startsWith('image/')) {
+          processFile(blob, conf);
+          return;
+        }
+      }
+    } catch (e) {
+    }
+
+    // 2) Fallback: прямая загрузка (если источник разрешает CORS).
+    try {
+      const direct = await fetch(rawUrl, { mode: 'cors' });
+      if (direct.ok) {
+        const blob = await direct.blob();
+        if (blob && (blob.type || '').startsWith('image/')) {
+          processFile(blob, conf);
+          return;
+        }
+      }
+    } catch (e) {
+    }
+
+    try {
+      if (typeof window.showToast === 'function') window.showToast('Не удалось загрузить изображение по адресу');
+    } catch (e) {
+    }
+  }
+
+  async function handleClipboardPaste(cfg) {
+    const conf = cfg || currentCropConfig || activeConfig;
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+        if (typeof window.showToast === 'function') window.showToast('Буфер обмена недоступен — разрешите доступ');
+        return;
+      }
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const types = item && item.types ? item.types : [];
+        const imgType = types.find((t) => t && t.startsWith('image/'));
+        if (imgType && typeof item.getType === 'function') {
+          const blob = await item.getType(imgType);
+          if (blob) {
+            processFile(blob, conf);
+            return;
+          }
+        }
+      }
+      try {
+        if (typeof window.showToast === 'function') window.showToast('В буфере обмена нет изображения');
+      } catch (e) {
+      }
+    } catch (e) {
+      try {
+        if (typeof window.showToast === 'function') window.showToast('Не удалось вставить из буфера обмена');
+      } catch (e2) {
+      }
+    }
+  }
+
+  function handleSourceAction(source) {
+    const conf = currentCropConfig || activeConfig;
+    toggleSourceMenu(false);
+    if (source === 'file') {
+      const input = getElById(conf && conf.fileInputId);
+      if (input) {
+        triggerFilePicker(input);
+      } else {
+        triggerFilePicker(getElById((activeConfig && activeConfig.fileInputId) || null));
+      }
+    } else if (source === 'url') {
+      openUrlModal();
+    } else if (source === 'clipboard') {
+      handleClipboardPaste(conf);
+    }
+  }
+
+  function bindSourceControls() {
+    if (window.__coverManagerSourceBound) return;
+    window.__coverManagerSourceBound = true;
+
+    const s = getSourceEls();
+
+    if (s.btn) {
+      s.btn.addEventListener('click', (e) => {
+        try { e.stopPropagation(); } catch (e2) {}
+        toggleSourceMenu();
+      });
+    }
+
+    if (s.menu) {
+      const items = s.menu.querySelectorAll('.crop-source-item');
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        item.addEventListener('click', (e) => {
+          try { e.stopPropagation(); } catch (e2) {}
+          handleSourceAction(item.getAttribute('data-source'));
+        });
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      const menu = getElById('crop-source-menu');
+      const btn = getElById('crop-source-btn');
+      if (!menu || menu.hasAttribute('hidden')) return;
+      if (btn && btn.contains(e.target)) return;
+      if (menu.contains(e.target)) return;
+      toggleSourceMenu(false);
+    });
+
+    if (s.urlConfirm) {
+      s.urlConfirm.addEventListener('click', () => {
+        const val = s.urlInput && s.urlInput.value ? String(s.urlInput.value).trim() : '';
+        if (!val) return;
+        closeUrlModal();
+        loadImageFromUrl(val, currentCropConfig || activeConfig);
+      });
+    }
+    if (s.urlClose) s.urlClose.addEventListener('click', closeUrlModal);
+    if (s.urlInput) {
+      s.urlInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          try { e.preventDefault(); } catch (e2) {}
+          const val = s.urlInput && s.urlInput.value ? String(s.urlInput.value).trim() : '';
+          if (!val) return;
+          closeUrlModal();
+          loadImageFromUrl(val, currentCropConfig || activeConfig);
+        }
+      });
+    }
+
+    // Клик по фону маленькой модалки URL закрывает её.
+    if (s.urlModal) {
+      s.urlModal.addEventListener('click', (e) => {
+        if (e.target === s.urlModal) closeUrlModal();
+      });
+    }
+
+    // Cmd/Ctrl+V — вставить картинку из буфера, пока открыта модалка обрезки.
+    document.addEventListener('keydown', (e) => {
+      if (!(e.metaKey || e.ctrlKey) || (e.key !== 'v' && e.key !== 'V')) return;
+      const modal = getElById('crop-modal');
+      if (!modal || (modal.style.display !== 'flex' && !modal.classList.contains('show'))) return;
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      try { e.preventDefault(); } catch (e2) {}
+      handleClipboardPaste(currentCropConfig || activeConfig);
+    });
   }
 
   function readFileAsDataUrl(file) {
@@ -204,7 +494,7 @@
     }
   }
 
-  function bindDropZone(el) {
+  function bindDropZone(el, cfg) {
     if (!el) return;
     if (el.getAttribute && el.getAttribute('data-cover-drop-bound') === '1') return;
     if (el.setAttribute) el.setAttribute('data-cover-drop-bound', '1');
@@ -226,7 +516,7 @@
       try { el.classList.remove('drag-over'); } catch (e2) {}
       const files = filesFromDataTransfer(e.dataTransfer);
       const file = files[0];
-      if (file) processFile(file);
+      if (file) processFile(file, cfg);
     });
   }
 
@@ -291,8 +581,9 @@
     }
   }
 
-  function processFile(file) {
+  function processFile(file, cfg) {
     if (!file) return;
+    const conf = cfg || activeConfig;
 
     if (!file.type || !file.type.startsWith('image/')) {
       try {
@@ -305,7 +596,7 @@
     }
 
     try {
-      const maxSize = activeConfig && activeConfig.maxFileSizeBytes ? Number(activeConfig.maxFileSizeBytes) : null;
+      const maxSize = conf && conf.maxFileSizeBytes ? Number(conf.maxFileSizeBytes) : null;
       if (maxSize && isFinite(maxSize) && maxSize > 0 && Number(file.size || 0) > maxSize) {
         try {
           if (typeof window.showToast === 'function') {
@@ -321,7 +612,7 @@
     (async () => {
       try {
         const dataUrl = await readFileAsDataUrl(file);
-        openCropModal(dataUrl);
+        openCropModal(dataUrl, conf);
       } catch (e) {
       }
     })();
@@ -331,43 +622,79 @@
     const file = getCoverFileFromEvent(event);
     if (!file) return;
 
+    // Определяем, к какому компоненту относится выбранный файл,
+    // чтобы модалка обрезки использовала правильные параметры
+    // (квадрат для обложки книги, широкий прямоугольник для диктанта и т.д.).
+    try {
+      const inputEl = event && event.target ? event.target : null;
+      const inputId = inputEl ? (inputEl.id || inputEl.getAttribute('id')) : null;
+      const found = findConfigByFileInputId(inputId);
+      if (found) activeConfig = found;
+    } catch (e) {
+    }
+
     // Сбрасываем value, чтобы повторный выбор того же файла срабатывал
     try {
       if (event && event.target) event.target.value = '';
     } catch (e) {
     }
 
-    processFile(file);
+    processFile(file, activeConfig);
   }
 
-  function openCropModal(imageSrc) {
-    const els = getModalEls(activeConfig);
+  function openCropModal(imageSrc, cfg) {
+    const conf = cfg || activeConfig;
+    currentCropConfig = conf || null;
+    const els = getModalEls(conf);
     const modal = els.modal;
     const image = els.image;
 
     if (!modal || !image) return;
 
-    image.src = imageSrc;
+    destroyCropper();
 
-    modal.style.display = 'flex';
-    modal.classList.add('show');
+    const hasImage = imageSrc && String(imageSrc).length > 0;
 
-    try {
-      const cropContainer = modal.querySelector('.crop-container');
-      if (cropContainer) cropContainer.classList.add('crop-has-image');
-    } catch (e) {
-    }
-
-    if (cropper) {
+    if (hasImage) {
+      image.src = imageSrc;
       try {
-        cropper.destroy();
+        const cropContainer = modal.querySelector('.crop-container');
+        if (cropContainer) cropContainer.classList.add('crop-has-image');
+      } catch (e) {
+      }
+    } else {
+      // Пустое состояние: открываем модалку, а файл ещё не выбран.
+      try { image.removeAttribute('src'); } catch (e) {}
+      try {
+        const cropContainer = modal.querySelector('.crop-container');
+        if (cropContainer) cropContainer.classList.remove('crop-has-image');
       } catch (e) {
       }
     }
 
+    modal.style.display = 'flex';
+    modal.classList.add('show');
+
+    // Заголовок модалки
+    try {
+      const title = getElById('crop-modal-title');
+      if (title) title.textContent = (conf && conf.modalTitle) ? String(conf.modalTitle) : 'Обрезка обложки';
+    } catch (e) {
+    }
+
+    if (!hasImage) {
+      // Фокус на кнопке-источнике, чтобы подсказать следующий шаг.
+      try {
+        const srcBtn = getElById('crop-source-btn');
+        if (srcBtn) setTimeout(() => srcBtn.focus(), 0);
+      } catch (e) {
+      }
+      return;
+    }
+
     const aspectRatio = (() => {
       try {
-        const v = activeConfig && activeConfig.aspectRatio != null ? activeConfig.aspectRatio : null;
+        const v = conf && conf.aspectRatio != null ? conf.aspectRatio : null;
         const n = v == null ? null : Number(v);
         if (n && isFinite(n) && n > 0) return n;
       } catch (e) {
@@ -391,7 +718,7 @@
       minCropBoxHeight: 100,
       ready: function () {
         try {
-          const mode = activeConfig && activeConfig.fillMode ? String(activeConfig.fillMode) : '';
+          const mode = conf && conf.fillMode ? String(conf.fillMode) : '';
           if (mode !== 'cover') return;
           const c = this.cropper;
           if (!c) return;
@@ -412,7 +739,7 @@
     });
 
     try {
-      if (activeConfig && activeConfig.focusConfirm) {
+      if (conf && conf.focusConfirm) {
         const btn = els.confirmBtn;
         if (btn) {
           setTimeout(() => btn.focus(), 0);
@@ -423,37 +750,44 @@
   }
 
   function closeCropModal(clearBlob = true) {
-    const els = getModalEls(activeConfig);
+    const conf = currentCropConfig || activeConfig;
+    const els = getModalEls(conf);
     const modal = els.modal;
     if (modal) {
       modal.style.display = 'none';
       modal.classList.remove('show');
     }
 
-    if (cropper) {
-      try {
-        cropper.destroy();
-      } catch (e) {
-      }
-      cropper = null;
-    }
+    destroyCropper();
+
+    try { toggleSourceMenu(false); } catch (e) {}
+    try { closeUrlModal(); } catch (e) {}
 
     if (clearBlob) {
       croppedImageBlob = null;
       try {
-        const inputId = activeConfig && activeConfig.fileInputId ? String(activeConfig.fileInputId) : null;
+        const key = getConfigKey(conf);
+        delete croppedBlobsById[key];
+      } catch (e) {
+      }
+      try {
+        const inputId = conf && conf.fileInputId ? String(conf.fileInputId) : null;
         clearInputValue(getElById(inputId));
       } catch (e) {
       }
     }
+
+    currentCropConfig = null;
   }
 
   function handleCropConfirm() {
     if (!cropper) return;
 
+    const conf = currentCropConfig || activeConfig;
+
     const outW = (() => {
       try {
-        const v = activeConfig && activeConfig.outputWidth != null ? Number(activeConfig.outputWidth) : null;
+        const v = conf && conf.outputWidth != null ? Number(conf.outputWidth) : null;
         return v && isFinite(v) && v > 0 ? v : 200;
       } catch (e) {
         return 200;
@@ -461,7 +795,7 @@
     })();
     const outH = (() => {
       try {
-        const v = activeConfig && activeConfig.outputHeight != null ? Number(activeConfig.outputHeight) : null;
+        const v = conf && conf.outputHeight != null ? Number(conf.outputHeight) : null;
         return v && isFinite(v) && v > 0 ? v : 200;
       } catch (e) {
         return 200;
@@ -469,14 +803,14 @@
     })();
     const outType = (() => {
       try {
-        return (activeConfig && activeConfig.outputType) ? String(activeConfig.outputType) : 'image/webp';
+        return (conf && conf.outputType) ? String(conf.outputType) : 'image/webp';
       } catch (e) {
         return 'image/webp';
       }
     })();
     const outQuality = (() => {
       try {
-        const v = activeConfig && activeConfig.outputQuality != null ? Number(activeConfig.outputQuality) : null;
+        const v = conf && conf.outputQuality != null ? Number(conf.outputQuality) : null;
         if (v != null && isFinite(v) && v > 0 && v <= 1) return v;
       } catch (e) {
       }
@@ -512,38 +846,43 @@
       }
 
       croppedImageBlob = blob;
+      try {
+        const key = getConfigKey(conf);
+        croppedBlobsById[key] = blob;
+      } catch (e) {
+      }
 
       try {
-        applyPreview(activeConfig, blob);
+        applyPreview(conf, blob);
       } catch (e) {
       }
 
       closeCropModal(false);
 
       try {
-        if (activeConfig && typeof activeConfig.onConfirm === 'function') {
-          activeConfig.onConfirm(blob);
+        if (conf && typeof conf.onConfirm === 'function') {
+          conf.onConfirm(blob);
         }
       } catch (e) {
       }
 
       try {
-        if (activeConfig && activeConfig.successToast && typeof window.showToast === 'function') {
-          window.showToast(String(activeConfig.successToast));
+        if (conf && conf.successToast && typeof window.showToast === 'function') {
+          window.showToast(String(conf.successToast));
         }
       } catch (e) {
       }
 
       try {
-        if (typeof window.showToast === 'function' && (!activeConfig || !activeConfig.onConfirm) && !activeConfig?.successToast) {
+        if (typeof window.showToast === 'function' && (!conf || !conf.onConfirm) && !conf?.successToast) {
           window.showToast('Обложка готова к сохранению');
         }
       } catch (e) {
       }
 
       try {
-        if (activeConfig && typeof activeConfig.onDirty === 'function') {
-          activeConfig.onDirty();
+        if (conf && typeof conf.onDirty === 'function') {
+          conf.onDirty();
         }
       } catch (e) {
       }
@@ -551,12 +890,29 @@
     }, outType, outQuality);
   }
 
-  function getCroppedBlob() {
+  function getCroppedBlob(key) {
+    if (key) {
+      return croppedBlobsById[key] || null;
+    }
     return croppedImageBlob;
   }
 
-  function clearCroppedBlob() {
+  function clearCroppedBlob(key) {
+    if (key) {
+      try {
+        delete croppedBlobsById[key];
+      } catch (e) {
+      }
+      return;
+    }
     croppedImageBlob = null;
+    try {
+      const k = getConfigKey(activeConfig);
+      if (k && k !== 'default') {
+        delete croppedBlobsById[k];
+      }
+    } catch (e) {
+    }
   }
 
   function triggerFilePicker(fileInput) {
@@ -577,21 +933,30 @@
   function bind(config) {
     activeConfig = config || {};
 
+    // Регистрируем конфигурацию по уникальному ключу, чтобы при выборе файла
+    // в конкретном input восстанавливать правильные параметры обрезки.
+    try {
+      const key = getConfigKey(activeConfig);
+      configsById[key] = activeConfig;
+    } catch (e) {
+    }
+
     const fileInput = getElById(activeConfig.fileInputId);
     const uploadBtn = getElById(activeConfig.uploadBtnId);
     const clickable = getElById(activeConfig.clickableId);
     const dropZone = getElById(activeConfig.dropZoneId || null);
 
-    if (uploadBtn && fileInput) {
+    // Новый порядок: сначала открываем модалку обрезки, а файл выбираем уже в ней.
+    if (uploadBtn) {
       if (!uploadBtn.getAttribute('data-cover-click-bound')) {
         uploadBtn.setAttribute('data-cover-click-bound', '1');
-        uploadBtn.addEventListener('click', () => triggerFilePicker(fileInput));
+        uploadBtn.addEventListener('click', () => openCropModal('', activeConfig));
       }
     }
-    if (clickable && fileInput) {
+    if (clickable) {
       if (!clickable.getAttribute('data-cover-click-bound')) {
         clickable.setAttribute('data-cover-click-bound', '1');
-        clickable.addEventListener('click', () => triggerFilePicker(fileInput));
+        clickable.addEventListener('click', () => openCropModal('', activeConfig));
       }
     }
     if (fileInput) {
@@ -602,11 +967,11 @@
     }
 
     // Drag & drop: кликабельная область, превью, явная drop-зона и сам кроп-модал
-    try { bindDropZone(clickable); } catch (e) {}
-    try { bindDropZone(dropZone); } catch (e) {}
+    try { bindDropZone(clickable, activeConfig); } catch (e) {}
+    try { bindDropZone(dropZone, activeConfig); } catch (e) {}
     const previewIds = normIdList(activeConfig && activeConfig.previewImgId);
     for (const id of previewIds) {
-      try { bindDropZone(getElById(id)); } catch (e) {}
+      try { bindDropZone(getElById(id), activeConfig); } catch (e) {}
     }
 
     const els = getModalEls(activeConfig);
@@ -625,9 +990,10 @@
 
     try {
       const cropContainer = els.modal ? els.modal.querySelector('.crop-container') : null;
-      bindDropZone(cropContainer);
+      bindDropZone(cropContainer, activeConfig);
     } catch (e) {}
 
+    try { bindSourceControls(); } catch (e) {}
     try { preventWindowDrop(); } catch (e) {}
     try { initFileDialogLock(); } catch (e) {}
   }
