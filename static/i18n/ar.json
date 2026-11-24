@@ -469,9 +469,7 @@
       "title": "معلومات",
       "close": "إغلاق",
       "my_resources": "مواردي",
-      "friends": "الأصدقاء",
-      "ratatype": "راتاتايب",
-      "dictations": "الإملاءات"
+      "friends": "الأصدقاء"
     },
     "delete_modal": {
       "title": "حذف الإملاء",

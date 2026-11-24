@@ -474,9 +474,7 @@
       "title": "Information",
       "close": "Close",
       "my_resources": "My resources",
-      "friends": "Friends",
-      "ratatype": "Ratatype",
-      "dictations": "Dictations"
+      "friends": "Friends"
     },
     "delete_modal": {
       "title": "Delete dictation",

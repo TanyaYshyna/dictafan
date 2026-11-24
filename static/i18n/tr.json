@@ -474,9 +474,7 @@
       "title": "Bilgi",
       "close": "Kapat",
       "my_resources": "Kaynaklarım",
-      "friends": "Arkadaşlar",
-      "ratatype": "Ratatype",
-      "dictations": "Dikteler"
+      "friends": "Arkadaşlar"
     },
     "delete_modal": {
       "title": "Dikteyi sil",

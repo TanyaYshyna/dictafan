@@ -474,9 +474,7 @@
       "title": "Информация",
       "close": "Закрыть",
       "my_resources": "Мои ресурсы",
-      "friends": "Друзья",
-      "ratatype": "Рататайп",
-      "dictations": "Диктанты"
+      "friends": "Друзья"
     },
     "delete_modal": {
       "title": "Удалить диктант",
