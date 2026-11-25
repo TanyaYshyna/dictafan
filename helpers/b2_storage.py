@@ -15,6 +15,7 @@ class B2Storage:
         return str(value).strip().lower() in {"true", "1", "yes", "y", "on"}
     
     def __init__(self):
+        self.provider = "b2"
         self.key_id = os.getenv('B2_APPLICATION_KEY_ID')
         self.application_key = os.getenv('B2_APPLICATION_KEY')
         self.bucket_name = os.getenv('B2_BUCKET_NAME')

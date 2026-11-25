@@ -35,6 +35,7 @@
 """
 
 import logging
+import mimetypes
 import os
 
 import boto3
@@ -286,8 +287,18 @@ class R2Storage:
             return None
 
         try:
+            extra_args = {}
+            # Явно сохраняем Content-Type при загрузке аудио/изображений/JSON:
+            # boto3 не всегда угадывает тип, а при раздаче через presigned GET
+            # браузер должен получить корректный заголовок.
+            guessed = mimetypes.guess_type(str(remote_path))[0]
+            if guessed:
+                extra_args["ContentType"] = guessed
             self.client.upload_file(
-                str(local_path), self.bucket_name, str(remote_path)
+                str(local_path),
+                self.bucket_name,
+                str(remote_path),
+                ExtraArgs=extra_args or None,
             )
             logger.info("File uploaded to R2: %s", remote_path)
             return self.get_download_url(remote_path)

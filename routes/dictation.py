@@ -64,16 +64,18 @@ def _try_send_local_audio(dictation_id, lang, filename):
 
 
 def _send_dictation_audio_from_b2(dictation_id, lang, filename):
-    """Получение аудио диктанта из B2 с fallback на локальные файлы.
+    """Получение аудио диктанта из активного хранилища (B2/R2) с fallback на локальные файлы.
 
-    Ожидаемый путь в B2:
+    Ожидаемый путь в хранилище:
       dictations/<dictation_id>/<lang>/<filename>
     где dictation_id в формате dict_<id>.
 
     Локальный fallback:
       static/data/dictations/<dictation_id>/<lang>/<filename>
     """
-    from helpers.b2_storage import b2_storage
+    from helpers.storage import get_storage
+
+    storage = get_storage()
 
     if not dictation_id or not dictation_id.startswith('dict_') or dictation_id.startswith('dict_temp_'):
         return jsonify({'error': f'Invalid dictation_id: {dictation_id}'}), 400
@@ -96,21 +98,21 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
     except Exception:
         pass
 
-    # Если B2 выключен — сразу пробуем локальный файл
-    if not b2_storage.enabled:
+    # Если хранилище выключено — сразу пробуем локальный файл
+    if not storage.enabled:
         local_resp = _try_send_local_audio(dictation_id, safe_lang, safe_name)
         if local_resp is not None:
             return local_resp
-        return jsonify({'error': 'B2 storage is disabled and local file not found'}), 503
+        return jsonify({'error': 'Storage is disabled and local file not found'}), 503
 
     remote_path = f"dictations/{dictation_id}/{safe_lang}/{safe_name}"
     try:
-        exists = b2_storage.file_exists(remote_path, raise_on_error=True)
+        exists = storage.file_exists(remote_path, raise_on_error=True)
     except Exception:
-        # B2 недоступен — пробуем локальный файл
+        # Хранилище недоступно — пробуем локальный файл
         try:
             current_app.logger.warning(
-                "[dictation_audio] B2 unavailable, trying local fallback dictation_id=%s lang=%s filename=%s",
+                "[dictation_audio] storage unavailable, trying local fallback dictation_id=%s lang=%s filename=%s",
                 dictation_id, safe_lang, safe_name,
             )
         except Exception:
@@ -118,19 +120,19 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
         local_resp = _try_send_local_audio(dictation_id, safe_lang, safe_name)
         if local_resp is not None:
             return local_resp
-        return jsonify({'error': 'B2 storage unavailable'}), 503
+        return jsonify({'error': 'Storage unavailable'}), 503
 
     if not exists:
         inferred_lang = _infer_lang_from_audio_filename(safe_name, fallback=safe_lang)
         if inferred_lang and inferred_lang != safe_lang:
             remote_path2 = f"dictations/{dictation_id}/{inferred_lang}/{safe_name}"
             try:
-                exists2 = b2_storage.file_exists(remote_path2, raise_on_error=True)
+                exists2 = storage.file_exists(remote_path2, raise_on_error=True)
             except Exception:
                 local_resp = _try_send_local_audio(dictation_id, safe_lang, safe_name)
                 if local_resp is not None:
                     return local_resp
-                return jsonify({'error': 'B2 storage unavailable'}), 503
+                return jsonify({'error': 'Storage unavailable'}), 503
             if exists2:
                 remote_path = remote_path2
                 exists = True
@@ -149,7 +151,7 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
     if not exists:
         try:
             current_app.logger.warning(
-                "[dictation_audio] NOT FOUND in B2 dictation_id=%s lang=%s filename=%s remote_path=%s, trying local fallback",
+                "[dictation_audio] NOT FOUND in storage dictation_id=%s lang=%s filename=%s remote_path=%s, trying local fallback",
                 dictation_id,
                 safe_lang,
                 safe_name,
@@ -167,7 +169,7 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
     tmp_path = tmp.name
     tmp.close()
 
-    ok = b2_storage.download_file(remote_path, tmp_path)
+    ok = storage.download_file(remote_path, tmp_path)
     if not ok:
         try:
             current_app.logger.warning(
@@ -186,7 +188,7 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
         local_resp = _try_send_local_audio(dictation_id, safe_lang, safe_name)
         if local_resp is not None:
             return local_resp
-        return jsonify({'error': 'Failed to download audio from B2'}), 502
+        return jsonify({'error': 'Failed to download audio from storage'}), 502
 
     @after_this_request
     def _cleanup_tmp(response):

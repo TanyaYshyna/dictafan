@@ -48,7 +48,6 @@ from helpers.db_telegram import (
 )
 from helpers.i18n import DEFAULT_UI_LANG, SUPPORTED_UI_LANGS
 from helpers.db_groups import ensure_personal_group_for_user
-from helpers.b2_storage import b2_storage
 
 user_bp = Blueprint('user', __name__, url_prefix='/user')
 
@@ -1059,32 +1058,35 @@ def api_upload_avatar():
 
         user_id = user_db['id']
         
-        # Всегда используем локальные URL для аватаров (B2 может вызывать SSL проблемы)
-        # Файлы сохраняются локально, а если B2 включён - дополнительно загружаются туда как бэкап
+        # Всегда используем локальные URL для аватаров (внешнее хранилище может вызывать SSL проблемы)
+        # Файлы сохраняются локально, а если хранилище включено - дополнительно загружаются туда как бэкап
+        from helpers.storage import get_storage
+        storage = get_storage()
+        provider = getattr(storage, 'provider', 'b2')
         avatar_large_url = f'/user/api/avatar?user_id={user_id}&size=large'
         avatar_small_url = f'/user/api/avatar?user_id={user_id}&size=small'
         
-        # Если включён B2 — загружаем туда как бэкап (но не используем URL для фронтенда)
-        if b2_storage.enabled:
+        # Если хранилище включено — загружаем туда как бэкап (но не используем URL для фронтенда)
+        if storage.enabled:
             user_id_folder = f"user_{user_id}"
 
             remote_large = f'avatars/{user_id_folder}/avatar.webp'
-            print(f"📤 Загрузка в B2: {remote_large}")
-            b2_large_result = b2_storage.upload_file(str(avatar_large_path), remote_large)
-            if b2_large_result:
-                print(f"✅ Загружено в B2: {remote_large}")
+            print(f"📤 Загрузка в {provider.upper()}: {remote_large}")
+            large_result = storage.upload_file(str(avatar_large_path), remote_large)
+            if large_result:
+                print(f"✅ Загружено в {provider.upper()}: {remote_large}")
             else:
-                print(f"❌ Ошибка загрузки в B2: {remote_large}")
+                print(f"❌ Ошибка загрузки в {provider.upper()}: {remote_large}")
 
             remote_small = f'avatars/{user_id_folder}/avatar_min.webp'
-            print(f"📤 Загрузка в B2: {remote_small}")
-            b2_small_result = b2_storage.upload_file(str(avatar_small_path), remote_small)
-            if b2_small_result:
-                print(f"✅ Загружено в B2: {remote_small}")
+            print(f"📤 Загрузка в {provider.upper()}: {remote_small}")
+            small_result = storage.upload_file(str(avatar_small_path), remote_small)
+            if small_result:
+                print(f"✅ Загружено в {provider.upper()}: {remote_small}")
             else:
-                print(f"❌ Ошибка загрузки в B2: {remote_small}")
+                print(f"❌ Ошибка загрузки в {provider.upper()}: {remote_small}")
         else:
-            print("ℹ️  B2 Storage выключен (B2_ENABLED=false или не настроен)")
+            print("ℹ️  Storage выключен (B2_ENABLED=false или не настроен)")
 
         # Возвращаем URL для фронтенда (вычислены по шаблону, ничего не храним в БД)
         return jsonify({
@@ -1139,16 +1141,17 @@ def api_get_avatar():
         avatar_path = os.path.join(user_folder, avatar_filename)
         
         # Принцип «сначала кеш, потом хранилище»:
-        # аватар отдаём из локального кеша, если он уже есть. B2 (платный file_exists +
+        # аватар отдаём из локального кеша, если он уже есть. Хранилище (платный file_exists +
         # download) дёргаем ТОЛЬКО когда локального файла нет.
-        from helpers.b2_storage import b2_storage
-        if not os.path.exists(avatar_path) and b2_storage.enabled:
+        from helpers.storage import get_storage
+        storage = get_storage()
+        if not os.path.exists(avatar_path) and storage.enabled:
             remote_path = f"avatars/user_{user_id}/{avatar_filename}"
             try:
-                if b2_storage.file_exists(remote_path):
-                    b2_storage.download_file(remote_path, avatar_path)
+                if storage.file_exists(remote_path):
+                    storage.download_file(remote_path, avatar_path)
             except Exception as e:
-                print(f"Error getting avatar from B2: {e}")
+                print(f"Error getting avatar from storage: {e}")
         
         # Проверяем локальный кэш или дефолтный аватар
         if not os.path.exists(avatar_path):

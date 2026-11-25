@@ -44,10 +44,10 @@ ALLOWED_IMAGE_EXTENSIONS = {".png", ".webp", ".jpg", ".jpeg", ".gif"}
 ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".ogg", ".wav", ".m4a", ".aac", ".webm"}
 
 
-def _get_b2():
-    from helpers.b2_storage import b2_storage
+def _get_storage():
+    from helpers.storage import get_storage
 
-    return b2_storage
+    return get_storage()
 
 
 def _get_local_base_dir() -> str:
@@ -80,18 +80,18 @@ def _read_config_local() -> dict:
 
 
 def _read_config_from_b2() -> dict:
-    b2 = _get_b2()
-    if not b2.enabled:
+    storage = _get_storage()
+    if not storage.enabled:
         return dict(DEFAULT_CONFIG)
 
     remote = f"{B2_PREFIX}/mults.json"
     tmp_path = None
     try:
-        if not b2.file_exists(remote):
+        if not storage.file_exists(remote):
             return dict(DEFAULT_CONFIG)
         fd, tmp_path = tempfile.mkstemp(prefix="mult_config_", suffix=".json")
         os.close(fd)
-        if not b2.download_file(remote, tmp_path):
+        if not storage.download_file(remote, tmp_path):
             return dict(DEFAULT_CONFIG)
         with open(tmp_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -139,8 +139,8 @@ def _write_config_local(config: dict) -> None:
 
 
 def _write_config_to_b2(config: dict) -> bool:
-    b2 = _get_b2()
-    if not b2.enabled:
+    storage = _get_storage()
+    if not storage.enabled:
         return False
 
     fd, tmp_path = tempfile.mkstemp(prefix="mult_config_", suffix=".json")
@@ -153,7 +153,7 @@ def _write_config_to_b2(config: dict) -> bool:
                 indent=2,
             )
             f.write("\n")
-        url = b2.upload_file(tmp_path, f"{B2_PREFIX}/mults.json")
+        url = storage.upload_file(tmp_path, f"{B2_PREFIX}/mults.json")
         return url is not None
     except Exception:
         return False
@@ -166,8 +166,8 @@ def _write_config_to_b2(config: dict) -> bool:
 
 def _migrate_local_to_b2() -> None:
     """При первом обращении заливаем локальные файлы мультиков в B2."""
-    b2 = _get_b2()
-    if not b2.enabled:
+    storage = _get_storage()
+    if not storage.enabled:
         return
 
     base = _get_local_base_dir()
@@ -187,17 +187,17 @@ def _migrate_local_to_b2() -> None:
             continue
         remote = f"{B2_PREFIX}/{name}"
         try:
-            if not b2.file_exists(remote):
-                b2.upload_file(local_path, remote)
+            if not storage.file_exists(remote):
+                storage.upload_file(local_path, remote)
         except Exception:
             continue
 
     # Конфиг — если его ещё нет в B2, но есть локально.
     try:
-        if not b2.file_exists(f"{B2_PREFIX}/mults.json"):
+        if not storage.file_exists(f"{B2_PREFIX}/mults.json"):
             local_config_path = _get_mult_config_path()
             if os.path.exists(local_config_path):
-                b2.upload_file(local_config_path, f"{B2_PREFIX}/mults.json")
+                storage.upload_file(local_config_path, f"{B2_PREFIX}/mults.json")
     except Exception:
         pass
 
@@ -219,8 +219,8 @@ def _read_config() -> dict:
     if local_cfg.get("saved_at"):
         return local_cfg
 
-    b2 = _get_b2()
-    if b2.enabled:
+    storage = _get_storage()
+    if storage.enabled:
         cfg = _read_config_from_b2()
         if cfg.get("mults"):
             try:
@@ -232,9 +232,9 @@ def _read_config() -> dict:
     return local_cfg
 
 
-def _has_config_in_b2(b2) -> bool:
+def _has_config_in_b2(storage) -> bool:
     try:
-        return bool(b2.file_exists(f"{B2_PREFIX}/mults.json"))
+        return bool(storage.file_exists(f"{B2_PREFIX}/mults.json"))
     except Exception:
         return False
 
@@ -374,15 +374,15 @@ def get_mult_asset(filename):
         return send_from_directory(os.path.dirname(local_path), name)
 
     # В кеше нет — пробуем скачать из B2 и синхронизировать локальный кеш.
-    b2 = _get_b2()
-    if b2.enabled:
+    storage = _get_storage()
+    if storage.enabled:
         remote = f"{B2_PREFIX}/{name}"
         tmp_path = None
         try:
-            if b2.file_exists(remote, raise_on_error=True):
+            if storage.file_exists(remote, raise_on_error=True):
                 fd, tmp_path = tempfile.mkstemp(prefix="mult_asset_", suffix=os.path.splitext(name)[1])
                 os.close(fd)
-                if b2.download_file(remote, tmp_path) and os.path.exists(tmp_path):
+                if storage.download_file(remote, tmp_path) and os.path.exists(tmp_path):
                     os.makedirs(os.path.dirname(local_path), exist_ok=True)
                     with open(tmp_path, "rb") as src, open(local_path, "wb") as dst:
                         dst.write(src.read())
@@ -438,10 +438,10 @@ def upload_mult_asset():
         return jsonify({"success": False, "error": f"Не удалось сохранить файл: {e}"}), 500
 
     uploaded = False
-    b2 = _get_b2()
-    if b2.enabled:
+    storage = _get_storage()
+    if storage.enabled:
         try:
-            uploaded = b2.upload_file(local_path, f"{B2_PREFIX}/{name}") is not None
+            uploaded = storage.upload_file(local_path, f"{B2_PREFIX}/{name}") is not None
         except Exception:
             uploaded = False
 

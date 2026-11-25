@@ -244,7 +244,9 @@ def api_get_book_cover():
     Отдаём Cache-Control: public, max-age — чтобы SW (staleWhileRevalidateImage) и браузер
     могли кешировать обложку, а не качать её снова при каждом открытии книги.
     """
-    from helpers.b2_storage import b2_storage
+    from helpers.storage import get_storage
+
+    storage = get_storage()
 
     try:
         from flask import after_this_request
@@ -272,7 +274,7 @@ def api_get_book_cover():
         if os.path.exists(local_path):
             return send_from_directory(covers_cache_dir, f"{book_id}.webp")
 
-        if not b2_storage.enabled:
+        if not storage.enabled:
             # fallback: дефолтная обложка
             default_path = os.path.join(data_base, "covers", "cover_en.webp")
             if os.path.exists(default_path):
@@ -295,7 +297,7 @@ def api_get_book_cover():
 
         ok = False
         try:
-            ok = b2_storage.download_file(remote_path_new, tmp_path)
+            ok = storage.download_file(remote_path_new, tmp_path)
         except Exception:
             ok = False
 
@@ -568,9 +570,9 @@ def api_create_book():
 
         # Обрабатываем обложку, если она была загружена
         if cover_file and cover_file.filename:
-            from helpers.b2_storage import b2_storage
-            if not b2_storage.enabled:
-                return jsonify({"success": False, "error": "B2 storage is disabled"}), 503
+            from helpers.storage import get_storage
+            if not get_storage().enabled:
+                return jsonify({"success": False, "error": "Storage is disabled"}), 503
 
             cover_url = _save_book_cover(book["id"], user["id"], cover_file)
             if not cover_url:
@@ -683,9 +685,9 @@ def api_update_book(book_id: int):
         
         # Обрабатываем обложку, если она была загружена
         if cover_file and cover_file.filename:
-            from helpers.b2_storage import b2_storage
-            if not b2_storage.enabled:
-                return jsonify({"success": False, "error": "B2 storage is disabled"}), 503
+            from helpers.storage import get_storage
+            if not get_storage().enabled:
+                return jsonify({"success": False, "error": "Storage is disabled"}), 503
 
             cover_url = _save_book_cover(book_id, user["id"], cover_file)
             if not cover_url:
@@ -917,7 +919,7 @@ def api_delete_book(book_id: int):
     if book["creator_user_id"] != user["id"]:
         return jsonify({"success": False, "error": "You don't have permission to delete this book"}), 403
 
-    from helpers.b2_storage import b2_storage
+    from helpers.storage import get_storage
     from routes.index import (
         _get_static_data_base_dir,
         load_categories,
@@ -953,27 +955,29 @@ def api_delete_book(book_id: int):
             logger.warning("Не удалось почистить categories.json при удалении книги: %s", exc)
 
     # 2. Очистка B2: обложки книг, аудио диктантов, обложки диктантов.
+    storage = get_storage()
+
     for bid in deleted_book_ids:
         try:
-            if b2_storage.enabled:
-                b2_storage.delete_file(f"books_covers/{bid}.webp")
+            if storage.enabled:
+                storage.delete_file(f"books_covers/{bid}.webp")
         except Exception as exc:
-            logger.warning("Не удалось удалить обложку книги %s из B2: %s", bid, exc)
+            logger.warning("Не удалось удалить обложку книги %s из хранилища: %s", bid, exc)
 
     for did in dictation_ids:
         dictation_id_str = f"dict_{did}"
         try:
-            if b2_storage.enabled:
-                b2_storage.delete_prefix(f"dictations/{dictation_id_str}/")
+            if storage.enabled:
+                storage.delete_prefix(f"dictations/{dictation_id_str}/")
         except Exception as exc:
-            logger.warning("Не удалось удалить аудио диктанта %s из B2: %s", dictation_id_str, exc)
+            logger.warning("Не удалось удалить аудио диктанта %s из хранилища: %s", dictation_id_str, exc)
         try:
-            if b2_storage.enabled:
+            if storage.enabled:
                 cover_path = f"dictations_covers/{did}.webp"
-                if b2_storage.file_exists(cover_path):
-                    b2_storage.delete_file(cover_path)
+                if storage.file_exists(cover_path):
+                    storage.delete_file(cover_path)
         except Exception as exc:
-            logger.warning("Не удалось удалить обложку диктанта %s из B2: %s", did, exc)
+            logger.warning("Не удалось удалить обложку диктанта %s из хранилища: %s", did, exc)
 
     # 3. Очистка локальных файлов диктантов.
     for did in dictation_ids:
@@ -1018,7 +1022,7 @@ def _save_book_cover(book_id: int, creator_user_id: int, cover_file) -> str:
     Frontend уже отправляет готовое изображение 200x200 в формате webp.
     Возвращает URL обложки или None в случае ошибки.
     """
-    from helpers.b2_storage import b2_storage
+    from helpers.storage import get_storage
 
     try:
         logger.info(
@@ -1027,15 +1031,15 @@ def _save_book_cover(book_id: int, creator_user_id: int, cover_file) -> str:
             creator_user_id,
             getattr(cover_file, "filename", None),
             getattr(cover_file, "content_type", None),
-            bool(getattr(b2_storage, "enabled", False)),
+            bool(getattr(get_storage(), "enabled", False)),
         )
         # Проверяем, что это изображение
         if not cover_file.content_type.startswith("image/"):
             logger.warning("Файл обложки не является изображением: %s", cover_file.content_type)
             return None
 
-        if not b2_storage.enabled:
-            logger.error("B2 storage is disabled; refusing to save book cover (Option A)")
+        if not get_storage().enabled:
+            logger.error("Storage is disabled; refusing to save book cover (Option A)")
             return None
 
         # Открываем изображение
@@ -1066,7 +1070,7 @@ def _save_book_cover(book_id: int, creator_user_id: int, cover_file) -> str:
             image.save(tmp_path, "WEBP", quality=90)
 
             remote_path = f"books_covers/{book_id}.webp"
-            uploaded = b2_storage.upload_file(tmp_path, remote_path)
+            uploaded = get_storage().upload_file(tmp_path, remote_path)
             if uploaded:
                 cover_url = f"/library/api/book-cover?book_id={book_id}&user_id={creator_user_id}&filename=cover.webp"
                 logger.info("Обложка книги загружена в B2: %s", remote_path)

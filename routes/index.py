@@ -491,7 +491,9 @@ def delete_dictation(dictation_id):
 
     from helpers.db_dictations import get_dictation_by_id, delete_dictation as delete_dictation_from_db
     from helpers.db import get_db_cursor
-    from helpers.b2_storage import b2_storage
+    from helpers.storage import get_storage
+
+    storage = get_storage()
 
     data_base = _get_static_data_base_dir()
     dictation_path = os.path.join(data_base, "dictations", dictation_id)
@@ -560,18 +562,18 @@ def delete_dictation(dictation_id):
     except (ValueError, Exception) as e:
         logger.warning(f"Не удалось удалить из БД: {e}")
 
-    # 3. Удаляем файлы из B2 (если B2 включен)
+    # 3. Удаляем файлы из хранилища (если включено)
     removed_from_b2 = False
-    if b2_storage.enabled:
+    if storage.enabled:
         try:
-            # Нормализуем ID для B2: в B2 файлы лежат в папке dict_XX
-            b2_dictation_id = dictation_id
-            if not b2_dictation_id.startswith('dict_'):
-                b2_dictation_id = 'dict_' + b2_dictation_id
+            # Нормализуем ID для хранилища: файлы лежат в папке dict_XX
+            storage_dictation_id = dictation_id
+            if not storage_dictation_id.startswith('dict_'):
+                storage_dictation_id = 'dict_' + storage_dictation_id
 
-            # Удаляем все файлы диктанта в B2 по prefix (B2 не умеет папки, удаляем по одному)
+            # Удаляем все файлы диктанта по prefix
             try:
-                deleted_media = b2_storage.delete_prefix(f"dictations/{b2_dictation_id}/")
+                deleted_media = storage.delete_prefix(f"dictations/{storage_dictation_id}/")
                 if deleted_media and deleted_media > 0:
                     removed_from_b2 = True
             except Exception:
@@ -581,13 +583,13 @@ def delete_dictation(dictation_id):
             try:
                 numeric_id = dictation_id.replace('dict_', '')
                 cover_path = f"dictations_covers/{numeric_id}.webp"
-                if b2_storage.file_exists(cover_path):
-                    if b2_storage.delete_file(cover_path):
+                if storage.file_exists(cover_path):
+                    if storage.delete_file(cover_path):
                         removed_from_b2 = True
             except Exception:
                 pass
         except Exception as e:
-            logger.warning(f"Не удалось удалить из B2: {e}")
+            logger.warning(f"Не удалось удалить из хранилища: {e}")
 
     # 4. Удаляем локальные файлы
     removed_files = False
@@ -1030,7 +1032,9 @@ def api_get_dictation_cover_webp(numeric_id: int):
     2) Иначе один раз скачиваем из B2 в локальный кеш и отдаём.
     3) Если в B2 нет — 404 (фронт подставит fallback через onerror).
     """
-    from helpers.b2_storage import b2_storage
+    from helpers.storage import get_storage
+
+    storage = get_storage()
 
     try:
         if not numeric_id or numeric_id <= 0:
@@ -1045,8 +1049,8 @@ def api_get_dictation_cover_webp(numeric_id: int):
         if os.path.exists(local_path):
             return send_from_directory(covers_cache_dir, f"{numeric_id}.webp")
 
-        if not b2_storage.enabled:
-            return jsonify({'error': 'B2 storage is disabled'}), 503
+        if not storage.enabled:
+            return jsonify({'error': 'Storage is disabled'}), 503
 
         remote_path_new = f"dictations_covers/{numeric_id}.webp"
 
@@ -1065,7 +1069,7 @@ def api_get_dictation_cover_webp(numeric_id: int):
 
         ok = False
         try:
-            ok = b2_storage.download_file(remote_path_new, tmp_path)
+            ok = storage.download_file(remote_path_new, tmp_path)
         except Exception:
             ok = False
 

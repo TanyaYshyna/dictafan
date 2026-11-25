@@ -26,7 +26,6 @@ from PIL import Image
 from helpers.language_data import load_language_data
 from helpers.user_helpers import get_safe_email_from_token, get_current_user 
 from routes.index import get_cover_url_for_id
-from helpers.b2_storage import b2_storage
 from helpers.db_dictations import create_dictation, update_dictation, get_dictation_by_id
 from helpers.db_users import get_user_by_email
 
@@ -244,24 +243,34 @@ def generate_audio():
 # ==============================================================
 @editor_bp.route('/api/b2/health', methods=['GET'])
 def api_b2_health():
-    """Проверяет, работает ли B2 Storage. Не делает платных запросов к B2 API."""
+    """Проверяет, работает ли активное хранилище (B2 или R2).
+
+    Формат ответа сохранён для обратной совместимости (sw_status_bar.js).
+    Для B2 выполняется только локальная проверка bucket (без платного запроса),
+    для R2 — локальная проверка клиента; реальные сетевые проверки не делаются.
+    """
     try:
-        from helpers.b2_storage import b2_storage
-        if not b2_storage.enabled:
-            return jsonify({'success': True, 'status': 'disabled', 'message': 'B2 Storage отключён'})
-        
-        # Проверяем, инициализирован ли bucket (без платного запроса к API)
-        if b2_storage.bucket is not None:
-            return jsonify({'success': True, 'status': 'ok', 'message': 'B2 Storage работает'})
-        
+        from helpers.storage import get_storage
+
+        storage = get_storage()
+        provider = getattr(storage, 'provider', 'b2').upper()
+
+        if not storage.enabled:
+            return jsonify({'success': True, 'status': 'disabled', 'message': f'{provider} Storage отключён'})
+
+        # Проверяем, инициализирован ли клиент/бакет (без платного запроса к API).
+        # bucket — псевдоним для boto3-клиента в R2 и объект bucket в B2.
+        if storage.bucket is not None:
+            return jsonify({'success': True, 'status': 'ok', 'message': f'{provider} Storage работает'})
+
         # Пытаемся переинициализировать
-        ok = b2_storage._ensure_initialized()
-        if ok and b2_storage.bucket is not None:
-            return jsonify({'success': True, 'status': 'ok', 'message': 'B2 Storage работает (переинициализирован)'})
-        
-        return jsonify({'success': True, 'status': 'error', 'message': 'B2 Storage не инициализирован. Проверь ключи в переменных окружения.'})
+        ok = storage._ensure_initialized()
+        if ok and storage.bucket is not None:
+            return jsonify({'success': True, 'status': 'ok', 'message': f'{provider} Storage работает (переинициализирован)'})
+
+        return jsonify({'success': True, 'status': 'error', 'message': f'{provider} Storage не инициализирован. Проверь ключи в переменных окружения.'})
     except Exception as e:
-        logger.error(f"B2 health check error: {e}", exc_info=True)
+        logger.error(f"storage health check error: {e}", exc_info=True)
         return jsonify({'success': False, 'status': 'error', 'message': f'Ошибка: {e}'}), 500
 
 
@@ -269,6 +278,8 @@ def api_b2_health():
 @jwt_required()
 def api_b2_get_upload_url():
     try:
+        from helpers.b2_storage import b2_storage
+
         if not b2_storage.enabled or not b2_storage.bucket:
             return jsonify({'success': False, 'error': 'B2 storage is disabled'}), 503
 
@@ -327,8 +338,11 @@ def api_b2_get_upload_url():
 @jwt_required()
 def api_b2_get_download_url():
     try:
-        if not b2_storage.enabled or not b2_storage.bucket:
-            return jsonify({'success': False, 'error': 'B2 storage is disabled'}), 503
+        from helpers.storage import get_storage
+
+        storage = get_storage()
+        if not storage.enabled or not storage.bucket:
+            return jsonify({'success': False, 'error': 'Storage is disabled'}), 503
 
         data = request.get_json(silent=True) or {}
         dictation_id_raw = str(data.get('dictation_id') or '').strip()
@@ -350,9 +364,9 @@ def api_b2_get_download_url():
 
         remote_path = f"dictations/{dictation_id}/{lang}/{filename}"
 
-        url = b2_storage.get_download_url(remote_path)
+        url = storage.get_download_url(remote_path)
         if not url:
-            logger.error('[b2_get_download_url] failed remote_path=%s', remote_path)
+            logger.error('[get_download_url] failed remote_path=%s', remote_path)
             return jsonify({'success': False, 'error': 'Failed to get download URL'}), 502
 
         try:
@@ -375,9 +389,12 @@ def api_b2_cleanup_dictation_audio():
       dictations/<dictation_id>/<lang>/<filename>
     where dictation_id is in format dict_<id>.
     """
+    from helpers.storage import get_storage
+
+    storage = get_storage()
     try:
-        if not b2_storage.enabled or not b2_storage.bucket:
-            return jsonify({'success': False, 'error': 'B2 storage is disabled'}), 503
+        if not storage.enabled or not storage.bucket:
+            return jsonify({'success': False, 'error': 'Storage is disabled'}), 503
 
         data = request.get_json(silent=True) or {}
         dictation_id = str(data.get('dictation_id') or '').strip()
@@ -468,7 +485,7 @@ def api_b2_cleanup_dictation_audio():
                 pass
             return jsonify({'success': False, 'error': 'Refusing to cleanup: keep list is empty'}), 400
 
-        existing = b2_storage.list_files(prefix)
+        existing = storage.list_files(prefix)
         deleted = 0
         skipped = 0
         for name in existing:
@@ -476,7 +493,7 @@ def api_b2_cleanup_dictation_audio():
                 if name in keep_set:
                     skipped += 1
                     continue
-                if b2_storage.delete_file(name):
+                if storage.delete_file(name):
                     deleted += 1
             except Exception:
                 continue
@@ -533,6 +550,9 @@ def save_dictation_final():
     from helpers.db_books import add_dictation_to_book
     from helpers.db_users import get_user_by_email
     from flask_jwt_extended import get_jwt_identity
+    from helpers.storage import get_storage
+
+    storage = get_storage()
     
     try:
         data = request.get_json()
@@ -1120,14 +1140,14 @@ def save_dictation_final():
                         shutil.copy2(src_file, dst_file)
                         logger.info(f"Скопирован аудиофайл: {rel_path}")
                         
-                        # Загружаем в B2, если включено (используем правильный формат dict_<id>)
-                        if b2_storage.enabled:
+                        # Загружаем в хранилище, если включено (используем правильный формат dict_<id>)
+                        if storage.enabled:
                             remote_path = f"dictations/{dictation_id}/{rel_path.replace(os.sep, '/')}"
-                            b2_url = b2_storage.upload_file(dst_file, remote_path)
-                            if b2_url:
-                                logger.info(f"Аудиофайл загружен в B2: {remote_path}")
+                            storage_url = storage.upload_file(dst_file, remote_path)
+                            if storage_url:
+                                logger.info(f"Аудиофайл загружен в хранилище: {remote_path}")
                             else:
-                                logger.warning(f"Не удалось загрузить в B2: {remote_path}")
+                                logger.warning(f"Не удалось загрузить в хранилище: {remote_path}")
 
             try:
                 if keep_rel_paths_posix:
@@ -1182,11 +1202,11 @@ def save_dictation_final():
                 except Exception as e:
                     logger.warning(f"⚠️ Не удалось обновить локальный кеш ковера: {e}")
 
-                # Загружаем обложку в B2
-                if b2_storage.enabled:
+                # Загружаем обложку в хранилище
+                if storage.enabled:
                     remote_path = f"dictations_covers/{numeric_id}.webp"
-                    b2_storage.upload_file(cover_dst, remote_path)
-                    logger.info(f"✅ Ковер загружен в B2: {remote_path}")
+                    storage.upload_file(cover_dst, remote_path)
+                    logger.info(f"✅ Ковер загружен в хранилище: {remote_path}")
             else:
                 logger.warning(f"⚠️ Ковер не найден в temp папке: {temp_path}/cover.webp")
 
@@ -1202,29 +1222,29 @@ def save_dictation_final():
         # После сохранения и загрузки новых файлов в B2,
         # удаляем orphan'ы: файлы в B2, которых нет в новом keep-списке.
         # keep_audio_relpaths уже содержит все имена из sentences_data (+ shared audio).
-        if b2_storage.enabled and keep_audio_relpaths:
+        if storage.enabled and keep_audio_relpaths:
             try:
-                b2_prefix = f"dictations/{dictation_id}/"
+                storage_prefix = f"dictations/{dictation_id}/"
                 keep_set = set()
                 for rel in keep_audio_relpaths:
-                    keep_set.add(f"{b2_prefix}{rel}")
+                    keep_set.add(f"{storage_prefix}{rel}")
 
-                existing = b2_storage.list_files(b2_prefix)
+                existing = storage.list_files(storage_prefix)
                 deleted = 0
                 for name in existing:
                     if name in keep_set:
                         continue
                     try:
-                        if b2_storage.delete_file(name):
+                        if storage.delete_file(name):
                             deleted += 1
                     except Exception:
                         continue
                 logger.info(
-                    "B2 cleanup: dictation_id=%s existing=%s keep=%s deleted=%s",
+                    "storage cleanup: dictation_id=%s existing=%s keep=%s deleted=%s",
                     dictation_id, len(existing), len(keep_set), deleted,
                 )
             except Exception as e:
-                logger.warning(f"B2 orphan cleanup failed (non-critical): {e}")
+                logger.warning(f"storage orphan cleanup failed (non-critical): {e}")
 
         # Если диктант был создан из приватной библиотеки и передан book_id,
         # привязываем его к книге/разделу через таблицу book_dictations
