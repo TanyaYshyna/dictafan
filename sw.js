@@ -1189,6 +1189,38 @@ async function purgeDictationFromMediaCache(dictationId) {
   return { deleted, dictationId: dictKey };
 }
 
+async function purgeDictationCoverFromMediaCache(dictationId) {
+  // Удаляем ТОЛЬКО обложку /api/dictations_covers/<id>.webp из медиа-кеша.
+  // Аудио /api/dictations/dict_123/... НЕ трогаем — оно нужно для фоновой
+  // загрузки на B2, которая запускается сразу после очистки ковера.
+  const cache = await caches.open(MEDIA_CACHE_PERSIST);
+  const keys = await cache.keys();
+
+  const dictKey = String(dictationId || '').trim();
+  if (!dictKey) return { deleted: 0, dictationId: dictKey };
+
+  const numericId = dictKey.startsWith('dict_')
+    ? dictKey.replace(/^dict_/, '')
+    : dictKey;
+
+  let deleted = 0;
+  for (const req of keys) {
+    try {
+      const path = new URL(req.url).pathname;
+
+      // Обложка: /api/dictations_covers/<id>.webp
+      if (path === `/api/dictations_covers/${numericId}.webp` || path === `/api/dictations_covers/${dictKey}.webp`) {
+        const ok = await cache.delete(req);
+        if (ok) deleted += 1;
+      }
+    } catch (e) {
+      // игнорируем
+    }
+  }
+
+  return { deleted, dictationId: dictKey };
+}
+
 async function promoteDraftDictationCache(fromDictationId, toDictationId) {
   // Дублируем черновое аудио в кеше, не обращаясь к сети:
   // источник: /api/dictations/<fromId>/<lang>/<file>
@@ -1307,6 +1339,12 @@ self.addEventListener('message', (event) => {
         } else {
           respond({ success: false, error: 'prefetch_failed', result: res });
         }
+        return;
+      }
+
+      if (action === 'purgeDictationCover') {
+        const res = await purgeDictationCoverFromMediaCache(data.dictationId);
+        respond({ success: true, result: res });
         return;
       }
 

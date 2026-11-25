@@ -245,11 +245,14 @@ async function _purgeDictationCoverFromSwCache(dictationId) {
     // 1) Через DictationKart._swRequest (если доступен).
     if (window.DictationKart && typeof window.DictationKart._swRequest === 'function') {
       try {
-        await window.DictationKart._swRequest('purgeDictation', { dictationId: dictKey });
+        // ВАЖНО: purgeDictationCover удаляет ТОЛЬКО обложку. Использование
+        // purgeDictation здесь удаляло бы и аудио /api/dictations/dict_.../,
+        // которое в этот момент ещё нужно для фоновой загрузки на B2.
+        await window.DictationKart._swRequest('purgeDictationCover', { dictationId: dictKey });
         console.log('[dictationEditorModal] SW-кеш ковера очищен через DictationKart:', dictKey);
         return;
       } catch (e) {
-        console.warn('[dictationEditorModal] _swRequest purgeDictation не удался, пробуем прямой postMessage:', e);
+        console.warn('[dictationEditorModal] _swRequest purgeDictationCover не удался, пробуем прямой postMessage:', e);
       }
     }
 
@@ -270,7 +273,7 @@ async function _purgeDictationCoverFromSwCache(dictationId) {
         };
         try {
           navigator.serviceWorker.controller.postMessage(
-            { action: 'purgeDictation', dictationId: dictKey, requestId: 'cover_purge_' + numericId },
+            { action: 'purgeDictationCover', dictationId: dictKey, requestId: 'cover_purge_' + numericId },
             [channel.port2]
           );
         } catch (e) {
