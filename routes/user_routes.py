@@ -31,6 +31,12 @@ from helpers.db_users import (
     verify_user_password,
     create_password_reset_token,
     reset_password_by_token,
+    create_email_verification_code,
+    verify_email_code,
+    is_email_verified,
+    mark_email_verified,
+    EMAIL_VERIFICATION_CODE_TTL_SECONDS,
+    EMAIL_VERIFICATION_CODE_COOLDOWN_SECONDS,
 )
 from helpers.db_history import (
     calculate_streak_days,
@@ -88,13 +94,29 @@ def generate_simple_user_id():
 
 # ==================== НОВЫЕ API ЭНДПОЙНТЫ (JWT) ====================
 
+def _send_verification_email(email: str) -> None:
+    """Генерирует код подтверждения и отправляет его на почту пользователя."""
+    code = create_email_verification_code(email)
+    if not code:
+        return
+
+    subject = 'Dictafan: код подтверждения почты'
+    text_body = (
+        'Добро пожаловать в Dictafan!\n\n'
+        f'Ваш код подтверждения почты: {code}\n\n'
+        'Код действителен 5 минут. Введите его в окне подтверждения.\n\n'
+        'Если вы не регистрировались на Dictafan — просто проигнорируйте письмо.'
+    )
+    send_email(email, subject, text_body)
+
+
 @user_bp.route('/api/register', methods=['POST'])
 def api_register():
     """Регистрация через API"""
     data = request.get_json()
-    email = data.get('email')
+    email = (data.get('email') or '').strip().lower()
     password = data.get('password')
-    username = data.get('username')
+    username = (data.get('username') or '').strip()
     native_language = (data.get('native_language') or 'ru').lower()
     learning_language = (data.get('learning_language') or 'en').lower()
 
@@ -154,20 +176,23 @@ def api_register():
     except Exception:
         pass
 
-    # Создаем токен (identity = email, как и раньше)
-    access_token = create_access_token(identity=email)
-    
-    # Формируем ответ и записываем токен и в куки, и в тело ответа
-    response = jsonify({
-        'message': 'User created successfully',
-        'access_token': access_token,
-        'user': user_response
-    })
-    # Куки нужны для работы @jwt_required() на обычных HTML-страницах (напр. /library/private)
-    set_access_cookies(response, access_token)
+    # Генерируем и отправляем код подтверждения почты.
+    # Токен пока НЕ выдаём: пользователь должен подтвердить адрес.
+    try:
+        _send_verification_email(email)
+    except Exception as exc:
+        print(f"❌ Ошибка отправки кода подтверждения почты при регистрации: {exc}")
 
     # Сохраняем выбранный язык интерфейса в cookie, чтобы после перезагрузки
     # страница сразу отрендерилась на нужном языке (SSR).
+    response = jsonify({
+        'message': 'User created successfully',
+        'requires_verification': True,
+        'email': email,
+        'verification_ttl_seconds': EMAIL_VERIFICATION_CODE_TTL_SECONDS,
+        'verification_cooldown_seconds': EMAIL_VERIFICATION_CODE_COOLDOWN_SECONDS,
+        'user': user_response,
+    })
     ui_lang = str(data.get('ui_lang') or '').strip().lower()
     if ui_lang not in SUPPORTED_UI_LANGS:
         ui_lang = native_language if native_language in SUPPORTED_UI_LANGS else DEFAULT_UI_LANG
@@ -176,6 +201,62 @@ def api_register():
     except Exception:
         pass
 
+    return response
+
+
+@user_bp.route('/api/email_verification/resend', methods=['POST'])
+def api_email_verification_resend():
+    """Повторно отправить код подтверждения почты."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({'success': False, 'error': 'Email is required'}), 400
+
+    user_db = get_user_by_email(email)
+    if not user_db:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    if is_email_verified(email):
+        return jsonify({'success': False, 'error': 'Email already verified'}), 400
+
+    try:
+        _send_verification_email(email)
+    except Exception as exc:
+        print(f"❌ Ошибка повторной отправки кода подтверждения почты: {exc}")
+        return jsonify({'success': False, 'error': 'email_send_failed'}), 500
+
+    return jsonify({
+        'success': True,
+        'cooldown_seconds': EMAIL_VERIFICATION_CODE_COOLDOWN_SECONDS,
+    })
+
+
+@user_bp.route('/api/email_verification/verify', methods=['POST'])
+def api_email_verification_verify():
+    """Подтвердить почту кодом и выдать токен."""
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    code = (data.get('code') or '').strip()
+
+    if not email or not code:
+        return jsonify({'success': False, 'error': 'Email and code are required'}), 400
+
+    user_db = get_user_by_email(email)
+    if not user_db:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    if not verify_email_code(email, code):
+        return jsonify({'success': False, 'error': 'Invalid or expired code'}), 400
+
+    # Код верный — выдаём токен
+    access_token = create_access_token(identity=email)
+    response = jsonify({
+        'success': True,
+        'message': 'Email verified',
+        'access_token': access_token,
+        'user': user_db,
+    })
+    set_access_cookies(response, access_token)
     return response
 
 
@@ -301,6 +382,13 @@ def google_oauth_callback():
     try:
         from helpers.license_manager import license_manager
         license_manager.assign_free_license(int(user_response.get('id')))
+    except Exception:
+        pass
+
+    # Google уже подтвердил адрес электронной почты, поэтому дополнительный
+    # код на почту не отправляем — просто помечаем email как проверенный.
+    try:
+        mark_email_verified(email)
     except Exception:
         pass
 

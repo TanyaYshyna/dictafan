@@ -720,7 +720,8 @@
       "login_required": "Yetkilendirme gerekli",
       "register": "Kayıt ol",
       "forgot": "Şifre kurtarma",
-      "reset": "Yeni şifre"
+      "reset": "Yeni şifre",
+      "verify_email": "E-postanızı kontrol edin"
     },
     "messages": {
       "login_required": "Uygulamayı kullanmak için giriş yapmalısınız",
@@ -730,7 +731,10 @@
       "reset": "Kodu yapıştırın ve yeni bir şifre belirleyin",
       "reset_sent_email": "Hesap mevcutsa — e-postanıza şifre sıfırlama bağlantısı gönderildi.",
       "reset_sent_telegram": "Hesap mevcutsa ve Telegram bağlıysa — Telegram'a şifre sıfırlama bağlantısı gönderildi.",
-      "password_updated": "Şifre güncellendi. Artık giriş yapabilirsiniz."
+      "password_updated": "Şifre güncellendi. Artık giriş yapabilirsiniz.",
+      "verify_email": "Verdiğiniz e-posta adresine bir doğrulama kodu gönderdik",
+      "verification_timer": "Kod {seconds} saniye daha geçerli.",
+      "verification_resent": "E-postanıza yeni bir kod gönderildi"
     },
     "fields": {
       "username": "Kullanıcı adı",
@@ -743,7 +747,8 @@
       "username": "Size nasıl hitap edelim?",
       "password": "Şifreniz",
       "password_min": "En az 6 karakter",
-      "code": "bağlantıdaki kodu yapıştırın"
+      "code": "bağlantıdaki kodu yapıştırın",
+      "verification_code": "6 haneli kod"
     },
     "actions": {
       "login": "Giriş yap",
@@ -756,7 +761,10 @@
       "back_to_login": "Girişe geri dön",
       "save": "Kaydet",
       "show_password": "Şifreyi göster",
-      "hide_password": "Şifreyi gizle"
+      "hide_password": "Şifreyi gizle",
+      "confirm_email": "Hesabı etkinleştir",
+      "resend_code": "Kodu yeniden gönder",
+      "back_to_register": "Kayda geri dön"
     },
     "hints": {
       "no_account_prefix": "Hesabınız yok mu?",
@@ -776,13 +784,17 @@
       "login_network": "Giriş yaparken bir hata oluştu. Lütfen tekrar deneyin.",
       "register_failed": "Kayıt hatası",
       "register_network": "Kayıt olurken bir hata oluştu. Lütfen tekrar deneyin.",
-      "generic": "Hata"
+      "generic": "Hata",
+      "enter_code": "E-postadaki kodu girin",
+      "verification_no_email": "E-posta adresi bulunamadı",
+      "verification_failed": "Kod geçersiz veya süresi dolmuş"
     },
     "states": {
       "sending": "Gönderiliyor…",
       "saving": "Kaydediliyor…",
       "logging_in": "Giriş yapılıyor…",
-      "creating_account": "Hesap oluşturuluyor…"
+      "creating_account": "Hesap oluşturuluyor…",
+      "verifying": "Doğrulanıyor…"
     }
   },
   "desktop": {

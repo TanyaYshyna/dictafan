@@ -720,7 +720,8 @@
         "login_required": "Authorization required",
         "register": "Sign up",
         "forgot": "Password recovery",
-        "reset": "New password"
+        "reset": "New password",
+        "verify_email": "Check your email"
       },
       "messages": {
         "login_required": "To use the app, you need to sign in",
@@ -730,7 +731,10 @@
         "reset": "Paste the code and set a new password",
         "reset_sent_email": "If the account exists — a password reset link has been sent to your email.",
         "reset_sent_telegram": "If the account exists and Telegram is linked — a password reset link has been sent to Telegram.",
-        "password_updated": "Password updated. You can sign in now."
+        "password_updated": "Password updated. You can sign in now.",
+        "verify_email": "We have sent a verification code to the email address you provided",
+        "verification_timer": "The code is valid for {seconds} more seconds.",
+        "verification_resent": "A new code has been sent to your email"
       },
       "fields": {
         "username": "Username",
@@ -743,7 +747,8 @@
         "username": "How should we call you?",
         "password": "Your password",
         "password_min": "At least 6 characters",
-        "code": "paste the code from the link"
+        "code": "paste the code from the link",
+        "verification_code": "6-digit code"
       },
       "actions": {
         "login": "Sign in",
@@ -756,7 +761,10 @@
         "back_to_login": "Back to sign in",
         "save": "Save",
         "show_password": "Show password",
-        "hide_password": "Hide password"
+        "hide_password": "Hide password",
+        "confirm_email": "Activate account",
+        "resend_code": "Resend code",
+        "back_to_register": "Back to sign up"
       },
       "hints": {
         "no_account_prefix": "No account?",
@@ -776,13 +784,17 @@
         "login_network": "An error occurred while signing in. Please try again.",
         "register_failed": "Registration error",
         "register_network": "An error occurred while signing up. Please try again.",
-        "generic": "Error"
+        "generic": "Error",
+        "enter_code": "Enter the code from the email",
+        "verification_no_email": "Email address not found",
+        "verification_failed": "Invalid or expired code"
       },
       "states": {
         "sending": "Sending…",
         "saving": "Saving…",
         "logging_in": "Signing in…",
-        "creating_account": "Creating account…"
+        "creating_account": "Creating account…",
+        "verifying": "Verifying…"
       }
     },
   "desktop": {

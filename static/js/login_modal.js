@@ -207,6 +207,42 @@ const __DICTAFAN_LOGIN_MODAL_HTML = `
                 <span id="registerAlreadyPrefix"></span> <a href="#" id="switchToLoginLink"></a>
             </p>
         </form>
+
+        <form id="verifyEmailModalForm" class="login-form" style="display: none;" autocomplete="off" data-form-type="verify_email">
+            <div class="form-row">
+                <label for="verifyEmailModalEmail"></label>
+                <div id="verifyEmailModalEmail" class="verify-email-address" style="font-weight: 600; word-break: break-all; padding: 4px 2px;"></div>
+            </div>
+
+            <div class="form-row">
+                <label for="verifyEmailCode"></label>
+                <input
+                    id="verifyEmailCode"
+                    class="text-input auth-input"
+                    type="text"
+                    name="code"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    maxlength="6"
+                    required
+                >
+            </div>
+
+            <div id="verifyEmailTimer" class="form-message" style="display: none;"></div>
+            <div id="verifyEmailErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+            <div class="login-form-actions">
+                <button type="submit" class="button-color-yellow auth-submit" id="verifyEmailSubmitBtn"></button>
+            </div>
+
+            <div class="login-form-actions" style="margin-top: 10px;">
+                <button type="button" class="button-color-transparent auth-submit" id="verifyEmailResendBtn" disabled></button>
+            </div>
+
+            <p class="form-note">
+                <a href="#" id="switchBackToRegisterFromVerifyLink"></a>
+            </p>
+        </form>
     </div>
 </div>
 `;
@@ -216,9 +252,91 @@ class LoginModal {
         this.modal = null;
         this.isVisible = false;
         this.pendingResolve = null;
-        this.mode = 'login'; // 'login' или 'register' или 'forgot' или 'reset'
+        this.mode = 'login'; // 'login' | 'register' | 'forgot' | 'reset' | 'verify_email'
         this.languageSelector = null;
         this.uiLanguageSelector = null;
+
+        // Состояние подтверждения email
+        this.verifyEmail = null;
+        this.verifyTimer = null;
+        this.verifyTimerRemaining = 0;
+    }
+
+    /**
+     * Показать форму подтверждения email после регистрации.
+     */
+    showVerifyEmail({ email, ttlSeconds, cooldownSeconds }) {
+        this.verifyEmail = {
+            email: (email || '').trim(),
+            ttlSeconds: Number(ttlSeconds) || 300,
+            cooldownSeconds: Number(cooldownSeconds) || 60,
+        };
+
+        const emailEl = document.getElementById('verifyEmailModalEmail');
+        if (emailEl) {
+            emailEl.textContent = this.verifyEmail.email;
+        }
+
+        this.mode = 'verify_email';
+        this.updateModalView();
+        try { this.applyTranslations(); } catch (e) {}
+
+        this.startVerifyTimer(this.verifyEmail.ttlSeconds);
+
+        const codeInput = document.getElementById('verifyEmailCode');
+        if (codeInput) {
+            codeInput.value = '';
+            setTimeout(() => codeInput.focus(), 100);
+        }
+    }
+
+    startVerifyTimer(seconds) {
+        this.clearVerifyTimer();
+        this.verifyTimerRemaining = Math.max(0, Number(seconds) || 0);
+
+        const timerEl = document.getElementById('verifyEmailTimer');
+        const resendBtn = document.getElementById('verifyEmailResendBtn');
+        const submitBtn = document.getElementById('verifyEmailSubmitBtn');
+
+        const render = () => {
+            if (timerEl) {
+                const mins = Math.floor(this.verifyTimerRemaining / 60);
+                const secs = this.verifyTimerRemaining % 60;
+                timerEl.style.display = 'block';
+                timerEl.textContent = this._t(
+                    'login_modal.messages.verification_timer',
+                    'Код действителен ещё {seconds} сек.',
+                    { seconds: this.verifyTimerRemaining }
+                );
+            }
+
+            if (resendBtn) {
+                resendBtn.disabled = this.verifyTimerRemaining > 0;
+            }
+            if (submitBtn) {
+                submitBtn.disabled = this.verifyTimerRemaining <= 0;
+            }
+        };
+
+        render();
+
+        this.verifyTimer = setInterval(() => {
+            this.verifyTimerRemaining -= 1;
+            if (this.verifyTimerRemaining <= 0) {
+                this.verifyTimerRemaining = 0;
+                render();
+                this.clearVerifyTimer();
+                return;
+            }
+            render();
+        }, 1000);
+    }
+
+    clearVerifyTimer() {
+        if (this.verifyTimer) {
+            clearInterval(this.verifyTimer);
+            this.verifyTimer = null;
+        }
     }
 
     _t(key, fallback, params) {
@@ -501,6 +619,22 @@ class LoginModal {
         }
 
         try {
+            const lve = document.querySelector('label[for="verifyEmailModalEmail"]');
+            if (lve) lve.textContent = this._t('login_modal.fields.email', 'Почта');
+            const lvc = document.querySelector('label[for="verifyEmailCode"]');
+            if (lvc) lvc.textContent = this._t('login_modal.fields.code', 'Код');
+            const codeInput = document.getElementById('verifyEmailCode');
+            if (codeInput) codeInput.setAttribute('placeholder', this._t('login_modal.placeholders.verification_code', '6-значный код'));
+            const vb = document.getElementById('verifyEmailSubmitBtn');
+            if (vb) vb.textContent = this._t('login_modal.actions.confirm_email', 'Подтвердить адрес электронной почты');
+            const vr = document.getElementById('verifyEmailResendBtn');
+            if (vr) vr.textContent = this._t('login_modal.actions.resend_code', 'Отправить код повторно');
+            const backReg = document.getElementById('switchBackToRegisterFromVerifyLink');
+            if (backReg) backReg.textContent = this._t('login_modal.actions.back_to_register', 'Назад к регистрации');
+        } catch (e) {
+        }
+
+        try {
             this.decorateLanguageSelector();
         } catch (e) {
         }
@@ -568,6 +702,31 @@ class LoginModal {
             registerForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 await this.handleRegister();
+            });
+        }
+
+        // Форма подтверждения email
+        const verifyEmailForm = document.getElementById('verifyEmailModalForm');
+        if (verifyEmailForm) {
+            verifyEmailForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleVerifyEmail();
+            });
+        }
+
+        const verifyEmailResendBtn = document.getElementById('verifyEmailResendBtn');
+        if (verifyEmailResendBtn) {
+            verifyEmailResendBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                await this.handleVerifyEmailResend();
+            });
+        }
+
+        const switchBackToRegisterFromVerifyLink = document.getElementById('switchBackToRegisterFromVerifyLink');
+        if (switchBackToRegisterFromVerifyLink) {
+            switchBackToRegisterFromVerifyLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.switchToRegister();
             });
         }
 
@@ -643,6 +802,10 @@ class LoginModal {
             closeBtn.addEventListener('click', () => {
                 if (window.UM && window.UM.isAuthenticated && window.UM.isAuthenticated()) {
                     this.hide();
+                } else if (this.mode === 'verify_email') {
+                    this.clearVerifyTimer();
+                    this.verifyEmail = null;
+                    this.switchToRegister();
                 } else {
                     alert(this._t('login_modal.messages.login_required_alert', 'Для работы с приложением необходимо войти в систему'));
                 }
@@ -655,6 +818,10 @@ class LoginModal {
                 if (e.target === this.modal) {
                     if (window.UM && window.UM.isAuthenticated && window.UM.isAuthenticated()) {
                         this.hide();
+                    } else if (this.mode === 'verify_email') {
+                        this.clearVerifyTimer();
+                        this.verifyEmail = null;
+                        this.switchToRegister();
                     } else {
                         alert(this._t('login_modal.messages.login_required_alert', 'Для работы с приложением необходимо войти в систему'));
                     }
@@ -667,6 +834,10 @@ class LoginModal {
             if (e.key === 'Escape' && this.isVisible) {
                 if (window.UM && window.UM.isAuthenticated && window.UM.isAuthenticated()) {
                     this.hide();
+                } else if (this.mode === 'verify_email') {
+                    this.clearVerifyTimer();
+                    this.verifyEmail = null;
+                    this.switchToRegister();
                 } else {
                     e.preventDefault();
                     e.stopPropagation();
@@ -741,34 +912,47 @@ class LoginModal {
         const registerForm = document.getElementById('registerModalForm');
         const forgotForm = document.getElementById('forgotModalForm');
         const resetForm = document.getElementById('resetModalForm');
+        const verifyEmailForm = document.getElementById('verifyEmailModalForm');
         const title = document.getElementById('loginModalTitle');
         const message = document.getElementById('loginModalMessage');
+        const closeBtn = document.getElementById('closeLoginBtn');
 
-        if (this.mode === 'login') {
-            if (loginForm) loginForm.style.display = 'block';
+        // Крестик показываем только в режиме подтверждения email,
+        // в остальных режимах он скрыт (пользователь обязан войти).
+        if (closeBtn) {
+            closeBtn.style.display = this.mode === 'verify_email' ? 'inline-flex' : 'none';
+        }
+
+        const hideAll = () => {
+            if (loginForm) loginForm.style.display = 'none';
             if (registerForm) registerForm.style.display = 'none';
             if (forgotForm) forgotForm.style.display = 'none';
             if (resetForm) resetForm.style.display = 'none';
+            if (verifyEmailForm) verifyEmailForm.style.display = 'none';
+        };
+
+        if (this.mode === 'login') {
+            hideAll();
+            if (loginForm) loginForm.style.display = 'block';
             if (title) title.textContent = this._t('login_modal.titles.login_required', 'Требуется авторизация');
             if (message) message.textContent = this._t('login_modal.messages.login_required', 'Для работы с приложением необходимо войти в систему');
         } else if (this.mode === 'register') {
-            if (loginForm) loginForm.style.display = 'none';
+            hideAll();
             if (registerForm) registerForm.style.display = 'block';
-            if (forgotForm) forgotForm.style.display = 'none';
-            if (resetForm) resetForm.style.display = 'none';
             if (title) title.textContent = this._t('login_modal.titles.register', 'Регистрация');
             if (message) message.textContent = this._t('login_modal.messages.register', 'Создайте доступ к диктантам и личному кабинету');
         } else if (this.mode === 'forgot') {
-            if (loginForm) loginForm.style.display = 'none';
-            if (registerForm) registerForm.style.display = 'none';
+            hideAll();
             if (forgotForm) forgotForm.style.display = 'block';
-            if (resetForm) resetForm.style.display = 'none';
             if (title) title.textContent = this._t('login_modal.titles.forgot', 'Восстановление пароля');
             if (message) message.textContent = this._t('login_modal.messages.forgot', 'Введи почту — мы отправим ссылку для сброса пароля на почту или в Telegram');
+        } else if (this.mode === 'verify_email') {
+            hideAll();
+            if (verifyEmailForm) verifyEmailForm.style.display = 'block';
+            if (title) title.textContent = this._t('login_modal.titles.verify_email', 'Проверь почту');
+            if (message) message.textContent = this._t('login_modal.messages.verify_email', 'Мы отправили код подтверждения на указанный адрес электронной почты');
         } else {
-            if (loginForm) loginForm.style.display = 'none';
-            if (registerForm) registerForm.style.display = 'none';
-            if (forgotForm) forgotForm.style.display = 'none';
+            hideAll();
             if (resetForm) resetForm.style.display = 'block';
             if (title) title.textContent = this._t('login_modal.titles.reset', 'Новый пароль');
             if (message) message.textContent = this._t('login_modal.messages.reset', 'Вставь код и задай новый пароль');
@@ -1194,7 +1378,14 @@ class LoginModal {
                 uiLanguage,
             });
 
-            if (result?.success) {
+            if (result?.success && result?.requiresVerification) {
+                // Требуется подтверждение email: показываем форму ввода кода.
+                this.showVerifyEmail({
+                    email: result.email || email,
+                    ttlSeconds: result.verificationTtlSeconds,
+                    cooldownSeconds: result.verificationCooldownSeconds,
+                });
+            } else if (result?.success) {
                 // Успешная регистрация
                 this.hide();
                 
@@ -1233,13 +1424,144 @@ class LoginModal {
     }
 
     /**
+     * Подтверждение email: ввод кода из письма.
+     */
+    async handleVerifyEmail() {
+        const codeInput = document.getElementById('verifyEmailCode');
+        const submitBtn = document.getElementById('verifyEmailSubmitBtn');
+
+        const code = (codeInput?.value || '').trim();
+        const email = (this.verifyEmail?.email || '').trim();
+
+        if (!code) {
+            this.showError(this._t('login_modal.errors.enter_code', 'Введи код из письма'), 'verify_email');
+            return;
+        }
+        if (!email) {
+            this.showError(this._t('login_modal.errors.verification_no_email', 'Адрес почты не найден'), 'verify_email');
+            return;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = this._t('login_modal.states.verifying', 'Проверяем...');
+        }
+        this.clearErrors();
+
+        try {
+            const res = await fetch('/user/api/email_verification/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, code }),
+            });
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok || !data || !data.success) {
+                const msg = data && (data.error || data.message) ? String(data.error || data.message) : `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+
+            // Успешное подтверждение: сохраняем токен и завершаем вход.
+            if (window.UM) {
+                const token = data.access_token;
+                if (token) {
+                    localStorage.setItem('jwt_token', token);
+                    window.UM.token = token;
+                }
+                if (data.user) {
+                    window.UM.userData = data.user;
+                    try { window.UM._saveUserCache(data.user); } catch (e) {}
+                    window.UM.setupAuthenticatedUser(data.user);
+                }
+            }
+
+            this.clearVerifyTimer();
+            this.verifyEmail = null;
+            this.hide();
+
+            if (this.pendingResolve) {
+                this.pendingResolve();
+                this.pendingResolve = null;
+            }
+
+            window.dispatchEvent(new CustomEvent('user-logged-in', { detail: { user: data.user } }));
+
+            try {
+                if (typeof window.location?.reload === 'function') {
+                    window.location.reload();
+                }
+            } catch (e) {
+            }
+        } catch (e) {
+            this.showError(e && e.message ? e.message : this._t('login_modal.errors.verification_failed', 'Неверный код или он истёк'), 'verify_email');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = this.verifyTimerRemaining <= 0;
+                submitBtn.textContent = this._t('login_modal.actions.confirm_email', 'Подтвердить адрес электронной почты');
+            }
+        }
+    }
+
+    /**
+     * Повторная отправка кода подтверждения.
+     */
+    async handleVerifyEmailResend() {
+        const email = (this.verifyEmail?.email || '').trim();
+        if (!email) return;
+
+        const resendBtn = document.getElementById('verifyEmailResendBtn');
+        const errorEl = document.getElementById('verifyEmailErrorMessage');
+
+        if (resendBtn) resendBtn.disabled = true;
+        if (errorEl) errorEl.style.display = 'none';
+
+        try {
+            const res = await fetch('/user/api/email_verification/resend', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok || !data || !data.success) {
+                const msg = data && (data.error || data.message) ? String(data.error || data.message) : `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+
+            const cooldown = Number(data.cooldown_seconds) || (this.verifyEmail?.cooldownSeconds) || 60;
+            this.startVerifyTimer(cooldown);
+
+            const timerEl = document.getElementById('verifyEmailTimer');
+            if (timerEl) {
+                timerEl.style.display = 'block';
+                timerEl.textContent = this._t('login_modal.messages.verification_resent', 'Новый код отправлен на почту');
+            }
+        } catch (e) {
+            this.showError(e && e.message ? e.message : this._t('login_modal.errors.verification_failed', 'Ошибка отправки кода'), 'verify_email');
+        } finally {
+            if (resendBtn) {
+                resendBtn.disabled = this.verifyTimerRemaining > 0;
+            }
+        }
+    }
+
+    /**
      * Показать ошибку
      */
     showError(message, mode = null) {
         const currentMode = mode || this.mode;
-        const errorMessageId = currentMode === 'login'
-            ? 'loginModalErrorMessage'
-            : (currentMode === 'forgot' ? 'forgotModalErrorMessage' : (currentMode === 'reset' ? 'resetModalErrorMessage' : 'registerModalErrorMessage'));
+        let errorMessageId;
+        if (currentMode === 'login') {
+            errorMessageId = 'loginModalErrorMessage';
+        } else if (currentMode === 'forgot') {
+            errorMessageId = 'forgotModalErrorMessage';
+        } else if (currentMode === 'reset') {
+            errorMessageId = 'resetModalErrorMessage';
+        } else if (currentMode === 'verify_email') {
+            errorMessageId = 'verifyEmailErrorMessage';
+        } else {
+            errorMessageId = 'registerModalErrorMessage';
+        }
         const errorMessage = document.getElementById(errorMessageId);
         if (errorMessage) {
             errorMessage.textContent = message;
@@ -1255,6 +1577,7 @@ class LoginModal {
         const registerError = document.getElementById('registerModalErrorMessage');
         const forgotError = document.getElementById('forgotModalErrorMessage');
         const resetError = document.getElementById('resetModalErrorMessage');
+        const verifyError = document.getElementById('verifyEmailErrorMessage');
         if (loginError) {
             loginError.style.display = 'none';
             loginError.textContent = '';
@@ -1270,6 +1593,10 @@ class LoginModal {
         if (resetError) {
             resetError.style.display = 'none';
             resetError.textContent = '';
+        }
+        if (verifyError) {
+            verifyError.style.display = 'none';
+            verifyError.textContent = '';
         }
     }
 
@@ -1343,8 +1670,13 @@ class LoginModal {
         // Очищаем формы
         const loginForm = document.getElementById('loginModalForm');
         const registerForm = document.getElementById('registerModalForm');
+        const verifyEmailForm = document.getElementById('verifyEmailModalForm');
         if (loginForm) loginForm.reset();
         if (registerForm) registerForm.reset();
+        if (verifyEmailForm) verifyEmailForm.reset();
+
+        this.clearVerifyTimer();
+        this.verifyEmail = null;
 
         this.clearErrors();
     }

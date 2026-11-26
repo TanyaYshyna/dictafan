@@ -48,6 +48,7 @@ def get_app_cache_revision() -> str:
             os.path.join('static', 'js', 'audio_manager.js'),
             os.path.join('static', 'js', 'sw_register.js'),
             os.path.join('static', 'js', 'desktop.js'),
+            os.path.join('static', 'js', 'admin.js'),
             os.path.join('static', 'css', 'desktop.css'),
             # os.path.join('static', 'css', 'style_dictation.css'),
             # Файлы редактора/диктанта и их рантайм-зависимостей. Раньше их не было

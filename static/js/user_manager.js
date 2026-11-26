@@ -694,6 +694,19 @@ class UserManager {
       const data = await response.json();
 
       if (response.ok) {
+        // Если сервер требует подтверждения email — не выполняем полный вход,
+        // а возвращаем флаг requiresVerification, чтобы модальное окно
+        // показало форму ввода кода подтверждения.
+        if (data.requires_verification) {
+          return {
+            success: true,
+            requiresVerification: true,
+            email: data.email || email,
+            verificationTtlSeconds: data.verification_ttl_seconds || 300,
+            verificationCooldownSeconds: data.verification_cooldown_seconds || 60,
+          };
+        }
+
         // Используем access_token вместо token
         const token = data.access_token;
         localStorage.setItem('jwt_token', token);

@@ -12,6 +12,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from .db import get_db_connection, get_db_cursor
 
 
+EMAIL_VERIFICATION_CODE_TTL_SECONDS = 300
+EMAIL_VERIFICATION_CODE_COOLDOWN_SECONDS = 60
+
+
 def _ensure_languages_exist(cur, language_codes) -> None:
     """
     Гарантирует наличие языков в таблице languages (upsert из languages.json).
@@ -866,6 +870,199 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
         # Возвращаем обновленные данные пользователя
         return get_user_by_email(email)
         
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _ensure_users_email_verification_columns(cur) -> None:
+    cur.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name='users'
+          AND column_name IN (
+              'email_verified',
+              'email_verification_code',
+              'email_verification_expires_at',
+              'email_verification_last_request_at'
+          )
+        """
+    )
+    rows = cur.fetchall() or []
+    cols = {r.get('column_name') if isinstance(r, dict) else r[0] for r in rows}
+    if 'email_verified' not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE")
+    if 'email_verification_code' not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_code VARCHAR(16)")
+    if 'email_verification_expires_at' not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expires_at TIMESTAMPTZ")
+    if 'email_verification_last_request_at' not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_last_request_at TIMESTAMPTZ")
+
+
+def create_email_verification_code(
+    email: str,
+    ttl_seconds: int = EMAIL_VERIFICATION_CODE_TTL_SECONDS,
+    cooldown_seconds: int = EMAIL_VERIFICATION_CODE_COOLDOWN_SECONDS,
+) -> Optional[str]:
+    """Генерирует 6-значный код подтверждения почты и сохраняет его в БД.
+
+    Возвращает код (строка), либо None, если ещё не истёк cooldown.
+    """
+    email_norm = (email or '').strip().lower()
+    if not email_norm:
+        return None
+
+    conn, cur = get_db_cursor()
+    try:
+        _ensure_users_email_verification_columns(cur)
+        cur.execute(
+            """
+            SELECT id, email_verification_last_request_at
+            FROM users
+            WHERE email = %s
+            """,
+            (email_norm,),
+        )
+        row = cur.fetchone() or None
+        if not row:
+            conn.commit()
+            return None
+
+        last_req = row.get('email_verification_last_request_at')
+        if last_req is not None:
+            cur.execute("SELECT EXTRACT(EPOCH FROM (NOW() - %s)) AS diff", (last_req,))
+            diff = (cur.fetchone() or {}).get('diff')
+            try:
+                diff_f = float(diff) if diff is not None else None
+            except Exception:
+                diff_f = None
+            if diff_f is not None and diff_f < float(cooldown_seconds):
+                conn.commit()
+                return None
+
+        code = f"{secrets.randbelow(1000000):06d}"
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(ttl_seconds))
+
+        cur.execute(
+            """
+            UPDATE users
+            SET email_verification_code = %s,
+                email_verification_expires_at = %s,
+                email_verification_last_request_at = NOW(),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            """,
+            (code, expires_at, int(row.get('id'))),
+        )
+        conn.commit()
+        return code
+    finally:
+        cur.close()
+        conn.close()
+
+
+def verify_email_code(email: str, code: str) -> bool:
+    """Проверяет код подтверждения почты и помечает email как подтверждённый."""
+    email_norm = (email or '').strip().lower()
+    code_norm = (code or '').strip()
+    if not email_norm or not code_norm:
+        return False
+
+    conn, cur = get_db_cursor()
+    try:
+        _ensure_users_email_verification_columns(cur)
+        cur.execute(
+            """
+            SELECT id, email_verification_code, email_verification_expires_at
+            FROM users
+            WHERE email = %s
+            LIMIT 1
+            """,
+            (email_norm,),
+        )
+        row = cur.fetchone() or None
+        if not row:
+            conn.commit()
+            return False
+
+        if not row.get('email_verification_code'):
+            conn.commit()
+            return False
+        if row.get('email_verification_code') != code_norm:
+            conn.commit()
+            return False
+
+        expires_at = row.get('email_verification_expires_at')
+        if expires_at is None:
+            conn.commit()
+            return False
+
+        cur.execute("SELECT NOW() > %s AS expired", (expires_at,))
+        expired = (cur.fetchone() or {}).get('expired')
+        if expired:
+            conn.commit()
+            return False
+
+        cur.execute(
+            """
+            UPDATE users
+            SET email_verified = TRUE,
+                email_verification_code = NULL,
+                email_verification_expires_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            """,
+            (int(row.get('id')),),
+        )
+        conn.commit()
+        return True
+    finally:
+        cur.close()
+        conn.close()
+
+
+def is_email_verified(email: str) -> bool:
+    email_norm = (email or '').strip().lower()
+    if not email_norm:
+        return False
+
+    conn, cur = get_db_cursor()
+    try:
+        _ensure_users_email_verification_columns(cur)
+        cur.execute("SELECT email_verified FROM users WHERE email = %s", (email_norm,))
+        row = cur.fetchone() or None
+        if not row:
+            return False
+        return bool(row.get('email_verified'))
+    finally:
+        cur.close()
+        conn.close()
+
+
+def mark_email_verified(email: str) -> bool:
+    """Помечает email как подтверждённый (например, при входе через OAuth)."""
+    email_norm = (email or '').strip().lower()
+    if not email_norm:
+        return False
+
+    conn, cur = get_db_cursor()
+    try:
+        _ensure_users_email_verification_columns(cur)
+        cur.execute(
+            """
+            UPDATE users
+            SET email_verified = TRUE,
+                email_verification_code = NULL,
+                email_verification_expires_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE email = %s
+            """,
+            (email_norm,),
+        )
+        conn.commit()
+        return True
     finally:
         cur.close()
         conn.close()

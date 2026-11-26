@@ -203,6 +203,42 @@
                     <span id="registerAlreadyPrefix"></span> <a href="#" id="switchToLoginLink"></a>
                 </p>
             </form>
+
+            <form id="verifyEmailModalForm" class="login-form" style="display: none;" autocomplete="off" data-form-type="verify_email">
+                <div class="form-row">
+                    <label for="verifyEmailModalEmail"></label>
+                    <div id="verifyEmailModalEmail" class="verify-email-address" style="font-weight: 600; word-break: break-all; padding: 4px 2px;"></div>
+                </div>
+
+                <div class="form-row">
+                    <label for="verifyEmailCode"></label>
+                    <input
+                        id="verifyEmailCode"
+                        class="text-input auth-input"
+                        type="text"
+                        name="code"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        maxlength="6"
+                        required
+                    >
+                </div>
+
+                <div id="verifyEmailTimer" class="form-message" style="display: none;"></div>
+                <div id="verifyEmailErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+                <div class="login-form-actions">
+                    <button type="submit" class="button-color-yellow auth-submit" id="verifyEmailSubmitBtn"></button>
+                </div>
+
+                <div class="login-form-actions" style="margin-top: 10px;">
+                    <button type="button" class="button-color-transparent auth-submit" id="verifyEmailResendBtn" disabled></button>
+                </div>
+
+                <p class="form-note">
+                    <a href="#" id="switchBackToRegisterFromVerifyLink"></a>
+                </p>
+            </form>
         </div>
     </div>
 </div>
