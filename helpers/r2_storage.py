@@ -418,11 +418,15 @@ class R2Storage:
             )
             return None
 
-    def get_presigned_put_url(self, remote_path, expiration=3600):
+    def get_presigned_put_url(self, remote_path, expiration=3600, content_type=None):
         """Генерирует presigned PUT URL для загрузки объекта по конкретному ключу.
 
-        Предназначен для будущей прямой загрузки из браузера (аналог
+        Предназначен для прямой загрузки из браузера (аналог
         bucket.get_upload_url() в B2). Возвращает URL или None.
+
+        content_type — если задан, включается в подпись (Params). Клиент
+        обязан отправить PUT с ровно тем же Content-Type, иначе R2 отвергнет
+        запрос по сигнатуре (SignatureDoesNotMatch).
         """
         if not self._ensure_initialized() or not self.client:
             return None
@@ -431,9 +435,12 @@ class R2Storage:
             expires = int(expiration) if expiration else 3600
             if expires <= 0:
                 expires = 3600
+            params = {"Bucket": self.bucket_name, "Key": str(remote_path)}
+            if content_type:
+                params["ContentType"] = str(content_type)
             return self.client.generate_presigned_url(
                 "put_object",
-                Params={"Bucket": self.bucket_name, "Key": str(remote_path)},
+                Params=params,
                 ExpiresIn=expires,
                 HttpMethod="PUT",
             )

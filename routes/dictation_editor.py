@@ -246,89 +246,258 @@ def api_b2_health():
     """Проверяет, работает ли активное хранилище (B2 или R2).
 
     Формат ответа сохранён для обратной совместимости (sw_status_bar.js).
-    Для B2 выполняется только локальная проверка bucket (без платного запроса),
-    для R2 — локальная проверка клиента; реальные сетевые проверки не делаются.
+    Помимо локальной проверки клиента/бакета выполняется реальная проверка
+    доступности бакета через check_availability() (если провайдер её
+    поддерживает): для R2 это head_bucket, для B2 — get_bucket_by_name.
     """
     try:
         from helpers.storage import get_storage
 
         storage = get_storage()
         provider = getattr(storage, 'provider', 'b2').upper()
+        provider_lc = provider.lower()
+        bucket_name = getattr(storage, 'bucket_name', None)
 
         if not storage.enabled:
-            return jsonify({'success': True, 'status': 'disabled', 'message': f'{provider} Storage отключён'})
+            return jsonify({
+                'success': True, 'status': 'disabled',
+                'message': f'{provider} Storage отключён',
+                'provider': provider_lc, 'bucket': bucket_name,
+            })
 
-        # Проверяем, инициализирован ли клиент/бакет (без платного запроса к API).
+        # 1) Локальная проверка: инициализирован ли клиент/бакет.
         # bucket — псевдоним для boto3-клиента в R2 и объект bucket в B2.
-        if storage.bucket is not None:
-            return jsonify({'success': True, 'status': 'ok', 'message': f'{provider} Storage работает'})
+        if storage.bucket is None:
+            ok = storage._ensure_initialized()
+            if not ok or storage.bucket is None:
+                return jsonify({
+                    'success': True, 'status': 'error',
+                    'message': f'{provider} Storage не инициализирован. Проверь ключи в переменных окружения.',
+                    'provider': provider_lc, 'bucket': bucket_name,
+                })
 
-        # Пытаемся переинициализировать
-        ok = storage._ensure_initialized()
-        if ok and storage.bucket is not None:
-            return jsonify({'success': True, 'status': 'ok', 'message': f'{provider} Storage работает (переинициализирован)'})
+        # 2) Реальная проверка доступности бакета (без записи/удаления).
+        checker = getattr(storage, 'check_availability', None)
+        if callable(checker):
+            try:
+                available = checker()
+            except Exception as e:
+                logger.error(f"{provider} check_availability raised: {e}", exc_info=True)
+                available = False
+            if not available:
+                return jsonify({
+                    'success': True, 'status': 'error',
+                    'message': f'{provider} Storage недоступен. Проверь доступность бакета и ключи.',
+                    'provider': provider_lc, 'bucket': bucket_name,
+                })
 
-        return jsonify({'success': True, 'status': 'error', 'message': f'{provider} Storage не инициализирован. Проверь ключи в переменных окружения.'})
+        return jsonify({
+            'success': True, 'status': 'ok',
+            'message': f'{provider} Storage работает',
+            'provider': provider_lc, 'bucket': bucket_name,
+        })
     except Exception as e:
         logger.error(f"storage health check error: {e}", exc_info=True)
         return jsonify({'success': False, 'status': 'error', 'message': f'Ошибка: {e}'}), 500
 
 
+# Допустимые части пути объекта для прямой загрузки. Ключ обязан иметь вид
+# dictations/<dict_id>/<lang>/<filename> — это исключает загрузку в чужие
+# диктанты и произвольные каталоги (covers, avatars, mult и т.п.).
+_DICTATION_AUDIO_EXT_RE = re.compile(
+    r'^dictations/(dict_[0-9]+)/([a-z]{2,3})/([^/]+)$'
+)
+_ALLOWED_AUDIO_EXTENSIONS = (
+    '.mp3', '.wav', '.m4a', '.webm', '.ogg', '.mp4', '.aac', '.flac', '.opus',
+)
+
+
+def _normalize_dictation_id(raw: str):
+    """Приводит dictation_id к виду dict_<число> или возвращает None."""
+    try:
+        s = str(raw or '').strip()
+        if not s:
+            return None
+        if s.isdigit():
+            return f"dict_{s}"
+        if s.startswith('dict_') and s[5:].isdigit():
+            return s
+        return None
+    except Exception:
+        return None
+
+
 @editor_bp.route('/api/b2/get_upload_url', methods=['POST'])
 @jwt_required()
 def api_b2_get_upload_url():
+    """Выдаёт URL прямой загрузки из браузера для активного провайдера.
+
+    B2 (обратная совместимость): если клиент не передаёт ключ объекта
+    (пустой JSON `{}`), возвращается прежний контракт — универсальный
+    uploadUrl + uploadAuthToken, загрузка методом POST с заголовками
+    Authorization / X-Bz-File-Name / X-Bz-Content-Sha1.
+
+    R2: ключ объекта обязателен. После проверки прав выдаётся presigned
+    PUT URL, действующий ограниченное время, для конкретного ключа
+    dictations/<dict_id>/<lang>/<filename>. Никакие секреты не передаются.
+
+    В обоих случаях в ответ добавляются `provider` и `method`, а для R2 —
+    `headers` (заголовки, которые должен отправить клиент вместе с PUT).
+    """
     try:
-        from helpers.b2_storage import b2_storage
+        from helpers.storage import get_storage
 
-        if not b2_storage.enabled or not b2_storage.bucket:
-            return jsonify({'success': False, 'error': 'B2 storage is disabled'}), 503
+        storage = get_storage()
+        provider = getattr(storage, 'provider', 'b2')
 
-        # NOTE: we intentionally do not accept a path here.
-        # The client will use this upload url/token to upload specific files.
-        # Server-side validation must happen at save-time / download-time.
-        try:
-            if hasattr(b2_storage.bucket, 'get_upload_url'):
-                upload_resp = b2_storage.bucket.get_upload_url()
-            else:
-                # Compatibility with older b2sdk versions
-                bucket_id = getattr(b2_storage.bucket, 'id_', None) or getattr(b2_storage.bucket, 'bucket_id', None)
-                if not bucket_id:
-                    raise AttributeError("Bucket has no get_upload_url and no bucket id attribute")
-                upload_resp = b2_storage.api.session.get_upload_url(bucket_id)
-        except Exception as e:
+        if not storage.enabled or not storage.bucket:
+            return jsonify({'success': False, 'error': f'{provider.upper()} storage is disabled'}), 503
+
+        data = request.get_json(silent=True) or {}
+
+        dictation_id_raw = data.get('dictation_id')
+        dictation_id = _normalize_dictation_id(dictation_id_raw)
+        lang = str(data.get('lang') or '').strip().lower()
+        filename = str(data.get('filename') or '').strip()
+
+        # ---- Проверка прав и ключа объекта — только для R2. ----
+        # B2 полностью сохраняет существующий контракт: универсальный
+        # uploadUrl + uploadAuthToken, ключ выбирает сам клиент через
+        # заголовок X-Bz-File-Name, поэтому серверная привязка к ключу и
+        # проверка прав для B2 не применяются (как и в прежней версии).
+        remote_path = None
+        if provider == 'r2':
+            if not dictation_id:
+                return jsonify({'success': False, 'error': 'Invalid or missing dictation_id'}), 400
+            if not lang or not filename:
+                return jsonify({'success': False, 'error': 'Missing lang or filename'}), 400
+
+            remote_path = f"dictations/{dictation_id}/{lang}/{filename}"
+            if not _DICTATION_AUDIO_EXT_RE.match(remote_path):
+                return jsonify({'success': False, 'error': 'Invalid object key'}), 400
+            if not filename.lower().endswith(_ALLOWED_AUDIO_EXTENSIONS):
+                return jsonify({'success': False, 'error': 'Unsupported audio file extension'}), 400
+
+            # Проверка прав на редактирование диктанта (владелец или админ).
+            current_email = get_jwt_identity()
+            user_db = get_user_by_email(current_email) if current_email else None
+            if not user_db:
+                return jsonify({'success': False, 'error': 'User not found'}), 404
+
             try:
-                from b2sdk.v2.exception import B2Error
-                if isinstance(e, B2Error):
-                    logger.error("B2 get_upload_url failed: %s", e, exc_info=True)
-                    return jsonify({'success': False, 'error': f'B2 error: {e}'}), 502
+                db_id = int(dictation_id[5:])
             except Exception:
-                pass
-            logger.error("get_upload_url unexpected error: %s", e, exc_info=True)
-            return jsonify({'success': False, 'error': f'get_upload_url failed: {type(e).__name__}: {e}'}), 502
+                return jsonify({'success': False, 'error': 'Invalid dictation_id'}), 400
 
-        upload_url = None
-        auth_token = None
-        try:
-            if isinstance(upload_resp, (tuple, list)) and len(upload_resp) >= 2:
-                upload_url, auth_token = upload_resp[0], upload_resp[1]
-            elif isinstance(upload_resp, dict):
-                upload_url = upload_resp.get('uploadUrl') or upload_resp.get('upload_url')
-                auth_token = upload_resp.get('authorizationToken') or upload_resp.get('authorization_token')
-            else:
-                upload_url = getattr(upload_resp, 'upload_url', None) or getattr(upload_resp, 'uploadUrl', None)
-                auth_token = getattr(upload_resp, 'authorization_token', None) or getattr(upload_resp, 'authorizationToken', None)
-        except Exception as e:
-            logger.error("Failed to parse b2 get_upload_url response: %s", e, exc_info=True)
-            return jsonify({'success': False, 'error': 'Failed to parse B2 upload url'}), 502
+            dictation = get_dictation_by_id(db_id)
+            if not dictation:
+                return jsonify({'success': False, 'error': 'Dictation not found'}), 404
 
-        if not upload_url or not auth_token:
-            return jsonify({'success': False, 'error': 'Failed to get B2 upload url'}), 502
+            from helpers.db_license import get_user_current_role
+            role = get_user_current_role(int(user_db['id']))
+            is_admin = bool(role and str(role.get('code') or '').lower() == 'admin')
+            owner_id = dictation.get('owner_id')
+            if not is_admin and (not owner_id or int(owner_id) != int(user_db.get('id'))):
+                logger.warning(
+                    "Попытка получить upload URL для чужого диктанта %s пользователем %s",
+                    dictation_id, user_db.get('id'),
+                )
+                return jsonify({'success': False, 'error': 'Forbidden'}), 403
 
-        return jsonify({
-            'success': True,
-            'uploadUrl': upload_url,
-            'uploadAuthToken': auth_token,
-        })
+        # ---- B2: полностью сохраняем существующий контракт. ----
+        if provider == 'b2':
+            try:
+                if hasattr(storage.bucket, 'get_upload_url'):
+                    upload_resp = storage.bucket.get_upload_url()
+                else:
+                    bucket_id = getattr(storage.bucket, 'id_', None) or getattr(storage.bucket, 'bucket_id', None)
+                    if not bucket_id:
+                        raise AttributeError("Bucket has no get_upload_url and no bucket id attribute")
+                    upload_resp = storage.api.session.get_upload_url(bucket_id)
+            except Exception as e:
+                try:
+                    from b2sdk.v2.exception import B2Error
+                    if isinstance(e, B2Error):
+                        logger.error("B2 get_upload_url failed: %s", e, exc_info=True)
+                        return jsonify({'success': False, 'error': f'B2 error: {e}'}), 502
+                except Exception:
+                    pass
+                logger.error("get_upload_url unexpected error: %s", e, exc_info=True)
+                return jsonify({'success': False, 'error': f'get_upload_url failed: {type(e).__name__}: {e}'}), 502
+
+            upload_url = None
+            auth_token = None
+            try:
+                if isinstance(upload_resp, (tuple, list)) and len(upload_resp) >= 2:
+                    upload_url, auth_token = upload_resp[0], upload_resp[1]
+                elif isinstance(upload_resp, dict):
+                    upload_url = upload_resp.get('uploadUrl') or upload_resp.get('upload_url')
+                    auth_token = upload_resp.get('authorizationToken') or upload_resp.get('authorization_token')
+                else:
+                    upload_url = getattr(upload_resp, 'upload_url', None) or getattr(upload_resp, 'uploadUrl', None)
+                    auth_token = getattr(upload_resp, 'authorization_token', None) or getattr(upload_resp, 'authorizationToken', None)
+            except Exception as e:
+                logger.error("Failed to parse b2 get_upload_url response: %s", e, exc_info=True)
+                return jsonify({'success': False, 'error': 'Failed to parse B2 upload url'}), 502
+
+            if not upload_url or not auth_token:
+                return jsonify({'success': False, 'error': 'Failed to get B2 upload url'}), 502
+
+            return jsonify({
+                'success': True,
+                'provider': 'b2',
+                'method': 'POST',
+                'uploadUrl': upload_url,
+                'uploadAuthToken': auth_token,
+                'bucket': getattr(storage, 'bucket_name', None),
+            })
+
+        # ---- R2: presigned PUT URL для конкретного ключа. ----
+        if provider == 'r2':
+            if not remote_path:
+                return jsonify({'success': False, 'error': 'dictation_id, lang and filename are required'}), 400
+
+            # Ограниченный срок действия ссылки (по умолчанию 1 час).
+            try:
+                expiration = int(os.getenv('R2_PRESIGNED_PUT_EXPIRATION', '3600'))
+            except Exception:
+                expiration = 3600
+            if expiration <= 0 or expiration > 43200:
+                expiration = 3600
+
+            # Content-Type подписывается в момент генерации URL. Чтобы клиент
+            # не ошибся с подписью, вычисляем его из расширения файла и
+            # возвращаем в headers — клиент обязан отправить PUT с этим же типом.
+            import mimetypes
+            content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+
+            presign = getattr(storage, 'get_presigned_put_url', None)
+            if not callable(presign):
+                return jsonify({'success': False, 'error': 'R2 presigned PUT is not supported'}), 501
+
+            url = presign(remote_path, expiration=expiration, content_type=content_type)
+            if not url:
+                logger.error('R2 get_presigned_put_url failed remote_path=%s', remote_path)
+                return jsonify({'success': False, 'error': 'Failed to generate presigned PUT URL'}), 502
+
+            return jsonify({
+                'success': True,
+                'provider': 'r2',
+                'method': 'PUT',
+                'uploadUrl': url,
+                'uploadAuthToken': None,
+                'remotePath': remote_path,
+                'expiresIn': expiration,
+                'bucket': getattr(storage, 'bucket_name', None),
+                # Никаких B2-специфичных заголовков для R2 не требуется.
+                # Content-Type, с которым подписан URL — клиент отправляет его
+                # ровно в таком виде (иначе SignatureDoesNotMatch).
+                'headers': {
+                    'Content-Type': content_type,
+                },
+            })
+
+        return jsonify({'success': False, 'error': f'Unsupported provider: {provider}'}), 501
     except Exception as e:
         logger.error(f"api_b2_get_upload_url error: {e}", exc_info=True)
         return jsonify({'success': False, 'error': f'Internal error: {e}'}), 500

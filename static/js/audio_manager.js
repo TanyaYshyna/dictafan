@@ -1477,33 +1477,59 @@ class AudioManagerClass {
         }
     }
 
-    _getB2LedgerKey(remotePath) {
+    _getLedgerKey(remotePath, provider, bucket) {
+        const p = String(provider || 'b2').toLowerCase();
+        const b = String(bucket || '').trim();
+        const rp = String(remotePath || '').trim();
+        if (b) return `upload_ledger:${p}:${b}:${rp}`;
+        return `upload_ledger:${p}:${rp}`;
+    }
+
+    _getLegacyB2LedgerKey(remotePath) {
         return `b2_ledger:${String(remotePath || '').trim()}`;
     }
 
-    async _getB2Ledger(remotePath) {
+    _getB2LedgerKey(remotePath) {
+        // Обратная совместимость: метод оставлен для старых вызовов.
+        return this._getLegacyB2LedgerKey(remotePath);
+    }
+
+    async _getB2Ledger(remotePath, provider = 'b2', bucket = null) {
         try {
-            const k = this._getB2LedgerKey(remotePath);
-            const row = await this._idbGet(this._b2LedgerStoreName, k);
-            return row && row.value ? row.value : null;
+            const key = this._getLedgerKey(remotePath, provider, bucket);
+            const row = await this._idbGet(this._b2LedgerStoreName, key);
+            if (row && row.value) return row.value;
+            // Обратная совместимость: старые записи B2 лежали под ключом
+            // `b2_ledger:<remotePath>` без провайдера/бакета.
+            if (String(provider || 'b2').toLowerCase() === 'b2') {
+                const legacyRow = await this._idbGet(this._b2LedgerStoreName, this._getLegacyB2LedgerKey(remotePath));
+                if (legacyRow && legacyRow.value) return legacyRow.value;
+            }
+            return null;
         } catch (e) {
             return null;
         }
     }
 
-    async _setB2Ledger(remotePath, value) {
+    async _setB2Ledger(remotePath, value, provider = 'b2', bucket = null) {
         try {
-            const k = this._getB2LedgerKey(remotePath);
-            await this._idbPut(this._b2LedgerStoreName, { key: k, value, updated_at: Date.now() });
+            const key = this._getLedgerKey(remotePath, provider, bucket);
+            await this._idbPut(this._b2LedgerStoreName, { key, value, updated_at: Date.now() });
             return true;
         } catch (e) {
             return false;
         }
     }
 
-    async getB2UploadUrl(token) {
+    async getB2UploadUrl(token, payload = null) {
         const t = String(token || '').trim();
         if (!t) return { ok: false, reason: 'missing_token' };
+        let body;
+        try {
+            body = JSON.stringify(payload && typeof payload === 'object' ? payload : {});
+        } catch (e) {
+            body = JSON.stringify({});
+        }
         let resp;
         try {
             resp = await fetch('/api/b2/get_upload_url', {
@@ -1512,7 +1538,7 @@ class AudioManagerClass {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${t}`
                 },
-                body: JSON.stringify({})
+                body
             });
         } catch (e) {
             return { ok: false, reason: 'get_upload_url_timeout' };
@@ -1522,11 +1548,47 @@ class AudioManagerClass {
             try { text = await resp.text(); } catch (e) {}
             return { ok: false, reason: 'get_upload_url_failed', status: resp.status, text };
         }
-        const json = await resp.json();
-        if (!json || !json.success || !json.uploadUrl || !json.uploadAuthToken) {
+        let json;
+        try {
+            json = await resp.json();
+        } catch (e) {
             return { ok: false, reason: 'get_upload_url_bad_payload' };
         }
-        return { ok: true, uploadUrl: json.uploadUrl, uploadAuthToken: json.uploadAuthToken };
+        if (!json || !json.success || !json.uploadUrl) {
+            return { ok: false, reason: 'get_upload_url_bad_payload' };
+        }
+        const provider = String(json.provider || 'b2').toLowerCase();
+        const method = String(json.method || (provider === 'r2' ? 'PUT' : 'POST')).toUpperCase();
+        // B2 требует uploadAuthToken; для R2 секретный токен не передаётся.
+        if (provider === 'b2' && !json.uploadAuthToken) {
+            return { ok: false, reason: 'get_upload_url_bad_payload' };
+        }
+        return {
+            ok: true,
+            provider,
+            method,
+            uploadUrl: json.uploadUrl,
+            uploadAuthToken: json.uploadAuthToken || null,
+            headers: json.headers || null,
+            remotePath: json.remotePath || null,
+            expiresIn: json.expiresIn || null,
+            bucket: json.bucket || null
+        };
+    }
+
+    async _getStorageInfo() {
+        try {
+            const resp = await fetch('/api/b2/health', { method: 'GET' });
+            if (!resp.ok) return { provider: 'b2', bucket: null };
+            const json = await resp.json();
+            if (!json) return { provider: 'b2', bucket: null };
+            return {
+                provider: String(json.provider || 'b2').toLowerCase(),
+                bucket: json.bucket || null
+            };
+        } catch (e) {
+            return { provider: 'b2', bucket: null };
+        }
     }
 
     async uploadDictationAudioFromCacheToB2({ dictationId, token, urls, shouldUpload = null, onUploaded = null, onProgress = null }) {
@@ -1571,12 +1633,13 @@ class AudioManagerClass {
             } catch (e) {
             }
 
-            const up = await this.getB2UploadUrl(t);
-            if (!up.ok) {
-                console.log('[AudioManager] [FLOW-' + flowNum + '] uploadDictationAudioFromCacheToB2: getB2UploadUrl failed, reason=' + up.reason + ' status=' + up.status);
-                return { ok: false, reason: up.reason, status: up.status, text: up.text };
-            }
-            console.log('[AudioManager] [FLOW-' + flowNum + '] uploadDictationAudioFromCacheToB2: upload URL отримано, починаю завантаження ' + list.length + ' файлів');
+            // Определяем активного провайдера и имя бакета через health-эндпоинт:
+            // B2 получает универсальный upload URL один раз (прежний контракт),
+            // R2 — presigned PUT URL на каждый файл отдельно.
+            const info = await this._getStorageInfo();
+            const provider = info.provider || 'b2';
+            const bucket = info.bucket || null;
+            console.log('[AudioManager] [FLOW-' + flowNum + '] uploadDictationAudioFromCacheToB2: провайдер=' + provider + ' bucket=' + (bucket || '-') + ', починаю завантаження ' + list.length + ' файлів');
 
             let cacheHit = 0;
             let uploaded = 0;
@@ -1651,7 +1714,7 @@ class AudioManagerClass {
 
                     if (sha256) {
                         try {
-                            const prev = await this._getB2Ledger(remotePath);
+                            const prev = await this._getB2Ledger(remotePath, provider, bucket);
                             if (prev && prev.sha256 && String(prev.sha256) === String(sha256) && Number(prev.size || 0) === Number(blob.size || 0)) {
                                 try {
                                     if (typeof onUploaded === 'function') {
@@ -1666,34 +1729,33 @@ class AudioManagerClass {
                         }
                     }
 
-                    console.log('[AudioManager] [FLOW-' + flowNum + '] завантажую на B2: ' + remotePath + ' blobSize=' + blob.size);
-                    let b2Resp;
+                    let uploadOk = false;
                     try {
-                        b2Resp = await fetch(up.uploadUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': up.uploadAuthToken,
-                                'X-Bz-File-Name': encodeURIComponent(remotePath),
-                                'Content-Type': blob.type || 'b2/x-auto',
-                                'X-Bz-Content-Sha1': 'do_not_verify'
-                            },
-                            body: blob
+                        uploadOk = await this._uploadBlobToStorage({
+                            flowNum,
+                            provider,
+                            token: t,
+                            remotePath,
+                            blob,
+                            bucket,
+                            dictationId,
+                            lang,
+                            filename
                         });
-                    } catch (b2FetchErr) {
-                        failed += 1;
-                        console.log('[AudioManager] [FLOW-' + flowNum + '] B2 upload failed: ' + remotePath + ' err=' + String(b2FetchErr && b2FetchErr.message ? b2FetchErr.message : b2FetchErr));
-                        continue;
+                    } catch (e) {
+                        uploadOk = false;
+                        console.log('[AudioManager] [FLOW-' + flowNum + '] upload error: ' + remotePath + ' err=' + String(e && e.message ? e.message : e));
                     }
-                    if (!b2Resp.ok) {
+                    if (!uploadOk) {
                         failed += 1;
-                        console.log('[AudioManager] [FLOW-' + flowNum + '] B2 upload failed: ' + remotePath + ' status=' + b2Resp.status);
                         continue;
                     }
 
                     uploaded += 1;
-                    console.log('[AudioManager] [FLOW-' + flowNum + '] B2 upload success: ' + remotePath + ' uploaded=' + uploaded);
+                    console.log('[AudioManager] [FLOW-' + flowNum + '] upload success (' + provider + '): ' + remotePath + ' uploaded=' + uploaded);
+                    // Записываем в ledger только ПОСЛЕ подтверждённого успеха.
                     try {
-                        await this._setB2Ledger(remotePath, { sha256: sha256 || null, size: Number(blob.size || 0), uploadedAt: Date.now() });
+                        await this._setB2Ledger(remotePath, { sha256: sha256 || null, size: Number(blob.size || 0), uploadedAt: Date.now() }, provider, bucket);
                     } catch (e) {
                     }
                     try {
@@ -1731,6 +1793,95 @@ class AudioManagerClass {
             } catch (e) {
             }
         }
+    }
+
+    async _uploadBlobToStorage({ flowNum, provider, token, remotePath, blob, bucket, dictationId, lang, filename }) {
+        const MAX_ATTEMPTS = 2;
+        const p = String(provider || 'b2').toLowerCase();
+
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            if (p === 'r2') {
+                // Для R2 получаем presigned PUT URL для конкретного ключа.
+                const pu = await this.getB2UploadUrl(token, {
+                    dictation_id: String(dictationId || ''),
+                    lang: String(lang || ''),
+                    filename: String(filename || '')
+                });
+                if (!pu.ok || !pu.uploadUrl) {
+                    console.log('[AudioManager] [FLOW-' + flowNum + '] R2 get presigned PUT failed for ' + remotePath + ': ' + (pu.reason || 'bad_payload'));
+                    return false;
+                }
+                // Content-Type обязан совпадать с тем, которым подписан URL,
+                // иначе R2 вернёт SignatureDoesNotMatch.
+                const headers = {};
+                const signedHeaders = (pu.headers && typeof pu.headers === 'object') ? pu.headers : null;
+                const signedContentType = signedHeaders && (signedHeaders['Content-Type'] || signedHeaders['content-type']);
+                if (signedContentType) {
+                    headers['Content-Type'] = signedContentType;
+                } else if (blob && blob.type) {
+                    headers['Content-Type'] = blob.type;
+                }
+                let r2Resp;
+                try {
+                    r2Resp = await fetch(pu.uploadUrl, {
+                        method: 'PUT',
+                        headers,
+                        body: blob
+                    });
+                } catch (fetchErr) {
+                    console.log('[AudioManager] [FLOW-' + flowNum + '] R2 upload network error: ' + remotePath + ' err=' + String(fetchErr && fetchErr.message ? fetchErr.message : fetchErr));
+                    if (attempt < MAX_ATTEMPTS) continue;
+                    return false;
+                }
+                // R2 возвращает пустое тело (обычно 200 OK без JSON) — это успех.
+                if (r2Resp.ok) {
+                    return true;
+                }
+                // Ссылка могла протухнуть (403/400) — пробуем ещё раз, но только
+                // если это не клиентская ошибка подписи/прав, повторять которую
+                // бессмысленно (403 из-за чужих прав, 400 из-за валидации ключа).
+                if (attempt < MAX_ATTEMPTS && (r2Resp.status === 403 || r2Resp.status === 408 || r2Resp.status === 429 || r2Resp.status >= 500)) {
+                    console.log('[AudioManager] [FLOW-' + flowNum + '] R2 upload retryable: ' + remotePath + ' status=' + r2Resp.status);
+                    continue;
+                }
+                console.log('[AudioManager] [FLOW-' + flowNum + '] R2 upload failed: ' + remotePath + ' status=' + r2Resp.status);
+                return false;
+            }
+
+            // B2: сохраняем прежний контракт POST + заголовки авторизации.
+            const b2Url = await this.getB2UploadUrl(token);
+            if (!b2Url.ok || !b2Url.uploadUrl || !b2Url.uploadAuthToken) {
+                console.log('[AudioManager] [FLOW-' + flowNum + '] B2 get upload url failed for ' + remotePath + ': ' + (b2Url.reason || 'bad_payload'));
+                return false;
+            }
+            let b2Resp;
+            try {
+                b2Resp = await fetch(b2Url.uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': b2Url.uploadAuthToken,
+                        'X-Bz-File-Name': encodeURIComponent(remotePath),
+                        'Content-Type': blob.type || 'b2/x-auto',
+                        'X-Bz-Content-Sha1': 'do_not_verify'
+                    },
+                    body: blob
+                });
+            } catch (fetchErr) {
+                console.log('[AudioManager] [FLOW-' + flowNum + '] B2 upload network error: ' + remotePath + ' err=' + String(fetchErr && fetchErr.message ? fetchErr.message : fetchErr));
+                if (attempt < MAX_ATTEMPTS) continue;
+                return false;
+            }
+            if (b2Resp.ok) {
+                return true;
+            }
+            if (attempt < MAX_ATTEMPTS && (b2Resp.status === 403 || b2Resp.status === 408 || b2Resp.status === 429 || b2Resp.status >= 500)) {
+                console.log('[AudioManager] [FLOW-' + flowNum + '] B2 upload retryable: ' + remotePath + ' status=' + b2Resp.status);
+                continue;
+            }
+            console.log('[AudioManager] [FLOW-' + flowNum + '] B2 upload failed: ' + remotePath + ' status=' + b2Resp.status);
+            return false;
+        }
+        return false;
     }
 
     async cleanupStaleB2DictationAudio({ dictationId, token, keepRemotePaths }) {

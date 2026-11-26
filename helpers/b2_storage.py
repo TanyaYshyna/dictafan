@@ -72,6 +72,24 @@ class B2Storage:
             logger.error("Failed to initialize B2 Storage: %s", e, exc_info=True)
             self.api = None
             self.bucket = None
+
+    def check_availability(self) -> bool:
+        """Проверяет реальную доступность бакета B2.
+
+        Использует get_bucket_by_name — реальный запрос к API B2, который
+        подтверждает, что ключи действующие и бакет с таким именем существует.
+        Не выполняет записей/удалений. Возвращает True/False.
+        """
+        if not self._ensure_initialized() or not self.bucket:
+            return False
+        try:
+            return self.api is not None and self.api.get_bucket_by_name(self.bucket_name) is not None
+        except B2Error as e:
+            logger.error("B2 check_availability failed: %s", e, exc_info=True)
+            return False
+        except Exception as e:
+            logger.error("B2 check_availability failed: type=%s", type(e).__name__, exc_info=True)
+            return False
     
     def upload_file(self, local_path, remote_path):
         """

@@ -1,0 +1,23 @@
+{
+  "_comment": "Cloudflare R2 CORS configuration for the direct browser upload (presigned PUT). Apply to the TEST bucket first. Replace <APP_ORIGIN> with the real production/test domain after it is known. No wildcard (*) is used.",
+  "cors_rules": [
+    {
+      "id": "dictafan-editor-presigned-put",
+      "allowed_origins": [
+        "<APP_ORIGIN>"
+      ],
+      "allowed_methods": [
+        "PUT",
+        "GET",
+        "HEAD"
+      ],
+      "allowed_headers": [
+        "Content-Type"
+      ],
+      "expose_headers": [
+        "ETag"
+      ],
+      "max_age_seconds": 3600
+    }
+  ]
+}

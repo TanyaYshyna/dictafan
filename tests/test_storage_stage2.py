@@ -320,7 +320,9 @@ class TestRouteHealthProviderAware(unittest.TestCase):
         fake.provider = "b2"
         fake.enabled = True
         fake.bucket = object()
+        fake.bucket_name = "my-b2-bucket"
         fake._ensure_initialized.return_value = True
+        fake.check_availability.return_value = True
 
         import helpers.storage as facade
 
@@ -338,7 +340,9 @@ class TestRouteHealthProviderAware(unittest.TestCase):
         fake.provider = "r2"
         fake.enabled = True
         fake.bucket = object()
+        fake.bucket_name = "my-r2-bucket"
         fake._ensure_initialized.return_value = True
+        fake.check_availability.return_value = True
 
         import helpers.storage as facade
 
@@ -355,10 +359,14 @@ class TestRouteHealthProviderAware(unittest.TestCase):
 class TestRouteB2UploadUrlUnchanged(unittest.TestCase):
     """Прямая браузерная загрузка в B2 должна остаться неизменной."""
 
+    def tearDown(self):
+        import helpers.storage as facade
+        facade._storage = None
+
     def test_get_upload_url_uses_b2_storage(self):
         from routes.dictation_editor import editor_bp
         from flask import Flask
-        import helpers.b2_storage as b2mod
+        import helpers.storage as facade
 
         app = Flask(__name__)
         app.register_blueprint(editor_bp)
@@ -369,19 +377,24 @@ class TestRouteB2UploadUrlUnchanged(unittest.TestCase):
             "authorizationToken": "token",
         }
         fake_storage = mock.MagicMock()
+        fake_storage.provider = "b2"
         fake_storage.enabled = True
         fake_storage.bucket = fake_bucket
-        # api_b2_get_upload_url импортирует b2_storage локально внутри функции.
+        fake_storage.bucket_name = "my-b2-bucket"
+        # api_b2_get_upload_url теперь использует фасад get_storage().
         # Эндпоинт под @jwt_required() — отключаем проверку токена.
         import flask_jwt_extended.view_decorators as jwd
 
-        with mock.patch.object(b2mod, "b2_storage", fake_storage), \
+        with mock.patch.object(facade, "get_storage", return_value=fake_storage), \
                 mock.patch.object(jwd, "verify_jwt_in_request", return_value=None):
             client = app.test_client()
-            resp = client.post("/api/b2/get_upload_url", json={"filename": "a.mp3"})
+            resp = client.post("/api/b2/get_upload_url", json={})
             data = resp.get_json()
         self.assertEqual(resp.status_code, 200)
         self.assertIn("uploadUrl", data)
+        self.assertEqual(data.get("provider"), "b2")
+        self.assertEqual(data.get("method"), "POST")
+        self.assertEqual(data.get("uploadAuthToken"), "token")
 
 
 if __name__ == "__main__":
