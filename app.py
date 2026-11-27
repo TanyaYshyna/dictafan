@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, send_from_directory
+from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 import os
 import sys
@@ -20,6 +21,17 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 app = Flask(
     __name__,
     static_folder=None,
+)
+
+# Приложение работает за reverse-proxy (Railway edge). Без ProxyFix Flask
+# не знает о том, что запрос пришёл по HTTPS, поэтому генерирует редиректы
+# и url_for с http://, что ломает переходы (например, /admin → http://.../admin/).
+app.wsgi_app = ProxyFix(
+    app.wsgi_app,
+    x_for=1,
+    x_proto=1,
+    x_host=1,
+    x_port=1,
 )
 
 

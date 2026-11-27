@@ -668,7 +668,9 @@ window.Desktop = window.Desktop || {
       if (name === 'desktop-menu-admin-panel' || name === 'desktop-menu-admin-licenses' || name === 'desktop-admin-licenses') {
         // Управление лицензиями переехало на отдельную страницу администратора.
         // Открываем админ-панель в новой вкладке браузера.
-        window.open('/admin', '_blank', 'noopener');
+        // Открываем с trailing slash, чтобы избежать 308-редиректа /admin → /admin/,
+        // который за reverse-proxy мог генерироваться с http:// (см. ProxyFix в app.py).
+        window.open('/admin/', '_blank', 'noopener');
         return;
       }
       if (name === 'desktop-new') {
