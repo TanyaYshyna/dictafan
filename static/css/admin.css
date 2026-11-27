@@ -385,9 +385,12 @@
 
 .admin-users-delete__table-wrap {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 520px;
   border: 1px solid var(--color-border-light, #e2e8f0);
   border-radius: 10px;
   background: var(--color-panel-bg, #fff);
+  scrollbar-width: thin;
 }
 
 .admin-users-delete__table {
