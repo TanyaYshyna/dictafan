@@ -1,10 +1,11 @@
 {
-  "_comment": "Cloudflare R2 CORS configuration for the direct browser upload (presigned PUT). Apply to the TEST bucket first. Replace <APP_ORIGIN> with the real production/test domain after it is known. No wildcard (*) is used.",
+  "_comment": "Cloudflare R2 CORS configuration for the direct browser upload (presigned PUT). Apply to the PRODUCTION bucket dictafan-prod. Production origin is https://dictafan.com. No wildcard (*) is used. NOTE: the browser sends Content-Type on the presigned PUT, so it MUST be in allowed_headers, and PUT MUST be in allowed_methods — otherwise the preflight (OPTIONS) is denied and fetch() fails with 'Failed to fetch'.",
   "cors_rules": [
     {
       "id": "dictafan-editor-presigned-put",
       "allowed_origins": [
-        "<APP_ORIGIN>"
+        "https://dictafan.com",
+        "https://www.dictafan.com"
       ],
       "allowed_methods": [
         "PUT",
