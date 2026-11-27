@@ -20,6 +20,7 @@
         bindLicenseSection();
         bindPermissionsSection();
         bindTimeSection();
+        bindUsersDeleteSection();
         bindToolbar();
 
         // Дождёмся инициализации UserManager (user_manager.js загружается в base.html)
@@ -913,10 +914,167 @@
     }
 
     // ----------------------------------------------------------------
+    // Вкладка «Удаление пользователей»
+    // ----------------------------------------------------------------
+    let deleteUserId = null;
+    let deleteUserEmail = null;
+
+    function bindUsersDeleteSection() {
+        var refreshBtn = document.getElementById('adminUsersDeleteRefreshBtn');
+        if (refreshBtn) refreshBtn.addEventListener('click', loadUsersForDelete);
+
+        var cancelBtn = document.getElementById('adminUserDeleteCancelBtn');
+        if (cancelBtn) cancelBtn.addEventListener('click', closeUserDeleteModal);
+
+        var confirmBtn = document.getElementById('adminUserDeleteConfirmBtn');
+        if (confirmBtn) confirmBtn.addEventListener('click', confirmDeleteUser);
+
+        var modal = document.getElementById('adminUserDeleteModal');
+        if (modal) {
+            modal.querySelectorAll('[data-close-admin-user-delete]').forEach(function (el) {
+                el.addEventListener('click', closeUserDeleteModal);
+            });
+        }
+
+        loadUsersForDelete();
+    }
+
+    function loadUsersForDelete() {
+        var tableWrap = document.getElementById('adminUsersDeleteTableWrap');
+        if (!tableWrap) return;
+
+        apiGet('/api/admin/users/list')
+            .then(function (data) {
+                if (!data.success || !data.users) {
+                    tableWrap.innerHTML = '<p style="color: #c62828;">' + escapeHtml(data.error || 'Ошибка загрузки') + '</p>';
+                    return;
+                }
+
+                if (data.users.length === 0) {
+                    tableWrap.innerHTML = '<p style="color: #999;">Пользователей нет</p>';
+                    return;
+                }
+
+                var rows = data.users.map(function (u) {
+                    return '<tr>' +
+                        '<td>' + escapeHtml(u.id) + '</td>' +
+                        '<td>' + escapeHtml(u.username || '') + '</td>' +
+                        '<td>' + escapeHtml(u.email || '') + '</td>' +
+                        '<td>' + escapeHtml(u.books_count) + '</td>' +
+                        '<td>' + escapeHtml(u.dictations_count) + '</td>' +
+                        '<td class="admin-users-delete__actions-cell">' +
+                            '<button class="admin-users-delete__trash" type="button" ' +
+                                'data-user-id="' + u.id + '" data-user-email="' + escapeHtml(u.email || '') + '" ' +
+                                'data-user-name="' + escapeHtml(u.username || '') + '" title="Удалить">' +
+                                '<i data-lucide="trash-2"></i>' +
+                            '</button>' +
+                        '</td>' +
+                        '</tr>';
+                }).join('');
+
+                tableWrap.innerHTML =
+                    '<table class="admin-users-delete__table">' +
+                    '<thead><tr>' +
+                    '<th>ID</th><th>Имя</th><th>Почта</th>' +
+                    '<th>Книг</th><th>Диктантов</th><th></th>' +
+                    '</tr></thead>' +
+                    '<tbody>' + rows + '</tbody>' +
+                    '</table>';
+
+                try {
+                    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                        window.lucide.createIcons({ attrs: {} });
+                    }
+                } catch (e) {}
+
+                tableWrap.querySelectorAll('.admin-users-delete__trash').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        openUserDeleteModal(
+                            parseInt(btn.getAttribute('data-user-id')),
+                            btn.getAttribute('data-user-email'),
+                            btn.getAttribute('data-user-name')
+                        );
+                    });
+                });
+            })
+            .catch(function () {
+                tableWrap.innerHTML = '<p style="color: #c62828;">Ошибка соединения</p>';
+            });
+    }
+
+    function openUserDeleteModal(userId, email, name) {
+        deleteUserId = userId;
+        deleteUserEmail = email;
+
+        var subtitle = document.getElementById('adminUserDeleteModalSubtitle');
+        if (subtitle) {
+            var label = name ? name + ' (' + email + ')' : email;
+            subtitle.textContent = 'Пользователь: ' + label;
+        }
+
+        var flag = document.getElementById('adminUserDeleteTransferFlag');
+        if (flag) flag.checked = false;
+
+        var modal = document.getElementById('adminUserDeleteModal');
+        if (modal) modal.style.display = 'block';
+
+        var msgEl = document.getElementById('adminUsersDeleteMessage');
+        if (msgEl) msgEl.style.display = 'none';
+    }
+
+    function closeUserDeleteModal() {
+        var modal = document.getElementById('adminUserDeleteModal');
+        if (modal) modal.style.display = 'none';
+        deleteUserId = null;
+        deleteUserEmail = null;
+    }
+
+    function confirmDeleteUser() {
+        if (!deleteUserId) return;
+
+        var flag = document.getElementById('adminUserDeleteTransferFlag');
+        var transferToAdmin = flag ? flag.checked : false;
+
+        var confirmBtn = document.getElementById('adminUserDeleteConfirmBtn');
+        if (confirmBtn) confirmBtn.disabled = true;
+
+        apiPost('/api/admin/users/delete', {
+            user_id: deleteUserId,
+            transfer_to_admin: transferToAdmin,
+        })
+            .then(function (data) {
+                if (data && data.success) {
+                    closeUserDeleteModal();
+                    showToast(data.message || 'Пользователь удалён', 'success');
+                    loadUsersForDelete();
+                } else {
+                    var msgEl = document.getElementById('adminUsersDeleteMessage');
+                    if (msgEl) {
+                        msgEl.textContent = '❌ ' + (data && data.error ? data.error : 'Ошибка удаления');
+                        msgEl.className = 'admin-license-message error';
+                        msgEl.style.display = 'block';
+                    }
+                    showToast((data && data.error) ? data.error : 'Ошибка удаления', 'error');
+                }
+            })
+            .catch(function () {
+                var msgEl = document.getElementById('adminUsersDeleteMessage');
+                if (msgEl) {
+                    msgEl.textContent = '❌ Ошибка соединения';
+                    msgEl.className = 'admin-license-message error';
+                    msgEl.style.display = 'block';
+                }
+            })
+            .finally(function () {
+                if (confirmBtn) confirmBtn.disabled = false;
+            });
+    }
+
+    // ----------------------------------------------------------------
     // Вспомогательные
     // ----------------------------------------------------------------
     function escapeHtml(str) {
-        if (!str) return '';
+        if (str === null || str === undefined) return '';
         var div = document.createElement('div');
         div.appendChild(document.createTextNode(str));
         return div.innerHTML;

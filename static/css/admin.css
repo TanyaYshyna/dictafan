@@ -353,6 +353,228 @@
   margin-bottom: 12px;
 }
 
+/* ===== ВКЛАДКА "УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЕЙ" ===== */
+.admin-users-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-users-delete__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-users-delete__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+}
+
+.admin-users-delete__header .button-color-yellow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.admin-users-delete__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-radius: 10px;
+  background: var(--color-panel-bg, #fff);
+}
+
+.admin-users-delete__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+  font-size: 13px;
+  color: var(--color-text, #1f2933);
+}
+
+.admin-users-delete__table th,
+.admin-users-delete__table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-light, #e2e8f0);
+  white-space: nowrap;
+}
+
+.admin-users-delete__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-bg-secondary, #f8fafc);
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.admin-users-delete__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-users-delete__table tbody tr:hover {
+  background: var(--color-hover, #f5f5f5);
+}
+
+.admin-users-delete__actions-cell {
+  width: 48px;
+  text-align: center !important;
+}
+
+.admin-users-delete__trash {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #c62828;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-users-delete__trash i {
+  width: 18px;
+  height: 18px;
+}
+
+.admin-users-delete__trash:hover {
+  background: #fdecea;
+  border-color: #ef9a9a;
+}
+
+/* ===== МОДАЛКА УДАЛЕНИЯ ПОЛЬЗОВАТЕЛЯ ===== */
+.admin-users-delete-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100400;
+  display: none;
+}
+
+.admin-users-delete-modal__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.admin-users-delete-modal__dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+  padding: 22px;
+  background: var(--color-panel-bg, #fff);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.admin-users-delete-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text, #1f2933);
+}
+
+.admin-users-delete-modal__subtitle {
+  font-size: 14px;
+  color: var(--color-text-secondary, #6b7280);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.admin-users-delete-modal__flag {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  background: var(--color-bg-secondary, #f8fafc);
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text, #1f2933);
+  line-height: 1.45;
+}
+
+.admin-users-delete-modal__flag input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.admin-users-delete-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-users-delete-modal__cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-light, #e2e8f0);
+  background: var(--color-bg-secondary, #f8fafc);
+  color: var(--color-text, #1f2933);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-users-delete-modal__cancel:hover {
+  background: var(--color-hover, #f5f5f5);
+}
+
+.admin-users-delete-modal__confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: #c62828;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-users-delete-modal__confirm i {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-users-delete-modal__confirm:hover {
+  background: #b71c1c;
+}
+
+.admin-users-delete-modal__confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .admin-panel__tabs-header {
     flex-wrap: wrap;

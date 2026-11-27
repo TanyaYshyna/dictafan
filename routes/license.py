@@ -18,9 +18,10 @@ from helpers.db_license import (
     get_user_current_license,
     update_user_role_by_id,
 )
+from helpers.db_users import list_users_with_counts, delete_user_with_transfer
 from helpers.license_manager import license_manager
 from helpers.db import get_db_connection, get_db_cursor
-from helpers.permission_checker import require_permission
+from helpers.permission_checker import require_permission, _resolve_user_id
 
 license_bp = Blueprint('license', __name__, url_prefix='')
 
@@ -302,6 +303,48 @@ def admin_get_user_role(user_id: int):
         "current_role": role,
         "roles": roles,
     })
+
+
+@license_bp.route('/api/admin/users/list', methods=['GET'])
+@jwt_required()
+@require_permission('manage_licenses')
+def admin_list_users():
+    """
+    Возвращает всех пользователей с количеством созданных книг и диктантов.
+    """
+    try:
+        users = list_users_with_counts()
+        return jsonify({"success": True, "users": users})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@license_bp.route('/api/admin/users/delete', methods=['POST'])
+@jwt_required()
+@require_permission('manage_licenses')
+def admin_delete_user():
+    """
+    Удаляет пользователя.
+
+    body:
+        user_id: int
+        transfer_to_admin: bool — если True, диктанты и книги не удаляются,
+                           а их авторство передаётся администратору.
+    """
+    identity = get_jwt_identity()
+    admin_id = _resolve_user_id(identity)
+
+    data = request.get_json(silent=True) or {}
+    try:
+        user_id = int(data.get('user_id'))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "user_id обязателен"}), 400
+
+    transfer_to_admin = bool(data.get('transfer_to_admin', False))
+
+    result = delete_user_with_transfer(user_id, transfer_to_admin, admin_id)
+    status_code = 200 if result.get("success") else 400
+    return jsonify(result), status_code
 
 
 @license_bp.route('/api/admin/user/<int:user_id>/role', methods=['POST'])

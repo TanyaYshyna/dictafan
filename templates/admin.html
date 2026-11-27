@@ -63,6 +63,10 @@
                     <i data-lucide="users"></i>
                     <span>Права пользователей</span>
                 </button>
+                <button class="admin-panel__tab-btn" data-tab="users-delete" type="button">
+                    <i data-lucide="trash-2"></i>
+                    <span>Удаление пользователей</span>
+                </button>
             </div>
 
             <div class="admin-panel__tabs-body">
@@ -303,6 +307,43 @@
                             </button>
 
                             <div id="adminPermissionsMessage" class="admin-license-message" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Вкладка: удаление пользователей -->
+                <div id="admin-tab-users-delete" class="admin-panel__tab-content">
+                    <div class="admin-panel__tab-inner">
+                        <div class="admin-users-delete">
+                            <div class="admin-users-delete__header">
+                                <div class="admin-users-delete__title">Все пользователи</div>
+                                <button id="adminUsersDeleteRefreshBtn" class="button-color-yellow" type="button">
+                                    <i data-lucide="refresh-cw"></i>
+                                    <span>Обновить</span>
+                                </button>
+                            </div>
+                            <div id="adminUsersDeleteTableWrap" class="admin-users-delete__table-wrap"></div>
+                            <div id="adminUsersDeleteMessage" class="admin-license-message" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Модалка подтверждения удаления пользователя -->
+                <div id="adminUserDeleteModal" class="admin-users-delete-modal" style="display: none;">
+                    <div class="admin-users-delete-modal__overlay" data-close-admin-user-delete></div>
+                    <div class="admin-users-delete-modal__dialog" role="dialog" aria-modal="true">
+                        <div class="admin-users-delete-modal__title">Удалить пользователя?</div>
+                        <div class="admin-users-delete-modal__subtitle" id="adminUserDeleteModalSubtitle"></div>
+                        <label class="admin-users-delete-modal__flag">
+                            <input type="checkbox" id="adminUserDeleteTransferFlag">
+                            <span>Диктанты и книги не удалять, а отдать авторство админу</span>
+                        </label>
+                        <div class="admin-users-delete-modal__actions">
+                            <button id="adminUserDeleteCancelBtn" class="admin-users-delete-modal__cancel" type="button">Отмена</button>
+                            <button id="adminUserDeleteConfirmBtn" class="admin-users-delete-modal__confirm" type="button">
+                                <i data-lucide="trash-2"></i>
+                                <span>Удалить</span>
+                            </button>
                         </div>
                     </div>
                 </div>

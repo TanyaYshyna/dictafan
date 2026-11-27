@@ -1067,3 +1067,232 @@ def mark_email_verified(email: str) -> bool:
         cur.close()
         conn.close()
 
+
+def list_users_with_counts() -> List[dict]:
+    """
+    Возвращает список всех пользователей с количеством созданных ими книг
+    и диктантов.
+
+    Книги считаются по books.creator_user_id, диктанты — по dictations.owner_id.
+    Используем COUNT(DISTINCT ...), т.к. LEFT JOIN по обеим таблицам даёт
+    декартово произведение.
+    """
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT
+                u.id,
+                u.username,
+                u.email,
+                COUNT(DISTINCT b.id)::int AS books_count,
+                COUNT(DISTINCT d.id)::int AS dictations_count
+            FROM users u
+            LEFT JOIN books b ON b.creator_user_id = u.id
+            LEFT JOIN dictations d ON d.owner_id = u.id
+            GROUP BY u.id, u.username, u.email
+            ORDER BY u.id ASC
+            """
+        )
+        rows = cur.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "username": r["username"],
+                "email": r["email"],
+                "books_count": int(r["books_count"] or 0),
+                "dictations_count": int(r["dictations_count"] or 0),
+            }
+            for r in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
+
+def delete_user_with_transfer(
+    user_id: int,
+    transfer_to_admin: bool,
+    admin_id: int,
+) -> dict:
+    """
+    Удаляет пользователя.
+
+    Если transfer_to_admin=True — диктанты и книги не удаляются, а их авторство
+    передаётся администратору (dictations.owner_id и books.creator_user_id).
+
+    Если transfer_to_admin=False — диктанты и книги пользователя удаляются,
+    а сам пользователь затем удаляется из БД.
+
+    Возвращает {"success": True, ...} или {"success": False, "error": ...}.
+    """
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        return {"success": False, "error": "Некорректный user_id"}
+    try:
+        admin_id = int(admin_id)
+    except (TypeError, ValueError):
+        return {"success": False, "error": "Не удалось определить администратора"}
+
+    if user_id == admin_id:
+        return {"success": False, "error": "Нельзя удалить текущего администратора"}
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute("SELECT id, email FROM users WHERE id = %s", (user_id,))
+        user_row = cur.fetchone()
+        if not user_row:
+            return {"success": False, "error": "Пользователь не найден"}
+
+        # Проверяем, что админ существует.
+        cur.execute("SELECT id FROM users WHERE id = %s", (admin_id,))
+        if not cur.fetchone():
+            return {"success": False, "error": "Администратор не найден"}
+
+        # Список существующих таблиц для безопасного удаления ссылок.
+        cur.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+        )
+        existing_tables = {r["table_name"] for r in cur.fetchall()}
+
+        def _delete_if_exists(table_name: str, sql: str, params) -> None:
+            if table_name in existing_tables:
+                cur.execute(sql, params)
+
+        if transfer_to_admin:
+            # Передаём авторство администратору, ничего не удаляя.
+            _delete_if_exists(
+                "books",
+                "UPDATE books SET creator_user_id = %s WHERE creator_user_id = %s",
+                (admin_id, user_id),
+            )
+            _delete_if_exists(
+                "dictations",
+                "UPDATE dictations SET owner_id = %s WHERE owner_id = %s",
+                (admin_id, user_id),
+            )
+        else:
+            # 1. Удаляем диктанты пользователя и все ссылки на них.
+            #    Набор таблиц повторяет delete_book() из helpers/db_books.py,
+            #    чтобы не нарушить FK, у которых нет ON DELETE CASCADE.
+            for _table, _sql in [
+                ("history_by_day", "DELETE FROM history_by_day WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("plan_tasks", "DELETE FROM plan_tasks WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("history_current", "DELETE FROM history_current WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("desk_items", "DELETE FROM desk_items WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("dictation_sentences", "DELETE FROM dictation_sentences WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("dictation_exercises", "DELETE FROM dictation_exercises WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("history_activity", "DELETE FROM history_activity WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("history_successes", "DELETE FROM history_successes WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("dictation_records", "DELETE FROM dictation_records WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("dictation_votes", "DELETE FROM dictation_votes WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("assignments", "DELETE FROM assignments WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+                ("book_dictations", "DELETE FROM book_dictations WHERE dictation_id IN (SELECT id FROM dictations WHERE owner_id = %s)"),
+            ]:
+                _delete_if_exists(_table, _sql, (user_id,))
+
+            _delete_if_exists(
+                "dictations",
+                "DELETE FROM dictations WHERE owner_id = %s",
+                (user_id,),
+            )
+
+            # 2. Удаляем книги пользователя: сначала ссылки, затем книги от листьев
+            #    к корню, чтобы не нарушить FK books.parent_id и books.root_book_id.
+            cur.execute(
+                "SELECT id, parent_id FROM books WHERE creator_user_id = %s",
+                (user_id,),
+            )
+            book_rows = cur.fetchall()
+            book_ids = sorted({int(r["id"]) for r in book_rows})
+            parent_map = {
+                int(r["id"]): (int(r["parent_id"]) if r.get("parent_id") is not None else None)
+                for r in book_rows
+            }
+
+            if book_ids:
+                _delete_if_exists(
+                    "user_books",
+                    """
+                    DELETE FROM user_books
+                    WHERE book_id IN (SELECT id FROM books WHERE creator_user_id = %s)
+                    """,
+                    (user_id,),
+                )
+                _delete_if_exists(
+                    "book_dictations",
+                    """
+                    DELETE FROM book_dictations
+                    WHERE book_id IN (SELECT id FROM books WHERE creator_user_id = %s)
+                    """,
+                    (user_id,),
+                )
+
+                remaining = set(book_ids)
+                while remaining:
+                    progressed = False
+                    for bid in sorted(remaining):
+                        pid = parent_map.get(bid)
+                        if pid is not None and pid in remaining:
+                            continue
+                        cur.execute("DELETE FROM books WHERE id = %s", (bid,))
+                        remaining.discard(bid)
+                        progressed = True
+                    if not progressed:
+                        # Защита от циклов в parent_id: удаляем остатки в произвольном порядке.
+                        for bid in sorted(remaining):
+                            try:
+                                cur.execute("DELETE FROM books WHERE id = %s", (bid,))
+                            except Exception:
+                                pass
+                        remaining.clear()
+
+        # 3. Удаляем личные ссылки пользователя на чужие материалы (стол и полка),
+        #    чтобы не нарушить возможные FK desk_items.user_id / user_books.user_id.
+        _delete_if_exists(
+            "desk_items",
+            "DELETE FROM desk_items WHERE user_id = %s",
+            (user_id,),
+        )
+        _delete_if_exists(
+            "user_books",
+            "DELETE FROM user_books WHERE user_id = %s",
+            (user_id,),
+        )
+
+        # 4. Обходим FK ON DELETE RESTRICT к users(id):
+        #    - history_by_day.teacher_id (NOT NULL) — передаём администратору;
+        #    - groups.teacher_id — передаём администратору.
+        _delete_if_exists(
+            "history_by_day",
+            "UPDATE history_by_day SET teacher_id = %s WHERE teacher_id = %s",
+            (admin_id, user_id),
+        )
+        _delete_if_exists(
+            "groups",
+            "UPDATE groups SET teacher_id = %s WHERE teacher_id = %s",
+            (admin_id, user_id),
+        )
+
+        # 5. Удаляем пользователя (остальные FK — ON DELETE CASCADE / SET NULL).
+        cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
+        deleted = cur.rowcount > 0
+        conn.commit()
+
+        return {
+            "success": True,
+            "deleted": deleted,
+            "message": (
+                "Пользователь удалён, авторство передано администратору"
+                if transfer_to_admin
+                else "Пользователь и его диктанты/книги удалены"
+            ),
+        }
+    except Exception as exc:
+        conn.rollback()
+        return {"success": False, "error": str(exc)}
+    finally:
+        cur.close()
+        conn.close()
+
