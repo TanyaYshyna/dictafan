@@ -1579,15 +1579,24 @@ class AudioManagerClass {
     async _getStorageInfo() {
         try {
             const resp = await fetch('/api/b2/health', { method: 'GET' });
-            if (!resp.ok) return { provider: 'b2', bucket: null };
+            if (!resp.ok) {
+                console.warn('[AudioManager] _getStorageInfo: health вернул HTTP ' + resp.status + ' — хранилище недоступно, загрузка будет пропущена');
+                return { provider: 'b2', bucket: null, status: 'error' };
+            }
             const json = await resp.json();
-            if (!json) return { provider: 'b2', bucket: null };
+            if (!json) return { provider: 'b2', bucket: null, status: 'error' };
+            const status = String(json.status || '').toLowerCase();
+            if (status !== 'ok') {
+                console.warn('[AudioManager] _getStorageInfo: storage status="' + status + '" message=' + (json.message || '-'));
+            }
             return {
                 provider: String(json.provider || 'b2').toLowerCase(),
-                bucket: json.bucket || null
+                bucket: json.bucket || null,
+                status: status || 'ok'
             };
         } catch (e) {
-            return { provider: 'b2', bucket: null };
+            console.warn('[AudioManager] _getStorageInfo: health check error:', e);
+            return { provider: 'b2', bucket: null, status: 'error' };
         }
     }
 
@@ -1639,6 +1648,10 @@ class AudioManagerClass {
             const info = await this._getStorageInfo();
             const provider = info.provider || 'b2';
             const bucket = info.bucket || null;
+            if (info.status && info.status !== 'ok') {
+                console.warn('[AudioManager] [FLOW-' + flowNum + '] uploadDictationAudioFromCacheToB2: хранилище недоступно (status=' + info.status + '), загрузка пропущена');
+                return { ok: false, reason: 'storage_unavailable', status: info.status, provider, bucket, dictationId, urls: list.length, cacheHit: 0, uploaded: 0, skipped: 0, failed: 0, cacheMiss: 0, hashed: 0 };
+            }
             console.log('[AudioManager] [FLOW-' + flowNum + '] uploadDictationAudioFromCacheToB2: провайдер=' + provider + ' bucket=' + (bucket || '-') + ', починаю завантаження ' + list.length + ' файлів');
 
             let cacheHit = 0;

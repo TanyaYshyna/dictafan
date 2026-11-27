@@ -722,7 +722,20 @@ def save_dictation_final():
     from helpers.storage import get_storage
 
     storage = get_storage()
-    
+    logger.info(
+        "🗄️ Storage: provider=%s enabled=%s bucket=%s",
+        getattr(storage, 'provider', 'unknown'),
+        bool(getattr(storage, 'enabled', False)),
+        getattr(storage, 'bucket_name', None),
+    )
+    if not getattr(storage, 'enabled', False):
+        logger.warning(
+            "⚠️ Хранилище ОТКЛЮЧЕНО (provider=%s, enabled=False). Аудио и обложка "
+            "НЕ будут загружены ни в B2, ни в R2! Проверь STORAGE_PROVIDER, "
+            "R2_* (или B2_*) переменные в Railway.",
+            getattr(storage, 'provider', 'unknown'),
+        )
+
     try:
         data = request.get_json()
         
@@ -1374,8 +1387,11 @@ def save_dictation_final():
                 # Загружаем обложку в хранилище
                 if storage.enabled:
                     remote_path = f"dictations_covers/{numeric_id}.webp"
-                    storage.upload_file(cover_dst, remote_path)
-                    logger.info(f"✅ Ковер загружен в хранилище: {remote_path}")
+                    cover_url = storage.upload_file(cover_dst, remote_path)
+                    if cover_url:
+                        logger.info(f"✅ Ковер загружен в хранилище: {remote_path}")
+                    else:
+                        logger.warning(f"Не удалось загрузить ковер в хранилище: {remote_path}")
             else:
                 logger.warning(f"⚠️ Ковер не найден в temp папке: {temp_path}/cover.webp")
 
