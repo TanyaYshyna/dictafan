@@ -1099,84 +1099,36 @@ def api_email_test_send():
 @user_bp.route('/api/avatar', methods=['POST'])
 @jwt_required()
 def api_upload_avatar():
-    """Загрузка аватара пользователя"""
+    """Загрузка аватара пользователя.
+
+    Обработка/запись полностью делегированы единому модулю
+    helpers/media_store.py (запись аватаров).
+    """
     try:
         current_email = get_jwt_identity()
-        # Ищем пользователя в БД (основное хранилище)
         user_db = get_user_by_email(current_email)
         if not user_db:
             return jsonify({'error': 'User not found'}), 404
-        
+
         if 'avatar' not in request.files:
             return jsonify({'error': 'No avatar file provided'}), 400
-        
+
         avatar_file = request.files['avatar']
-        
+
         if avatar_file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
-        
-        # Проверяем что это изображение
+
         if not avatar_file.content_type.startswith('image/'):
             return jsonify({'error': 'File must be an image'}), 400
-        
-        # Получаем папку пользователя (локальный кэш для аватаров)
-        user_folder = get_user_folder(current_email)
-        os.makedirs(user_folder, exist_ok=True)
-        
-        # Открываем изображение
-        image = Image.open(avatar_file.stream)
-        
-        # Размеры для аватаров
-        LARGE_SIZE = (100, 100)
-        SMALL_SIZE = (40, 40)
-        
-        # Создаем большую версию (100x100)
-        avatar_large = image.copy()
-        avatar_large.thumbnail(LARGE_SIZE, Image.Resampling.LANCZOS)
-        
-        # Создаем маленькую версию (40x40)
-        avatar_small = image.copy()
-        avatar_small.thumbnail(SMALL_SIZE, Image.Resampling.LANCZOS)
-        
-        # Сохраняем аватары локально в папку, основанную на user_id (через get_user_folder)
-        avatar_large_path = os.path.join(user_folder, 'avatar.webp')
-        avatar_small_path = os.path.join(user_folder, 'avatar_min.webp')
-        avatar_large.save(avatar_large_path, 'WEBP', quality=85)
-        avatar_small.save(avatar_small_path, 'WEBP', quality=85)
+
+        from helpers.media_store import save_avatar
 
         user_id = user_db['id']
-        
-        # Всегда используем локальные URL для аватаров (внешнее хранилище может вызывать SSL проблемы)
-        # Файлы сохраняются локально, а если хранилище включено - дополнительно загружаются туда как бэкап
-        from helpers.storage import get_storage
-        storage = get_storage()
-        provider = getattr(storage, 'provider', 'b2')
+        save_avatar(user_id, avatar_file)
+
         avatar_large_url = f'/user/api/avatar?user_id={user_id}&size=large'
         avatar_small_url = f'/user/api/avatar?user_id={user_id}&size=small'
-        
-        # Если хранилище включено — загружаем туда как бэкап (но не используем URL для фронтенда)
-        if storage.enabled:
-            user_id_folder = f"user_{user_id}"
 
-            remote_large = f'avatars/{user_id_folder}/avatar.webp'
-            print(f"📤 Загрузка в {provider.upper()}: {remote_large}")
-            large_result = storage.upload_file(str(avatar_large_path), remote_large)
-            if large_result:
-                print(f"✅ Загружено в {provider.upper()}: {remote_large}")
-            else:
-                print(f"❌ Ошибка загрузки в {provider.upper()}: {remote_large}")
-
-            remote_small = f'avatars/{user_id_folder}/avatar_min.webp'
-            print(f"📤 Загрузка в {provider.upper()}: {remote_small}")
-            small_result = storage.upload_file(str(avatar_small_path), remote_small)
-            if small_result:
-                print(f"✅ Загружено в {provider.upper()}: {remote_small}")
-            else:
-                print(f"❌ Ошибка загрузки в {provider.upper()}: {remote_small}")
-        else:
-            print("ℹ️  Storage выключен (B2_ENABLED=false или не настроен)")
-
-        # Возвращаем URL для фронтенда (вычислены по шаблону, ничего не храним в БД)
         return jsonify({
             'message': 'Avatar uploaded successfully',
             'avatar_urls': {
@@ -1184,19 +1136,22 @@ def api_upload_avatar():
                 'small': avatar_small_url
             }
         })
-        
     except Exception as e:
         print(f"Error uploading avatar: {e}")
         return jsonify({'error': str(e)}), 500
 
 @user_bp.route('/api/avatar')
 def api_get_avatar():
-    """Получение аватара пользователя"""
+    """Получение аватара пользователя.
+
+    Чтение делегировано единому модулю helpers/media_store.py
+    (принцип «сначала кеш, потом хранилище» реализован ТОЛЬКО там).
+    """
     try:
         email = request.args.get('email')
         user_id = request.args.get('user_id')
         size = request.args.get('size', 'large')
-        
+
         # Получаем user_id либо из параметра, либо из email
         if user_id:
             try:
@@ -1211,49 +1166,31 @@ def api_get_avatar():
         else:
             return jsonify({'error': 'Email or user_id parameter required'}), 400
 
-        # Вычисляем путь к аватару по шаблону user_<id>
-        # В проде и при работе через git worktree данные могут жить вне репозитория,
-        # поэтому учитываем STATIC_DATA_FOLDER.
-        data_base = os.getenv('STATIC_DATA_FOLDER')
-        if not data_base:
-            # current_app.root_path тут надёжнее, чем относительный путь
-            from flask import current_app
-            data_base = os.path.join(current_app.root_path, 'static', 'data')
+        from helpers.media_store import (
+            avatar_local_path,
+            avatar_remote_path,
+            get_or_fetch_local,
+        )
 
-        user_folder = os.path.join(data_base, 'users', f'user_{user_id}')
-        try:
-            os.makedirs(user_folder, exist_ok=True)
-        except Exception:
-            pass
-        avatar_filename = 'avatar.webp' if size == 'large' else 'avatar_min.webp'
-        avatar_path = os.path.join(user_folder, avatar_filename)
-        
-        # Принцип «сначала кеш, потом хранилище»:
-        # аватар отдаём из локального кеша, если он уже есть. Хранилище (платный file_exists +
-        # download) дёргаем ТОЛЬКО когда локального файла нет.
-        from helpers.storage import get_storage
-        storage = get_storage()
-        if not os.path.exists(avatar_path) and storage.enabled:
-            remote_path = f"avatars/user_{user_id}/{avatar_filename}"
-            try:
-                if storage.file_exists(remote_path):
-                    storage.download_file(remote_path, avatar_path)
-            except Exception as e:
-                print(f"Error getting avatar from storage: {e}")
-        
-        # Проверяем локальный кэш или дефолтный аватар
-        if not os.path.exists(avatar_path):
+        avatar_path = get_or_fetch_local(
+            avatar_remote_path(user_id, size),
+            avatar_local_path(user_id, size),
+            tmp_prefix="avatar_",
+        )
+
+        # Если нет ни кеша, ни объекта в хранилище — дефолтный аватар.
+        if not avatar_path:
             from flask import current_app
             default_path = os.path.join(current_app.root_path, 'static', 'icons', f'default-avatar-{size}.svg')
-            
+
             if not os.path.exists(default_path):
                 # Если файлов по умолчанию нет, возвращаем логотип как запасной вариант
                 default_path = os.path.join(current_app.root_path, 'static', 'icons', 'logo.svg')
                 if not os.path.exists(default_path):
                     return jsonify({'error': 'Avatar not found'}), 404
-            
+
             avatar_path = default_path
-        
+
         # Определяем MIME type в зависимости от расширения файла
         if avatar_path.endswith('.webp'):
             mimetype = 'image/webp'
@@ -1263,10 +1200,9 @@ def api_get_avatar():
             mimetype = 'image/svg+xml'
         else:
             mimetype = 'image/jpeg'
-        
-        # Возвращаем файл аватара
+
         return send_file(avatar_path, mimetype=mimetype)
-        
+
     except Exception as e:
         # Для UI аватар НЕ должен ломать страницу: возвращаем дефолтный аватар.
         try:

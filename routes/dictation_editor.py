@@ -1364,34 +1364,18 @@ def save_dictation_final():
                         break
             
             if os.path.exists(cover_src):
-                cover_dst = os.path.join(final_path, 'cover.webp')
-                # Создаем папку назначения
-                os.makedirs(os.path.dirname(cover_dst), exist_ok=True)
-                shutil.copy2(cover_src, cover_dst)
-                logger.info(f"✅ Ковер скопирован: {cover_src} -> {cover_dst}")
-
                 numeric_id = str(dictation_id).split('_', 1)[1] if str(dictation_id).startswith('dict_') else str(dictation_id)
 
-                # Обновляем серверный локальный кеш /api/dictations_covers/<id>.webp.
-                # Без этого api_get_dictation_cover_webp будет отдавать СТАРЫЙ ковер:
-                # он сначала проверяет локальный файл и НЕ смотрит в B2.
-                try:
-                    covers_cache_dir = os.path.join('static', 'data', 'dictations_covers')
-                    os.makedirs(covers_cache_dir, exist_ok=True)
-                    local_cover_cache = os.path.join(covers_cache_dir, f"{numeric_id}.webp")
-                    shutil.copy2(cover_dst, local_cover_cache)
-                    logger.info(f"✅ Ковер обновлён в локальном кеше: {local_cover_cache}")
-                except Exception as e:
-                    logger.warning(f"⚠️ Не удалось обновить локальный кеш ковера: {e}")
+                # Обложка хранится ТОЛЬКО в объектном хранилище (R2). Локальные
+                # копии на диске Railway больше не создаются — ни в
+                # static/data/dictations/<id>/cover.webp, ни в
+                # static/data/dictations_covers/<id>.webp. Единственный источник
+                # истины для обложки теперь R2, а /api/dictations_covers/<id>.webp
+                # при первом GET сам скачивает её в свой read-through кеш.
+                # Запись полностью делегирована единому модулю helpers/media_store.py.
+                from helpers.media_store import upload_dictation_cover
 
-                # Загружаем обложку в хранилище
-                if storage.enabled:
-                    remote_path = f"dictations_covers/{numeric_id}.webp"
-                    cover_url = storage.upload_file(cover_dst, remote_path)
-                    if cover_url:
-                        logger.info(f"✅ Ковер загружен в хранилище: {remote_path}")
-                    else:
-                        logger.warning(f"Не удалось загрузить ковер в хранилище: {remote_path}")
+                upload_dictation_cover(numeric_id, cover_src)
             else:
                 logger.warning(f"⚠️ Ковер не найден в temp папке: {temp_path}/cover.webp")
 

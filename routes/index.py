@@ -1026,76 +1026,28 @@ def api_get_dictation_cover_webp(numeric_id: int):
     """
     Получение обложки диктанта по каноническому URL.
 
-    Принцип «сначала кеш, потом хранилище»:
-    1) Если файл уже лежит в локальном кеше (static/data/dictations_covers/) — отдаём его,
-       БЕЗ обращения к B2.
-    2) Иначе один раз скачиваем из B2 в локальный кеш и отдаём.
-    3) Если в B2 нет — 404 (фронт подставит fallback через onerror).
+    Чтение/запись полностью делегированы единому модулю helpers/media_store.py:
+    принцип «сначала кеш, потом хранилище» реализован ТОЛЬКО там.
+    1) Если файл уже лежит в локальном кеше — отдаём его без обращения к хранилищу.
+    2) Иначе один раз скачиваем из хранилища в кеш и отдаём.
+    3) Если в хранилище нет — 404 (фронт подставит fallback через onerror).
     """
-    from helpers.storage import get_storage
-
-    storage = get_storage()
+    from helpers.media_store import (
+        dictation_cover_local_path,
+        dictation_cover_remote_path,
+        get_or_fetch_local,
+    )
 
     try:
         if not numeric_id or numeric_id <= 0:
             return jsonify({'error': 'numeric_id parameter required'}), 400
 
-        # Локальный кеш обложек диктантов (создаётся при первом скачивании).
-        data_base = _get_static_data_base_dir()
-        covers_cache_dir = os.path.join(data_base, "dictations_covers")
-        local_path = os.path.join(covers_cache_dir, f"{numeric_id}.webp")
+        remote_path = dictation_cover_remote_path(numeric_id)
+        local_path = dictation_cover_local_path(numeric_id)
 
-        # 1) Сначала локальный кеш — без сети и B2.
-        if os.path.exists(local_path):
-            return send_from_directory(covers_cache_dir, f"{numeric_id}.webp")
-
-        if not storage.enabled:
-            return jsonify({'error': 'Storage is disabled'}), 503
-
-        remote_path_new = f"dictations_covers/{numeric_id}.webp"
-
-        # 2) Скачиваем из B2 один раз и сохраняем в локальный кеш.
-        try:
-            os.makedirs(covers_cache_dir, exist_ok=True)
-        except OSError:
-            pass
-
-        import tempfile
-        from flask import after_this_request
-
-        tmp = tempfile.NamedTemporaryFile(prefix="dict_cover_", suffix=".webp", delete=False)
-        tmp_path = tmp.name
-        tmp.close()
-
-        ok = False
-        try:
-            ok = storage.download_file(remote_path_new, tmp_path)
-        except Exception:
-            ok = False
-
-        if not ok:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+        served_path = get_or_fetch_local(remote_path, local_path, tmp_prefix="dict_cover_")
+        if not served_path:
             return jsonify({'error': 'Cover not found'}), 404
-
-        # Атомарно перемещаем скачанный файл в локальный кеш.
-        try:
-            import shutil
-            shutil.move(tmp_path, local_path)
-            served_path = local_path
-        except Exception:
-            served_path = tmp_path
-
-        @after_this_request
-        def _cleanup_tmp(response):
-            try:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-            except OSError:
-                pass
-            return response
 
         return send_from_directory(os.path.dirname(served_path), os.path.basename(served_path))
     except Exception as e:

@@ -3,7 +3,6 @@ import os
 import shutil
 from flask import Blueprint, render_template, jsonify, request, current_app, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from PIL import Image
 
 from helpers.db import get_db_cursor
 from helpers.db_users import get_user_by_email
@@ -235,18 +234,20 @@ def api_get_book_cover():
     """
     Получение обложки книги.
 
-    Принцип «сначала кеш, потом хранилище»:
-    1) Если обложка уже лежит в локальном кеше (static/data/books_covers/) — отдаём её,
-       БЕЗ обращения к B2.
-    2) Иначе один раз скачиваем из B2 в локальный кеш и отдаём.
-    3) Если в B2 нет — дефолтная обложка.
+    Чтение/запись полностью делегированы единому модулю helpers/media_store.py:
+    принцип «сначала кеш, потом хранилище» реализован ТОЛЬКО там.
+    1) Если обложка уже лежит в локальном кеше — отдаём её без обращения к хранилищу.
+    2) Иначе один раз скачиваем из хранилища в кеш и отдаём.
+    3) Если в хранилище нет — дефолтная обложка.
 
     Отдаём Cache-Control: public, max-age — чтобы SW (staleWhileRevalidateImage) и браузер
     могли кешировать обложку, а не качать её снова при каждом открытии книги.
     """
-    from helpers.storage import get_storage
-
-    storage = get_storage()
+    from helpers.media_store import (
+        book_cover_local_path,
+        book_cover_remote_path,
+        get_or_fetch_local,
+    )
 
     try:
         from flask import after_this_request
@@ -260,74 +261,23 @@ def api_get_book_cover():
             return response
 
         book_id = request.args.get("book_id")
-        user_id = request.args.get("user_id")
-        filename = request.args.get("filename", "cover.webp")
 
         if not book_id:
             return jsonify({"error": "book_id parameter required"}), 400
 
-        data_base = os.getenv("STATIC_DATA_FOLDER") or os.path.join(current_app.root_path, "static", "data")
-        covers_cache_dir = os.path.join(data_base, "books_covers")
-        local_path = os.path.join(covers_cache_dir, f"{book_id}.webp")
+        served_path = get_or_fetch_local(
+            book_cover_remote_path(book_id),
+            book_cover_local_path(book_id),
+            tmp_prefix="book_cover_",
+        )
 
-        # 1) Локальный кеш — без сети и B2.
-        if os.path.exists(local_path):
-            return send_from_directory(covers_cache_dir, f"{book_id}.webp")
-
-        if not storage.enabled:
+        if not served_path:
             # fallback: дефолтная обложка
+            data_base = os.getenv("STATIC_DATA_FOLDER") or os.path.join(current_app.root_path, "static", "data")
             default_path = os.path.join(data_base, "covers", "cover_en.webp")
             if os.path.exists(default_path):
                 return send_from_directory(os.path.dirname(default_path), os.path.basename(default_path))
             return jsonify({"error": "Cover not found"}), 404
-
-        remote_path_new = f"books_covers/{book_id}.webp"
-
-        try:
-            os.makedirs(covers_cache_dir, exist_ok=True)
-        except OSError:
-            pass
-
-        import tempfile
-        from flask import after_this_request
-
-        tmp = tempfile.NamedTemporaryFile(prefix="book_cover_", suffix=".webp", delete=False)
-        tmp_path = tmp.name
-        tmp.close()
-
-        ok = False
-        try:
-            ok = storage.download_file(remote_path_new, tmp_path)
-        except Exception:
-            ok = False
-
-        if not ok:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-            # fallback: дефолтная обложка
-            default_path = os.path.join(data_base, "covers", "cover_en.webp")
-            if os.path.exists(default_path):
-                return send_from_directory(os.path.dirname(default_path), os.path.basename(default_path))
-            return jsonify({"error": "Cover not found"}), 404
-
-        # Атомарно перемещаем скачанный файл в локальный кеш.
-        try:
-            import shutil
-            shutil.move(tmp_path, local_path)
-            served_path = local_path
-        except Exception:
-            served_path = tmp_path
-
-        @after_this_request
-        def _cleanup_tmp(response):
-            try:
-                if os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-            except OSError:
-                pass
-            return response
 
         return send_from_directory(os.path.dirname(served_path), os.path.basename(served_path))
     except Exception as exc:
@@ -1021,69 +971,21 @@ def _save_book_cover(book_id: int, creator_user_id: int, cover_file) -> str:
     Сохраняет обложку книги.
     Frontend уже отправляет готовое изображение 200x200 в формате webp.
     Возвращает URL обложки или None в случае ошибки.
+
+    Вся логика обработки/записи делегирована единому модулю
+    helpers/media_store.py (запись обложек книг).
     """
-    from helpers.storage import get_storage
+    from helpers.media_store import save_book_cover
 
     try:
         logger.info(
-            "Saving book cover: book_id=%s user_id=%s filename=%s content_type=%s b2_enabled=%s",
+            "Saving book cover: book_id=%s user_id=%s filename=%s content_type=%s",
             book_id,
             creator_user_id,
             getattr(cover_file, "filename", None),
             getattr(cover_file, "content_type", None),
-            bool(getattr(get_storage(), "enabled", False)),
         )
-        # Проверяем, что это изображение
-        if not cover_file.content_type.startswith("image/"):
-            logger.warning("Файл обложки не является изображением: %s", cover_file.content_type)
-            return None
-
-        if not get_storage().enabled:
-            logger.error("Storage is disabled; refusing to save book cover (Option A)")
-            return None
-
-        # Открываем изображение
-        image = Image.open(cover_file.stream)
-        
-        # Конвертируем в RGB если нужно (для webp)
-        if image.mode in ('RGBA', 'LA', 'P'):
-            # Создаем белый фон для прозрачных изображений
-            background = Image.new('RGB', image.size, (255, 255, 255))
-            if image.mode == 'P':
-                image = image.convert('RGBA')
-            background.paste(image, mask=image.split()[-1] if image.mode in ('RGBA', 'LA') else None)
-            image = background
-        elif image.mode != 'RGB':
-            image = image.convert('RGB')
-
-        # Убеждаемся что размер 200x200 (на случай если cropper не сработал)
-        if image.size != (200, 200):
-            image = image.resize((200, 200), Image.Resampling.LANCZOS)
-
-        import tempfile
-
-        tmp = tempfile.NamedTemporaryFile(prefix=f"book_{book_id}_", suffix=".webp", delete=False)
-        tmp_path = tmp.name
-        tmp.close()
-
-        try:
-            image.save(tmp_path, "WEBP", quality=90)
-
-            remote_path = f"books_covers/{book_id}.webp"
-            uploaded = get_storage().upload_file(tmp_path, remote_path)
-            if uploaded:
-                cover_url = f"/library/api/book-cover?book_id={book_id}&user_id={creator_user_id}&filename=cover.webp"
-                logger.info("Обложка книги загружена в B2: %s", remote_path)
-                return cover_url
-
-            logger.error("Failed to upload book cover to B2: %s", remote_path)
-            return None
-        finally:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
-
+        return save_book_cover(book_id, creator_user_id, cover_file)
     except Exception as exc:
         logger.error("Ошибка сохранения обложки книги %s: %s", book_id, exc)
         return None
